@@ -12,7 +12,8 @@
     </div>
 
     <div class="card table-card">
-      <table>
+      <div class="table-wrapper">
+        <table>
         <thead>
           <tr>
             <th>Name</th>
@@ -74,6 +75,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <BranchForm
@@ -179,9 +181,15 @@ const cloneServices = async (branchId) => {
   margin-top: 16px;
 }
 
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 700px;
 }
 
 th {
@@ -240,6 +248,7 @@ td {
 .actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn-gold {
@@ -256,5 +265,46 @@ td {
 .btn-gold:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(201,162,77,.4);
+}
+
+/* RESPONSIVE STYLES */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header .btn-primary {
+    width: 100%;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions button {
+    margin-right: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 12px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  th, td {
+    padding: 8px;
+    font-size: 12px;
+  }
 }
 </style>

@@ -57,25 +57,26 @@
 
     <!-- TABLE -->
     <div class="card table-card">
-      <table>
-        <thead>
-  <tr>
-    <th width="40">
-      <input
-        type="checkbox"
-        v-model="selectAll"
-        @change="toggleAll"
-      />
-    </th>
-    <th>Full Name</th>
-    <th>Username</th>
-    <th>Phone</th>
-    <th>Role</th>
-    <th>Branch</th>
-    <th>Status</th>
-    <th width="260">Actions</th>
-  </tr>
-</thead>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+    <tr>
+      <th width="40">
+        <input
+          type="checkbox"
+          v-model="selectAll"
+          @change="toggleAll"
+        />
+      </th>
+      <th>Full Name</th>
+      <th>Username</th>
+      <th>Phone</th>
+      <th>Role</th>
+      <th>Branch</th>
+      <th>Status</th>
+      <th width="260">Actions</th>
+    </tr>
+  </thead>
 
 
         <transition-group name="fade" tag="tbody">
@@ -154,6 +155,7 @@
 
         </transition-group>
       </table>
+      </div>
 
       <!-- PAGINATION -->
       <div class="pagination">
@@ -306,7 +308,7 @@ const bulkDelete = async () => {
 }
 
 /* FILTER */
-.filter { display:flex; gap:12px }
+.filter { display:flex; gap:12px; flex-wrap: wrap; }
 .filter input,
 .filter select {
   background:#000;
@@ -314,6 +316,8 @@ const bulkDelete = async () => {
   color:#fff;
   padding:8px;
   border-radius:10px;
+  flex: 1;
+  min-width: 150px;
 }
 
 /* BULK */
@@ -325,10 +329,17 @@ const bulkDelete = async () => {
   border-radius:12px;
   display:flex;
   justify-content:space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 /* TABLE */
-table { width:100%; border-collapse:collapse }
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table { width:100%; border-collapse:collapse; min-width: 700px; }
 th {
   color:#888;
   font-size:12px;
@@ -389,6 +400,7 @@ button:active { transform:scale(.96) }
   justify-content:center;
   gap:12px;
   margin-top:16px;
+  flex-wrap: wrap;
 }
 
 /* SKELETON */
@@ -507,6 +519,95 @@ tbody tr:hover {
 input[type="checkbox"] {
   cursor: pointer;
   accent-color: var(--gold);
+}
+
+/* RESPONSIVE STYLES */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header .btn-primary {
+    width: 100%;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card h3 {
+    font-size: 24px;
+  }
+
+  .filter {
+    flex-direction: column;
+  }
+
+  .filter input,
+  .filter select {
+    width: 100%;
+  }
+
+  .bulk-bar {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .bulk-bar > div {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .actions button {
+    margin-right: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 12px;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-card h3 {
+    font-size: 22px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  th, td {
+    padding: 8px;
+    font-size: 12px;
+  }
 }
 
 </style>
