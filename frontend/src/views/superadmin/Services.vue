@@ -359,7 +359,7 @@ const format = (v) =>
 
 /* TABLE DARI USERS */
 /* TABLE */
-table { width:100%; border-collapse:collapse; min-width: 800px; }
+table { width:100%; border-collapse:collapse; min-width: 700px; }
 th {
   color:#888;
   font-size:12px;

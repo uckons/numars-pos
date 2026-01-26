@@ -235,7 +235,7 @@ const format = v => Number(v || 0).toLocaleString("id-ID")
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: 700px;
 }
 
 th {
