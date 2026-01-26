@@ -56,7 +56,8 @@
     <div class="card table-card">
       <h3 class="table-title">Latest Orders</h3>
 
-      <table>
+      <div class="table-wrapper">
+        <table>
         <thead>
           <tr>
             <th>ID</th>
@@ -85,6 +86,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
 <!-- PAGINATION -->
       <div class="pagination">
         <button @click="page--" :disabled="page === 1">Prev</button>
@@ -225,9 +227,15 @@ const format = v => Number(v || 0).toLocaleString("id-ID")
 }
 
 /* TABLE */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
 }
 
 th {
@@ -269,6 +277,7 @@ td {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .filters input,
@@ -278,6 +287,8 @@ td {
   color: white;
   padding: 8px;
   border-radius: var(--radius);
+  flex: 1;
+  min-width: 150px;
 }
 
 .pagination {
@@ -285,6 +296,8 @@ td {
   justify-content: space-between;
   align-items: center;
   margin-top: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .pagination button {
@@ -315,6 +328,66 @@ tbody tr:hover {
   );
   transform: translateX(4px);
   box-shadow: inset 4px 0 0 var(--gold);
+}
+
+/* RESPONSIVE STYLES */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card h3 {
+    font-size: 22px;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .filters input,
+  .filters select {
+    width: 100%;
+  }
+
+  .pagination {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 12px;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-card h3 {
+    font-size: 20px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  th, td {
+    padding: 8px;
+    font-size: 12px;
+  }
 }
 
 </style>

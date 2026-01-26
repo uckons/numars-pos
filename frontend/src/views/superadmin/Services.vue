@@ -87,7 +87,8 @@
 
     <!-- TABLE -->
     <div class="card table-card">
-      <table>
+      <div class="table-wrapper">
+        <table>
         <thead>
           <tr>
             <th>Name</th>
@@ -156,6 +157,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <!-- PAGINATION -->
       <div class="pagination-bar">
@@ -340,29 +342,24 @@ const format = (v) =>
 .filters {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filters input,
+.filters select {
+  flex: 1;
+  min-width: 150px;
 }
 
 /* TABLE */
-/* table {
-  width: 100%;
-  border-collapse: collapse;
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-th {
-  color: var(--text-muted);
-  text-align: left;
-  padding: 12px;
-  font-size: 13px;
-}
-td {
-  padding: 12px;
-  border-top: 1px solid var(--border-soft);
-}
-.row-hover:hover {
-  background: rgba(201,162,77,.05) !important;
-} */
+
 /* TABLE DARI USERS */
 /* TABLE */
-table { width:100%; border-collapse:collapse }
+table { width:100%; border-collapse:collapse; min-width: 800px; }
 th {
   color:#888;
   font-size:12px;
@@ -450,6 +447,7 @@ button:hover {
   justify-content:center;
   gap:12px;
   margin-top:16px;
+  flex-wrap: wrap;
 }
 
 
@@ -532,6 +530,83 @@ tbody tr:hover {
   );
   transform: translateX(4px);
   box-shadow: inset 4px 0 0 var(--gold);
+}
+
+/* RESPONSIVE STYLES */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header .btn-primary {
+    width: 100%;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card h3 {
+    font-size: 24px;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .filters input,
+  .filters select {
+    width: 100%;
+  }
+
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .actions button {
+    margin-right: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 12px;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-card h3 {
+    font-size: 22px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  th, td {
+    padding: 8px;
+    font-size: 12px;
+  }
 }
 
 </style>
