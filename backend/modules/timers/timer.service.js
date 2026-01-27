@@ -1,3 +1,59 @@
+// GET THERAPISTS FOR DROPDOWN
+exports.getTherapists = async (db, branch_id, service_type) => {
+  let query = `
+    SELECT 
+      id,
+      name,
+      grade_id
+    FROM therapists
+    WHERE branch_id = $1 AND active = true
+    ORDER BY name ASC
+  `
+  
+  const { rows } = await db.query(query, [branch_id])
+  return rows
+}
+
+// GET ROOMS WITH OCCUPANCY STATUS
+exports.getRooms = async (db, branch_id, service_type) => {
+  let query = `
+    SELECT 
+      r.id,
+      r.name,
+      r.type,
+      r.is_active,
+      CASE 
+        WHEN EXISTS (
+          SELECT 1 FROM timers t 
+          WHERE t.room_id = r.id 
+          AND t.end_time IS NULL 
+          AND t.branch_id = $1
+        ) THEN true
+        ELSE false
+      END as is_occupied
+    FROM rooms r
+    WHERE r.branch_id = $1 AND r.is_active = true
+  `
+  
+  const params = [branch_id]
+  
+  // Filter by service type if provided
+  if (service_type) {
+    query += ` AND r.type = $2`
+    params.push(service_type)
+  }
+  
+  query += ` ORDER BY r.name ASC`
+  
+  const { rows } = await db.query(query, params)
+  
+  // Add status field for better UX
+  return rows.map(room => ({
+    ...room,
+    status: room.is_occupied ? 'occupied' : 'free'
+  }))
+}
+
 exports.startTimer = async (db, order_id, therapist_id, room_id) => {
   const dur = await db.query(`
     SELECT COALESCE(SUM(duration_minutes), 60) AS duration

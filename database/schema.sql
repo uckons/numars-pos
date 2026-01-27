@@ -35,9 +35,12 @@ CREATE TABLE services (
   id SERIAL PRIMARY KEY,
   branch_id INT REFERENCES branches(id),
   name VARCHAR(100),
-  category VARCHAR(50), -- spa / karaoke / lounge
+  type VARCHAR(50), -- SPA / LC / FNB / KARAOKE
+  category VARCHAR(50), -- spa / karaoke / lounge (legacy, use type instead)
+  base_price NUMERIC(12,2),
   price NUMERIC(12,2),
   duration_minutes INT, -- 0 = no limit
+  is_active BOOLEAN DEFAULT true,
   active BOOLEAN DEFAULT true
 );
 
@@ -53,6 +56,19 @@ CREATE TABLE therapists (
   grade_id INT REFERENCES therapist_grades(id),
   name VARCHAR(100),
   active BOOLEAN DEFAULT true
+);
+
+-- =========================
+-- ROOMS
+-- =========================
+
+CREATE TABLE rooms (
+  id SERIAL PRIMARY KEY,
+  branch_id INT REFERENCES branches(id),
+  name VARCHAR(100),
+  type VARCHAR(50), -- SPA / LC / FNB / KARAOKE
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- =========================
@@ -104,9 +120,15 @@ CREATE TABLE timers (
   id SERIAL PRIMARY KEY,
   order_id INT REFERENCES orders(id),
   therapist_id INT REFERENCES therapists(id),
-  start_time TIMESTAMP,
+  room_id INT REFERENCES rooms(id),
+  service_id INT REFERENCES services(id),
+  branch_id INT REFERENCES branches(id),
+  start_time TIMESTAMP DEFAULT NOW(),
   end_time TIMESTAMP,
-  paused BOOLEAN DEFAULT false
+  planned_end_time TIMESTAMP,
+  status VARCHAR(20) DEFAULT 'RUNNING', -- RUNNING, PAUSED, FINISHED
+  paused BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- =========================

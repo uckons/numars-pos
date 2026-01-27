@@ -9,6 +9,24 @@ exports.list = async (req, res) => {
     res.status(500).json({ message: "Failed load services" })
   }
 }
+
+// GET SERVICES BY TYPE
+exports.getByType = async (req, res) => {
+  try {
+    const { type, branch_id } = req.query
+    
+    if (!type || !branch_id) {
+      return res.status(400).json({ message: "type and branch_id are required" })
+    }
+    
+    const data = await service.getByType(type, branch_id)
+    res.json(data)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Failed to load services" })
+  }
+}
+
 //tambahan
 exports.create = async (req, res) => {
   try {

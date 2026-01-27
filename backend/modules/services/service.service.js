@@ -32,6 +32,27 @@ exports.list = async ({ branch_id, type }) => {
   return rows
 }
 
+// GET SERVICES BY TYPE
+exports.getByType = async (type, branch_id) => {
+  const { rows } = await db.query(`
+    SELECT
+      s.id,
+      s.name,
+      s.type,
+      s.base_price,
+      s.duration_minutes,
+      s.is_active
+    FROM services s
+    WHERE s.type = $1 
+      AND s.branch_id = $2
+      AND s.is_active = true
+      AND s.deleted_at IS NULL
+    ORDER BY s.name ASC
+  `, [type, branch_id])
+
+  return rows
+}
+
 exports.create = async (data, actor) => {
   const {
     branch_id,

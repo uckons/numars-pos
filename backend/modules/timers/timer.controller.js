@@ -1,5 +1,41 @@
 const service = require("./timer.service")
 
+// GET THERAPISTS FOR TIMER DROPDOWN
+exports.getTherapists = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const { branch_id, service_type } = req.query
+
+    if (!branch_id) {
+      return res.status(400).json({ message: "branch_id is required" })
+    }
+
+    const therapists = await service.getTherapists(db, branch_id, service_type)
+    res.json(therapists)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// GET ROOMS FOR TIMER DROPDOWN
+exports.getRooms = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const { branch_id, service_type } = req.query
+
+    if (!branch_id) {
+      return res.status(400).json({ message: "branch_id is required" })
+    }
+
+    const rooms = await service.getRooms(db, branch_id, service_type)
+    res.json(rooms)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
 exports.start = async (req, res) => {
   try {
     const db = req.app.get("db")
@@ -65,13 +101,52 @@ exports.startTimer = async (req, res) => {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
     }
 
+    // Validate therapist exists and is active
+    const therapistCheck = await db.query(
+      `SELECT id FROM therapists WHERE id = $1 AND active = true AND branch_id = $2`,
+      [therapist_id, user.branch_id]
+    )
+    if (!therapistCheck.rows.length) {
+      return res.status(400).json({ message: "Therapist tidak valid atau tidak aktif" })
+    }
+
+    // Validate room exists and is not occupied (if room_id provided)
+    if (room_id) {
+      const roomCheck = await db.query(
+        `SELECT id FROM rooms WHERE id = $1 AND is_active = true AND branch_id = $2`,
+        [room_id, user.branch_id]
+      )
+      if (!roomCheck.rows.length) {
+        return res.status(400).json({ message: "Room tidak valid atau tidak aktif" })
+      }
+
+      // Check if room is occupied
+      const occupancyCheck = await db.query(
+        `SELECT id FROM timers 
+         WHERE room_id = $1 AND end_time IS NULL AND branch_id = $2`,
+        [room_id, user.branch_id]
+      )
+      if (occupancyCheck.rows.length > 0) {
+        return res.status(400).json({ message: "Room sedang digunakan" })
+      }
+    }
+
+    // Validate service exists
+    const serviceCheck = await db.query(
+      `SELECT id FROM services WHERE id = $1 AND branch_id = $2`,
+      [service_id, user.branch_id]
+    )
+    if (!serviceCheck.rows.length) {
+      return res.status(400).json({ message: "Service tidak valid" })
+    }
+
     const start = new Date()
     const plannedEnd = new Date(start.getTime() + duration_minutes * 60000)
 
     const { rows } = await db.query(
       `INSERT INTO timers
-       (order_id, therapist_id, service_id, room_id, start_time, planned_end_time, paused, branch_id)
-       VALUES ($1,$2,$3,$4,$5,$6,false,$7)
+       (order_id, therapist_id, service_id, room_id, start_time, planned_end_time, paused, branch_id, status)
+       VALUES ($1,$2,$3,$4,$5,$6,false,$7,'RUNNING')
        RETURNING *`,
       [
         order_id,
