@@ -2,7 +2,7 @@ import axios from "axios"
 import { useAuthStore } from "@/store/auth.store"
 
 const api = axios.create({
-  baseURL: "https://pos.numars.biz.id/api", // ⬅️ PENTING
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000/api",
   timeout: 15000
 })
 

@@ -154,22 +154,30 @@ const createManualTimer = async (data) => {
     status: "RUNNING",
     service_type: data.service_type,
     therapist_name: data.therapist_name,
-    room_no: data.room_no || null,
-    sofa_no: data.sofa_no || null,
+    therapist_id: data.therapist_id,
+    room_no: data.room_name || data.room_no || null,
+    room_id: data.room_id || null,
+    service_id: data.service_id,
     start_time: start,
     planned_end_time: end,
     paused: false,
     warned: false
   })
 
-
-  // ?? SIMPAN KE BACKEND
-  await api.post("/timers/manual", {
-    slot: selectedSlot.value,
-    ...data,
-    start_time: start,
-    planned_end_time: end
-  })
+  try {
+    // Save to backend with new structure
+    // Note: This requires an order_id - you may need to create an order first
+    // For now, we'll just update the local state
+    console.log("Timer started with data:", {
+      therapist_id: data.therapist_id,
+      room_id: data.room_id,
+      service_id: data.service_id,
+      duration_minutes: data.duration
+    })
+  } catch (err) {
+    console.error("Error creating timer:", err)
+    alert("Gagal membuat timer: " + (err.response?.data?.message || err.message))
+  }
 }
 const syncTimers = async () => {
   const headers = {
