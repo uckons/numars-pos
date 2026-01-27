@@ -150,6 +150,7 @@ const createManualTimer = async (data) => {
   const start = new Date()
   const end = new Date(start.getTime() + data.duration * 60000)
 
+  // Update local state
   Object.assign(slot, {
     status: "RUNNING",
     service_type: data.service_type,
@@ -165,9 +166,12 @@ const createManualTimer = async (data) => {
   })
 
   try {
-    // Save to backend with new structure
-    // Note: This requires an order_id - you may need to create an order first
-    // For now, we'll just update the local state
+    // TODO: Save to backend with proper order integration
+    // This requires creating an order first, then starting the timer
+    // For now, timer is tracked in local state only
+    // Backend integration should be:
+    // 1. Create order (if not exists)
+    // 2. Call POST /api/timers/start with { order_id, therapist_id, room_id, service_id, duration_minutes }
     console.log("Timer started with data:", {
       therapist_id: data.therapist_id,
       room_id: data.room_id,
@@ -176,6 +180,20 @@ const createManualTimer = async (data) => {
     })
   } catch (err) {
     console.error("Error creating timer:", err)
+    // Revert local state on error
+    Object.assign(slot, {
+      status: null,
+      service_type: null,
+      therapist_name: null,
+      therapist_id: null,
+      room_no: null,
+      room_id: null,
+      service_id: null,
+      start_time: null,
+      planned_end_time: null,
+      paused: false,
+      warned: false
+    })
     alert("Gagal membuat timer: " + (err.response?.data?.message || err.message))
   }
 }
