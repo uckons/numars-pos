@@ -2,7 +2,7 @@ const db = require("../../config/db")
 
 exports.list = async ({ branch_id, type }) => {
   const params = []
-  let where = "s.deleted_at IS NULL"
+  let where = "1=1"
 
   if (branch_id) {
     params.push(branch_id)
@@ -46,7 +46,6 @@ exports.getByType = async (type, branch_id) => {
     WHERE s.type = $1 
       AND s.branch_id = $2
       AND s.is_active = true
-      AND s.deleted_at IS NULL
     ORDER BY s.name ASC
   `, [type, branch_id])
 
