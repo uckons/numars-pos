@@ -20,14 +20,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue"
 import api from "@/services/api"
+import { formatSecondsToTime } from "@/utils/timeFormat"
 
 const timers = ref([]) // ✅ WAJIB DEFAULT ARRAY
 let tickInterval = null
 let reloadInterval = null
+let tickCount = 0
 
 const loadTimers = async () => {
   try {
-    console.log('[PosTimerGrid] Loading timers from backend...')
+    console.log('[PosTimerGrid] Reloading timers from backend...')
     const res = await api.get("/timers/active")
     const rawTimers = res.data || []
     
@@ -45,15 +47,19 @@ const loadTimers = async () => {
 }
 
 const tick = () => {
-  console.log('[PosTimerGrid] Tick - decrementing timers by 1 second')
+  tickCount++
+  
+  // Log every 30 seconds instead of every second
+  if (tickCount % 30 === 0) {
+    console.log(`[PosTimerGrid] Tick count: ${tickCount}`)
+  }
   
   // Decrement each timer by 1 second
-  timers.value = timers.value
-    .map(t => ({
-      ...t,
-      remaining_seconds: Math.max(0, t.remaining_seconds - 1)
-    }))
-    .filter(t => t.remaining_seconds > 0) // Remove expired timers
+  timers.value = timers.value.map(t => ({
+    ...t,
+    remaining_seconds: Math.max(0, t.remaining_seconds - 1)
+  }))
+  // Note: We don't filter out expired timers here - let backend handle that on next reload
 }
 
 onMounted(async () => {
@@ -80,21 +86,7 @@ const statusClass = (seconds) => {
   return "success"
 }
 
-const formatTime = (seconds) => {
-  if (seconds == null || seconds < 0) return "--"
-  
-  const totalMinutes = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  
-  // Format as HH:MM:SS if >= 1 hour, otherwise MM:SS
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  } else {
-    return `${m}:${String(s).padStart(2, '0')}`
-  }
-}
+const formatTime = formatSecondsToTime
 </script>
 
 <style scoped>
