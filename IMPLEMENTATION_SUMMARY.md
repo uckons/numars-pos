@@ -250,3 +250,41 @@ The CodeQL security scanner identified that the new endpoints lack rate limiting
 
 ### Other
 - `.gitignore` - Added to exclude build artifacts and dependencies
+
+## Frontend Build and Deployment
+
+To deploy frontend changes to the production server:
+
+### Build Commands
+```bash
+# Navigate to frontend directory
+cd /home/numarsadmin/fullnumars/frontend
+
+# Install dependencies (run as numarsadmin)
+sudo -u numarsadmin npm install --no-audit --no-fund
+
+# Build the frontend (run as numarsadmin)
+sudo -u numarsadmin npm run build
+
+# Fix ownership of dist directory
+sudo chown -R numarsadmin:numarsadmin /home/numarsadmin/fullnumars/frontend/dist
+
+# Reload nginx to pick up new files
+sudo systemctl reload nginx
+```
+
+### Verify Deployment
+After deploying, verify the new build is loaded by visiting the POS page with a cache-busting parameter:
+```
+https://your-domain.com/kasir?v=TIMESTAMP
+```
+
+Check the browser console for the build tag:
+```
+__FRONTEND_BUILD__ v20260129-PR
+```
+
+### Troubleshooting
+- If changes don't appear, clear browser cache or use incognito mode
+- Check nginx error logs: `sudo tail -f /var/log/nginx/error.log`
+- Verify dist directory permissions: `ls -la /home/numarsadmin/fullnumars/frontend/dist`
