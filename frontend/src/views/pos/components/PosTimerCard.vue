@@ -12,6 +12,7 @@
 
 <script setup>
 import { computed } from "vue"
+import { formatTime } from "@/utils/timeFormatter"
 
 const props = defineProps({
   timer: Object
@@ -22,7 +23,7 @@ const remaining = computed(() => {
   if (props.timer.remaining_seconds != null) {
     return Math.max(0, props.timer.remaining_seconds)
   }
-  return Math.max(0, Math.ceil(props.timer.remaining_minutes || 0)) * 60
+  return Math.max(0, (props.timer.remaining_minutes || 0)) * 60
 })
 
 const color = computed(() => {
@@ -31,23 +32,6 @@ const color = computed(() => {
   if (minutes <= 30) return "yellow"
   return "green"
 })
-
-const formatTime = (seconds) => {
-  if (seconds == null) return "--"
-  
-  const totalMinutes = Math.floor(seconds / 60)
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  const s = seconds % 60
-  
-  if (h > 0) {
-    // Format as HH:MM:SS when >= 1 hour
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  } else {
-    // Format as MM:SS when < 1 hour
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-}
 </script>
 
 <style scoped>

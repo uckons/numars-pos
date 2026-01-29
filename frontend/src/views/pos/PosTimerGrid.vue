@@ -20,6 +20,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue"
 import api from "@/services/api"
+import { formatTime } from "@/utils/timeFormatter"
 
 const timers = ref([]) // ✅ WAJIB DEFAULT ARRAY
 let tickInterval = null
@@ -27,7 +28,6 @@ let reloadInterval = null
 
 const loadTimers = async () => {
   try {
-    console.log('[PosTimerGrid] Loading timers from backend...')
     const res = await api.get("/timers/active")
     const rawTimers = res.data || []
     
@@ -36,8 +36,6 @@ const loadTimers = async () => {
       ...t,
       remaining_seconds: (t.remaining_minutes || 0) * 60
     }))
-    
-    console.log('[PosTimerGrid] Loaded timers:', timers.value.length)
   } catch (e) {
     console.error("Timer load failed", e)
     timers.value = []
@@ -45,33 +43,24 @@ const loadTimers = async () => {
 }
 
 const tick = () => {
-  console.log('[PosTimerGrid] Tick - updating timer seconds')
-  
   // Decrement remaining_seconds for each timer
-  timers.value = timers.value
-    .map(t => ({
-      ...t,
-      remaining_seconds: Math.max(0, t.remaining_seconds - 1)
-    }))
-    .filter(t => t.remaining_seconds > 0) // Remove expired timers
+  timers.value = timers.value.map(t => ({
+    ...t,
+    remaining_seconds: Math.max(0, t.remaining_seconds - 1)
+  }))
 }
 
 onMounted(async () => {
-  console.log('[PosTimerGrid] Component mounted')
   await loadTimers()
   
   // Tick every second for smooth countdown
   tickInterval = setInterval(tick, 1000)
   
   // Reload from backend every 30 seconds to resync
-  reloadInterval = setInterval(() => {
-    console.log('[PosTimerGrid] Periodic reload (30s)')
-    loadTimers()
-  }, 30000)
+  reloadInterval = setInterval(loadTimers, 30000)
 })
 
 onUnmounted(() => {
-  console.log('[PosTimerGrid] Component unmounted, clearing intervals')
   if (tickInterval) clearInterval(tickInterval)
   if (reloadInterval) clearInterval(reloadInterval)
 })
@@ -81,23 +70,6 @@ const statusClass = (seconds) => {
   if (minutes <= 10) return "danger"
   if (minutes <= 30) return "warning"
   return "success"
-}
-
-const formatTime = (seconds) => {
-  if (seconds == null) return "--"
-  
-  const totalMinutes = Math.floor(seconds / 60)
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  const s = seconds % 60
-  
-  if (h > 0) {
-    // Format as HH:MM:SS when >= 1 hour
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  } else {
-    // Format as MM:SS when < 1 hour
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
 }
 </script>
 
