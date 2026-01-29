@@ -250,3 +250,44 @@ The CodeQL security scanner identified that the new endpoints lack rate limiting
 
 ### Other
 - `.gitignore` - Added to exclude build artifacts and dependencies
+
+## Frontend Deployment Instructions
+
+To build and deploy frontend changes to the production server:
+
+### 1. Build the Frontend
+```bash
+# Navigate to frontend directory
+cd /home/numarsadmin/fullnumars/frontend
+
+# Install dependencies (if needed) - run as root or with sudo
+sudo -u numarsadmin npm install --no-audit --no-fund
+
+# Build the production bundle - run as root or with sudo
+sudo -u numarsadmin npm run build
+```
+
+### 2. Fix Ownership
+```bash
+# Ensure dist directory has correct ownership - run as root or with sudo
+sudo chown -R numarsadmin:numarsadmin /home/numarsadmin/fullnumars/frontend/dist
+```
+
+### 3. Reload Nginx
+```bash
+# Reload nginx to pick up new files - run as root or with sudo
+sudo systemctl reload nginx
+```
+
+### 4. Verify Deployment
+```bash
+# Clear browser cache and visit with cache-busting parameter
+# Visit: http://your-server/kasir?v=<timestamp>
+```
+
+**Important Notes:**
+- Commands above use `sudo -u numarsadmin` to run as the numarsadmin user (execute these as root or a user with sudo privileges)
+- If you're already logged in as `numarsadmin`, omit the `sudo -u numarsadmin` prefix from npm commands
+- Ensure the `dist` directory ownership is correct before reloading nginx
+- Use cache-busting parameter (`?v=`) to force browser to load new bundle
+- Check browser console for build tag: `__FRONTEND_BUILD__ v20260129-PR`

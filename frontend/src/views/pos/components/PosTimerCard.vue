@@ -5,25 +5,35 @@
     <p class="service">{{ timer.service }}</p>
 
     <div class="time">
-      {{ remaining }} min
+      {{ formattedTime }}
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue"
+import { formatSecondsToTime } from "@/utils/timeFormat"
 
 const props = defineProps({
   timer: Object
 })
 
-const remaining = computed(() =>
-  Math.max(0, Math.ceil(props.timer.remaining_minutes))
+const remainingSeconds = computed(() => 
+  props.timer.remaining_seconds || 0
 )
 
+const remainingMinutes = computed(() => 
+  Math.ceil(remainingSeconds.value / 60)
+)
+
+const formattedTime = computed(() => {
+  return formatSecondsToTime(remainingSeconds.value)
+})
+
 const color = computed(() => {
-  if (remaining.value <= 10) return "red"
-  if (remaining.value <= 30) return "yellow"
+  const minutes = remainingMinutes.value
+  if (minutes <= 10) return "red"
+  if (minutes <= 30) return "yellow"
   return "green"
 })
 </script>
@@ -47,22 +57,28 @@ const color = computed(() => {
 
 h4 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
 }
 
 .therapist {
-  color: #aaa;
-  font-size: 13px;
+  color: #ddd;
+  font-size: 14px;
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .service {
   font-size: 12px;
   color: #c9a24d;
+  margin-top: 2px;
 }
 
 .time {
   margin-top: 10px;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
+  color: #fff;
 }
 </style>
