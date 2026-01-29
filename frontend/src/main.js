@@ -9,3 +9,5 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.mount("#app")
+
+console.log('__FRONTEND_BUILD__ v20260129-PR')

@@ -4,11 +4,11 @@
       v-for="t in timers"
       :key="t.id"
       class="timer-card"
-      :class="statusClass(t.remaining_minutes)"
+      :class="statusClass(t.remaining_seconds)"
     >
       <h4>{{ t.room_name || "Room ?" }}</h4>
       <p class="therapist">{{ t.therapist_name || "-" }}</p>
-      <p class="time">{{ formatTime(t.remaining_minutes) }}</p>
+      <p class="time">{{ formatTime(t.remaining_seconds) }}</p>
     </div>
 
     <div v-if="!timers.length" class="empty">
@@ -22,12 +22,22 @@ import { ref, onMounted, onUnmounted } from "vue"
 import api from "@/services/api"
 
 const timers = ref([]) // ✅ WAJIB DEFAULT ARRAY
-let interval = null
+let tickInterval = null
+let reloadInterval = null
 
 const loadTimers = async () => {
   try {
+    console.log('[PosTimerGrid] Loading timers from backend...')
     const res = await api.get("/timers/active")
-    timers.value = res.data || []
+    const rawTimers = res.data || []
+    
+    // Convert remaining_minutes to remaining_seconds
+    timers.value = rawTimers.map(t => ({
+      ...t,
+      remaining_seconds: (t.remaining_minutes || 0) * 60
+    }))
+    
+    console.log(`[PosTimerGrid] Loaded ${timers.value.length} timers`)
   } catch (e) {
     console.error("Timer load failed", e)
     timers.value = []
@@ -35,32 +45,55 @@ const loadTimers = async () => {
 }
 
 const tick = () => {
-  timers.value = timers.value.map(t => ({
-    ...t,
-    remaining_minutes: Math.max(0, t.remaining_minutes - 1)
-  }))
+  console.log('[PosTimerGrid] Tick - decrementing timers by 1 second')
+  
+  // Decrement each timer by 1 second
+  timers.value = timers.value
+    .map(t => ({
+      ...t,
+      remaining_seconds: Math.max(0, t.remaining_seconds - 1)
+    }))
+    .filter(t => t.remaining_seconds > 0) // Remove expired timers
 }
 
 onMounted(async () => {
+  console.log('[PosTimerGrid] Component mounted, starting timers...')
   await loadTimers()
-  interval = setInterval(tick, 60000) // ⏱️ 1 menit
+  
+  // Tick every 1 second for smooth UI updates
+  tickInterval = setInterval(tick, 1000)
+  
+  // Reload from backend every 30 seconds to resync
+  reloadInterval = setInterval(loadTimers, 30000)
 })
 
 onUnmounted(() => {
-  if (interval) clearInterval(interval)
+  console.log('[PosTimerGrid] Component unmounted, clearing intervals')
+  if (tickInterval) clearInterval(tickInterval)
+  if (reloadInterval) clearInterval(reloadInterval)
 })
 
-const statusClass = (min) => {
-  if (min <= 10) return "danger"
-  if (min <= 30) return "warning"
+const statusClass = (seconds) => {
+  const minutes = Math.ceil(seconds / 60)
+  if (minutes <= 10) return "danger"
+  if (minutes <= 30) return "warning"
   return "success"
 }
 
-const formatTime = (min) => {
-  if (min == null) return "--"
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return h ? `${h}j ${m}m` : `${m}m`
+const formatTime = (seconds) => {
+  if (seconds == null || seconds < 0) return "--"
+  
+  const totalMinutes = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  
+  // Format as HH:MM:SS if >= 1 hour, otherwise MM:SS
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  } else {
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
 }
 </script>
 
@@ -89,18 +122,23 @@ const formatTime = (min) => {
 
 h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
 }
 
 .therapist {
-  font-size: 12px;
-  color: #aaa;
+  font-size: 14px;
+  color: #ddd;
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .time {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: bold;
   margin-top: 6px;
+  color: #fff;
 }
 
 .empty {
