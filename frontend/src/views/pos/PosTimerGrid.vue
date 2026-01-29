@@ -22,14 +22,21 @@ import { ref, onMounted, onUnmounted } from "vue"
 import api from "@/services/api"
 import { formatTime } from "@/utils/timeFormatter"
 
+const TICK_INTERVAL_MS = 1000  // Tick every second
+const RELOAD_INTERVAL_MS = 30000  // Reload every 30 seconds
+
 const timers = ref([]) // ✅ WAJIB DEFAULT ARRAY
 let tickInterval = null
 let reloadInterval = null
+let isMounted = false
 
 const loadTimers = async () => {
   try {
     const res = await api.get("/timers/active")
     const rawTimers = res.data || []
+    
+    // Only update state if component is still mounted
+    if (!isMounted) return
     
     // Convert remaining_minutes to remaining_seconds
     timers.value = rawTimers.map(t => ({
@@ -38,7 +45,9 @@ const loadTimers = async () => {
     }))
   } catch (e) {
     console.error("Timer load failed", e)
-    timers.value = []
+    if (isMounted) {
+      timers.value = []
+    }
   }
 }
 
@@ -51,16 +60,18 @@ const tick = () => {
 }
 
 onMounted(async () => {
+  isMounted = true
   await loadTimers()
   
   // Tick every second for smooth countdown
-  tickInterval = setInterval(tick, 1000)
+  tickInterval = setInterval(tick, TICK_INTERVAL_MS)
   
   // Reload from backend every 30 seconds to resync
-  reloadInterval = setInterval(loadTimers, 30000)
+  reloadInterval = setInterval(loadTimers, RELOAD_INTERVAL_MS)
 })
 
 onUnmounted(() => {
+  isMounted = false
   if (tickInterval) clearInterval(tickInterval)
   if (reloadInterval) clearInterval(reloadInterval)
 })
