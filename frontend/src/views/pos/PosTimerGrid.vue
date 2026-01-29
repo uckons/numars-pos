@@ -4,11 +4,11 @@
       v-for="t in timers"
       :key="t.id"
       class="timer-card"
-      :class="statusClass(t.remaining_minutes)"
+      :class="statusClass(t.remaining_seconds)"
     >
       <h4>{{ t.room_name || "Room ?" }}</h4>
       <p class="therapist">{{ t.therapist_name || "-" }}</p>
-      <p class="time">{{ formatTime(t.remaining_minutes) }}</p>
+      <p class="time">{{ formatTime(t.remaining_seconds) }}</p>
     </div>
 
     <div v-if="!timers.length" class="empty">
@@ -20,47 +20,67 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue"
 import api from "@/services/api"
+import { formatTime } from "@/utils/timeFormatter"
+
+const TICK_INTERVAL_MS = 1000  // Tick every second
+const RELOAD_INTERVAL_MS = 30000  // Reload every 30 seconds
 
 const timers = ref([]) // ✅ WAJIB DEFAULT ARRAY
-let interval = null
+let tickInterval = null
+let reloadInterval = null
+let isMounted = false
 
 const loadTimers = async () => {
   try {
     const res = await api.get("/timers/active")
-    timers.value = res.data || []
+    const rawTimers = res.data || []
+    
+    // Only update state if component is still mounted
+    if (!isMounted) return
+    
+    // Convert remaining_minutes to remaining_seconds
+    timers.value = rawTimers.map(t => ({
+      ...t,
+      remaining_seconds: (t.remaining_minutes || 0) * 60
+    }))
   } catch (e) {
     console.error("Timer load failed", e)
-    timers.value = []
+    if (isMounted) {
+      timers.value = []
+    }
   }
 }
 
 const tick = () => {
+  // Decrement remaining_seconds for each timer
   timers.value = timers.value.map(t => ({
     ...t,
-    remaining_minutes: Math.max(0, t.remaining_minutes - 1)
+    remaining_seconds: Math.max(0, t.remaining_seconds - 1)
   }))
 }
 
 onMounted(async () => {
+  isMounted = true
   await loadTimers()
-  interval = setInterval(tick, 60000) // ⏱️ 1 menit
+  
+  // Tick every second for smooth countdown
+  tickInterval = setInterval(tick, TICK_INTERVAL_MS)
+  
+  // Reload from backend every 30 seconds to resync
+  reloadInterval = setInterval(loadTimers, RELOAD_INTERVAL_MS)
 })
 
 onUnmounted(() => {
-  if (interval) clearInterval(interval)
+  isMounted = false
+  if (tickInterval) clearInterval(tickInterval)
+  if (reloadInterval) clearInterval(reloadInterval)
 })
 
-const statusClass = (min) => {
-  if (min <= 10) return "danger"
-  if (min <= 30) return "warning"
+const statusClass = (seconds) => {
+  const minutes = Math.floor(seconds / 60)
+  if (minutes <= 10) return "danger"
+  if (minutes <= 30) return "warning"
   return "success"
-}
-
-const formatTime = (min) => {
-  if (min == null) return "--"
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return h ? `${h}j ${m}m` : `${m}m`
 }
 </script>
 
@@ -89,12 +109,16 @@ const formatTime = (min) => {
 
 h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
 }
 
 .therapist {
-  font-size: 12px;
-  color: #aaa;
+  font-size: 14px;
+  color: #ddd;
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .time {
