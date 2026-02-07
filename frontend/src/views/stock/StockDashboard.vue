@@ -186,6 +186,20 @@
               <span>Paket Minuman</span>
               <input v-model="form.is_package" type="checkbox" />
             </label>
+            <label>
+              Qty Paket
+              <input
+                v-model.number="form.package_qty"
+                type="number"
+                min="0"
+                class="input"
+                :required="form.is_package"
+              />
+            </label>
+            <label>
+              Grup Paket
+              <input v-model="form.package_group" class="input" placeholder="contoh: beer-330ml" />
+            </label>
             <label class="inline-toggle">
               <span>Happy Hour Aktif</span>
               <input v-model="form.happy_hour_enabled" type="checkbox" />
@@ -260,6 +274,8 @@ const form = ref({
   sell_price: 0,
   is_beverage: false,
   is_package: false,
+  package_qty: 0,
+  package_group: '',
   happy_hour_enabled: false,
   happy_hour_price: 0,
   stock: 0,
@@ -374,6 +390,8 @@ const openAdd = () => {
     sell_price: 0,
     is_beverage: false,
     is_package: false,
+    package_qty: 0,
+    package_group: '',
     happy_hour_enabled: false,
     happy_hour_price: 0,
     stock: 0,
@@ -390,6 +408,8 @@ const openEdit = (item) => {
     sell_price: Number(item.sell_price || item.price || 0),
     is_beverage: Boolean(item.is_beverage),
     is_package: Boolean(item.is_package),
+    package_qty: Number(item.package_qty || 0),
+    package_group: item.package_group || '',
     happy_hour_enabled: Boolean(item.happy_hour_enabled),
     happy_hour_price: Number(item.happy_hour_price || 0),
     stock: Number(item.stock || 0),
@@ -410,6 +430,8 @@ const submitForm = async () => {
     sell_price: Number(form.value.sell_price || 0),
     is_beverage: Boolean(form.value.is_beverage),
     is_package: Boolean(form.value.is_package),
+    package_qty: Number(form.value.package_qty || 0),
+    package_group: form.value.package_group || null,
     happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
     happy_hour_price: form.value.happy_hour_enabled
       ? Number(form.value.happy_hour_price || 0)

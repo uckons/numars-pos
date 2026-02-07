@@ -37,15 +37,17 @@ const loadOrder = async (orderId) => {
     
     // Load items dari order ke STORE
     if (order.items && order.items.length > 0) {
-// 🆕 Set current order ID
-pos.currentOrderId = orderId
-      
-      // Add items ke store
+// Add items ke store
+      pos.clear()
+      // 🆕 Set current order ID
+      pos.currentOrderId = orderId
       order.items.forEach(item => {
         const cartItem = {
           id: item.service_id,
           name: item.service_name,
           base_price: item.price,
+          price_label: item.price_label || null,
+          is_package: Boolean(item.is_package),
           qty: 1
         }
         

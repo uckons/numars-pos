@@ -12,8 +12,16 @@ export const usePosStore = defineStore("pos", () => {
 const selectedTherapist = ref(null)
 const selectedRoom = ref(null)
 
+  const itemKey = (service) => [
+    service.id,
+    Number(service.base_price || 0),
+    service.price_label || '',
+    service.is_package ? 'P' : 'N'
+  ].join(':')
+
   function addService(service) {
-    const found = items.value.find(i => i.id === service.id)
+    const key = itemKey(service)
+    const found = items.value.find(i => i.cart_key === key)
     if (found) {
       found.qty++
     } else {
@@ -21,6 +29,13 @@ const selectedRoom = ref(null)
         id: service.id,
         name: service.name,
         base_price: Number(service.base_price),
+        price_label: service.price_label || null,
+        is_package: Boolean(service.is_package),
+        package_qty: Number(service.package_qty || 0),
+        package_group: service.package_group || null,
+        package_service_id: service.package_service_id || null,
+        package_price: Number(service.package_price || 0) || null,
+        cart_key: key,
         qty: 1
       })
     }
@@ -36,18 +51,18 @@ const selectedRoom = ref(null)
     locked.value = false
   }
 
-  function inc(id) {
-    const item = items.value.find(i => i.id === id)
+  function inc(id, cartKey = null) {
+    const item = items.value.find(i => i.id === id && (!cartKey || i.cart_key === cartKey))
     if (item) item.qty++
   }
 
-  function dec(id) {
-    const item = items.value.find(i => i.id === id)
+  function dec(id, cartKey = null) {
+    const item = items.value.find(i => i.id === id && (!cartKey || i.cart_key === cartKey))
     if (item && item.qty > 1) item.qty--
   }
 
-  function remove(id) {
-    items.value = items.value.filter(i => i.id !== id)
+  function remove(id, cartKey = null) {
+    items.value = items.value.filter(i => !(i.id === id && (!cartKey || i.cart_key === cartKey)))
   }
 
   function clear() {
@@ -61,6 +76,37 @@ const selectedRoom = ref(null)
 function setRoom(room) {
   selectedRoom.value = room
 }
+
+
+  function findByCartKey(cartKey) {
+    return items.value.find(i => i.cart_key === cartKey)
+  }
+
+  function convertToPackage(cartKey, packageService) {
+    const item = findByCartKey(cartKey)
+    if (!item || !packageService) return
+
+    const packageQty = Number(packageService.package_qty || item.package_qty || 0)
+    if (!packageQty || item.qty < packageQty) return
+
+    const bundles = Math.floor(item.qty / packageQty)
+    const remainder = item.qty % packageQty
+
+    item.qty = remainder
+    if (item.qty === 0) {
+      items.value = items.value.filter(i => i.cart_key !== cartKey)
+    }
+
+    for (let idx = 0; idx < bundles; idx += 1) {
+      addService({
+        ...packageService,
+        is_package: true,
+        price_label: 'PAKET',
+        base_price: Number(packageService.base_price)
+      })
+    }
+  }
+
   // 🔥 AUTO SAVE
   watch(
     items,
@@ -81,6 +127,8 @@ function setRoom(room) {
   dec,
   remove,
   clear,
+  findByCartKey,
+  convertToPackage,
   setTherapist,         // 🆕
   setRoom              // 🆕
 }

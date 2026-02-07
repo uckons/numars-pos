@@ -13,6 +13,8 @@ exports.getAll = async (db, user) => {
       fi.happy_hour_enabled,
       fi.happy_hour_price,
       fi.is_package,
+      fi.package_qty,
+      fi.package_group,
       COALESCE(s.base_price, 0) AS sell_price,
       COALESCE(s.base_price, 0) AS price,
       s.is_active AS service_active
@@ -46,7 +48,9 @@ exports.create = async (db, user, data) => {
     is_beverage,
     happy_hour_enabled,
     happy_hour_price,
-    is_package
+    is_package,
+    package_qty,
+    package_group
   } = data
  //const { rows } = await db.query(
  //   `INSERT INTO fnb_items
@@ -55,6 +59,10 @@ exports.create = async (db, user, data) => {
  //    RETURNING *`,
  //   [user.branch_id, name, price, stock, alert_stock]
  // )
+  if (Boolean(is_package) && Number(package_qty || 0) <= 0) {
+    throw new Error("package_qty wajib diisi untuk item paket")
+  }
+
   await db.query("BEGIN")
 
   try {
@@ -70,8 +78,8 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       (branch_id, service_id, name, cost_price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
       [
         user.branch_id,
@@ -82,6 +90,8 @@ exports.create = async (db, user, data) => {
         Boolean(happy_hour_enabled),
         happy_hour_price ?? null,
         Boolean(is_package),
+        Number(package_qty || 0) || null,
+        package_group || null,
         stock,
         alert_stock
       ]
@@ -108,7 +118,9 @@ exports.update = async (db, id, data) => {
     is_beverage,
     happy_hour_enabled,
     happy_hour_price,
-    is_package
+    is_package,
+    package_qty,
+    package_group
   } = data  
   //const { rows } = await db.query(
   //  `UPDATE fnb_items
@@ -171,8 +183,10 @@ exports.update = async (db, id, data) => {
            is_beverage=$6,
            happy_hour_enabled=$7,
            happy_hour_price=$8,
-           is_package=$9
-       WHERE id=$10
+           is_package=$9,
+           package_qty=$10,
+           package_group=$11
+       WHERE id=$12
        RETURNING *`,
       [
         name,
@@ -184,6 +198,8 @@ exports.update = async (db, id, data) => {
         Boolean(happy_hour_enabled),
         happy_hour_price ?? null,
         Boolean(is_package),
+        Number(package_qty || 0) || null,
+        package_group || null,
         id
       ]
     ) 

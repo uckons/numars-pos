@@ -1,6 +1,14 @@
 const service = require("./order.service")
 const stockService = require("../stock/stock.service")
 
+const parseOrderId = (rawId) => {
+  const orderId = Number(rawId)
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    throw new Error("Invalid order id")
+  }
+  return orderId
+}
+
 exports.create = async (req, res) => {
   try {
     const db = req.app.get("db")
@@ -16,7 +24,7 @@ exports.create = async (req, res) => {
 exports.addItem = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const orderId = req.params.id
+    const orderId = parseOrderId(req.params.id)
     const { service_id, qty } = req.body
 
     const item = await service.addItem(db, orderId, service_id, qty || 1)
@@ -41,7 +49,7 @@ exports.getAll = async (req, res) => {
 exports.close = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const orderId = req.params.id
+    const orderId = parseOrderId(req.params.id)
     const { items, payment_method } = req.body
     const orderStatusRes = await db.query(
       "SELECT status FROM orders WHERE id = $1",
@@ -58,47 +66,18 @@ exports.close = async (req, res) => {
       
       // Insert items baru
       for (const i of items) {
-        // Get service name from services table
         const svcResult = await db.query(
-        `
-          SELECT
-            s.name,
-            CASE
-              WHEN s.type = 'FNB'
-                AND fi.is_beverage = true
-                AND COALESCE(fi.is_package, false) = false
-                AND fi.happy_hour_enabled = true
-                AND fi.happy_hour_price IS NOT NULL
-                AND hh_active.active = true
-              THEN fi.happy_hour_price
-              WHEN s.type IN ('SPA', 'LC')
-                AND s.happy_hour_enabled = true
-                AND s.happy_hour_price IS NOT NULL
-                AND hh_active.active = true
-              THEN s.happy_hour_price
-              ELSE s.base_price
-            END AS base_price
-          FROM services s
-          LEFT JOIN fnb_items fi ON fi.service_id = s.id
-          LEFT JOIN LATERAL (
-            SELECT true AS active
-            FROM happy_hours hh
-            WHERE hh.branch_id = s.branch_id
-              AND hh.is_active = true
-              AND CURRENT_TIME BETWEEN hh.start_time AND hh.end_time
-              AND (hh.service_type IS NULL OR hh.service_type = s.type::text OR hh.service_type = 'ALL')
-            LIMIT 1
-          ) hh_active ON true
-          WHERE s.id = $1
-          `,
+          `SELECT name FROM services WHERE id = $1`,
           [i.id]
         )
-        const serviceName = svcResult.rows[0]?.name || i.name || 'Unknown Service'
-        const unitPrice = Number(svcResult.rows[0]?.base_price ?? i.base_price ?? 0)
+        const serviceName = i.name || svcResult.rows[0]?.name || "Unknown Service"
+        const qty = Number(i.qty || 1)
+        const unitPrice = Number(i.base_price ?? 0)
+
         await db.query(
-          `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-           [orderId, i.id, serviceName, i.qty, unitPrice, i.qty * unitPrice]
+          `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           [orderId, i.id, serviceName, qty, unitPrice, qty * unitPrice, i.price_label || null, Boolean(i.is_package)]
         )
       }
     //}
@@ -258,7 +237,7 @@ exports.close = async (req, res) => {
 //exports.cancel = async (req, res) => {
 //  try {
 //    const db = req.app.get("db")
-//    const orderId = req.params.id
+//    const orderId = parseOrderId(req.params.id)
 
 //    await db.query(
 //      `DELETE FROM order_items WHERE order_id=$1`,
@@ -277,11 +256,11 @@ exports.close = async (req, res) => {
 //}
 exports.cancel = async (req, res) => {
   const db = req.app.get("db")
-  const { id } = req.params
+  const orderId = parseOrderId(req.params.id)
 
   await db.query(
     "UPDATE orders SET status='CANCELLED' WHERE id=$1",
-    [id]
+    [orderId]
   )
 
   res.json({ success: true })
@@ -328,41 +307,8 @@ exports.createFromPos = async (req, res) => {
 
     // 4️⃣ loop item (SATU KALI SAJA)
     for (const i of items) {
-      // ambil service dari DB (WAJIB)
       const svcRes = await db.query(
-        `
-        SELECT
-          s.id,
-          s.name,
-          s.duration_minutes,
-          CASE
-            WHEN s.type = 'FNB'
-              AND fi.is_beverage = true
-              AND COALESCE(fi.is_package, false) = false
-              AND fi.happy_hour_enabled = true
-              AND fi.happy_hour_price IS NOT NULL
-              AND hh_active.active = true
-            THEN fi.happy_hour_price
-            WHEN s.type IN ('SPA', 'LC')
-              AND s.happy_hour_enabled = true
-              AND s.happy_hour_price IS NOT NULL
-              AND hh_active.active = true
-            THEN s.happy_hour_price
-            ELSE s.base_price
-          END AS base_price
-        FROM services s
-        LEFT JOIN fnb_items fi ON fi.service_id = s.id
-        LEFT JOIN LATERAL (
-          SELECT true AS active
-          FROM happy_hours hh
-          WHERE hh.branch_id = s.branch_id
-            AND hh.is_active = true
-            AND CURRENT_TIME BETWEEN hh.start_time AND hh.end_time
-            AND (hh.service_type IS NULL OR hh.service_type = s.type::text OR hh.service_type = 'ALL')
-          LIMIT 1
-        ) hh_active ON true
-        WHERE s.id=$1
-        `,
+        `SELECT id, name, duration_minutes FROM services WHERE id=$1`,
         [i.id]
       )
 
@@ -372,23 +318,21 @@ exports.createFromPos = async (req, res) => {
 
       const svc = svcRes.rows[0]
       const qty = Number(i.qty || 1)
-      const unitPrice = Number(svc.base_price)
+      const unitPrice = Number(i.base_price ?? 0)
       const subtotal = unitPrice * qty
 
       total += subtotal
 
-      // insert order_items
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal)
+          (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6)
+          ($1,$2,$3,$4,$5,$6,$7,$8)
         `,
-        [orderId, svc.id, svc.name, qty, unitPrice, subtotal]
+        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
       )
 
-      // ⏱️ AUTO TIMER (SPA / LC / SERVICE BERDURASI)
       if (svc.duration_minutes && svc.duration_minutes > 0) {
         await db.query(
           `
@@ -485,42 +429,7 @@ exports.createDraftFromPos = async (req, res) => {
 
     for (const i of items) {
       const svcRes = await db.query(
-        `
-        SELECT
-          s.id,
-          s.name,
-          CASE
-            WHEN s.type = 'FNB'
-              AND fi.is_beverage = true
-          AND COALESCE(fi.is_package, false) = false
-              AND fi.happy_hour_enabled = true
-              AND fi.happy_hour_price IS NOT NULL
-              AND hh_active.active = true
-            THEN fi.happy_hour_price
-            WHEN s.type IN ('SPA', 'LC')
-              AND s.happy_hour_enabled = true
-              AND s.happy_hour_price IS NOT NULL
-              AND hh_active.active = true
-            THEN s.happy_hour_price
-            ELSE s.base_price
-          END AS base_price
-        FROM services s
-        LEFT JOIN fnb_items fi ON fi.service_id = s.id
-        LEFT JOIN LATERAL (
-          SELECT true AS active
-          FROM happy_hours hh
-          WHERE hh.branch_id = s.branch_id
-            AND hh.is_active = true
-            AND CURRENT_TIME BETWEEN hh.start_time AND hh.end_time
-            AND (
-              hh.service_type IS NULL
-              OR hh.service_type = s.type::text
-              OR hh.service_type = 'ALL'
-            )
-          LIMIT 1
-        ) hh_active ON true
-        WHERE s.id=$1
-        `,
+        `SELECT s.id, s.name FROM services s WHERE s.id=$1`,
         [i.id]
       )
 
@@ -530,7 +439,7 @@ exports.createDraftFromPos = async (req, res) => {
 
       const svc = svcRes.rows[0]
       const qty = Number(i.qty || 1)
-      const unitPrice = Number(svc.base_price)
+      const unitPrice = Number(i.base_price ?? 0)
       const subtotal = unitPrice * qty
 
       total += subtotal
@@ -538,11 +447,11 @@ exports.createDraftFromPos = async (req, res) => {
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal)
+          (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6)
+          ($1,$2,$3,$4,$5,$6,$7,$8)
         `,
-        [orderId, svc.id, svc.name, qty, unitPrice, subtotal]
+        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
       )
     }
 
@@ -581,6 +490,70 @@ exports.createDraftFromPos = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
+exports.saveDraft = async (req, res) => {
+  const db = req.app.get("db")
+  let inTransaction = false
+
+  try {
+    const idOrder = parseOrderId(req.params.id)
+    const { items } = req.body
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Item kosong" })
+    }
+
+    await db.query("BEGIN")
+    inTransaction = true
+
+    await db.query("DELETE FROM order_items WHERE order_id = $1", [idOrder])
+
+    let total = 0
+
+    for (const item of items) {
+      const svcRes = await db.query("SELECT name FROM services WHERE id = $1", [item.id])
+
+      if (!svcRes.rows.length) {
+        throw new Error("Service tidak ditemukan")
+      }
+
+      const qty = Number(item.qty || 1)
+      const unitPrice = Number(item.base_price ?? 0)
+      const subtotal = qty * unitPrice
+      total += subtotal
+
+      await db.query(
+        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [idOrder, item.id, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, item.price_label || null, Boolean(item.is_package)]
+      )
+    }
+
+    await db.query(
+      `UPDATE orders
+       SET status = 'DRAFT', total = $2, total_amount = $2
+       WHERE id = $1`,
+      [idOrder, total]
+    )
+
+    await db.query("COMMIT")
+    inTransaction = false
+
+    res.json({ success: true, order_id: idOrder, status: "DRAFT", total })
+  } catch (err) {
+    try {
+      if (inTransaction) {
+        await db.query("ROLLBACK")
+      }
+    } catch (rollbackErr) {
+      console.error("ROLLBACK SAVE DRAFT ERROR:", rollbackErr)
+    }
+
+    console.error("SAVE DRAFT ERROR:", err)
+    res.status(400).json({ message: err.message })
+  }
+}
+
 exports.getKasirOrders = async (req, res) => {
   try {
     const db = req.app.get("db")
@@ -698,7 +671,7 @@ exports.getKasirOrders = async (req, res) => {
 }
 exports.getById = async (req, res) => {
   const db = req.app.get("db")
-  const orderId = req.params.id
+  const orderId = parseOrderId(req.params.id)
 
   try {
     const { rows } = await db.query(
@@ -708,10 +681,12 @@ exports.getById = async (req, res) => {
         json_agg(
           json_build_object(
             'service_id', oi.service_id,
-            'service_name', s.name,
+            'service_name', oi.service_name,
             'qty', oi.qty,
             'price', oi.price,
-            'subtotal', oi.subtotal
+            'subtotal', oi.subtotal,
+            'price_label', oi.price_label,
+            'is_package', oi.is_package_snapshot
           ) ORDER BY oi.id
         ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
@@ -737,7 +712,7 @@ exports.getById = async (req, res) => {
 exports.getOrderDetail = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { id } = req.params
+    const orderId = parseOrderId(req.params.id)
     const branchId = req.user.branch_id
 
     // Get order header
@@ -759,7 +734,7 @@ exports.getOrderDetail = async (req, res) => {
       LEFT JOIN branches b ON b.id = o.branch_id
       LEFT JOIN users u ON u.id = o.user_id
       WHERE o.id = $1 AND o.branch_id = $2
-    `, [id, branchId])
+    `, [orderId, branchId])
 
     if (orderRows.length === 0) {
       return res.status(404).json({ message: "Order not found" })
@@ -774,11 +749,13 @@ exports.getOrderDetail = async (req, res) => {
         service_name,
         qty,
         price,
-        subtotal
+        subtotal,
+        price_label,
+        is_package_snapshot AS is_package
       FROM order_items
       WHERE order_id = $1
       ORDER BY id ASC
-    `, [id])
+    `, [orderId])
 
     order.items = items
     

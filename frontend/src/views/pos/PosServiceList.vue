@@ -23,6 +23,7 @@
         <div class="card-top">
           <h4>{{ s.name }}</h4>
           <span class="badge">{{ s.type }}</span>
+          <span v-if="s.price_label" class="badge price-badge">{{ s.price_label }}</span>
         </div>
 
         <div class="card-bottom">
@@ -44,6 +45,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue"
+import Swal from "sweetalert2"
 import api from "@/services/api"
 import { usePosStore } from "@/store/pos.store"
 const pos = usePosStore()
@@ -91,6 +93,52 @@ const filteredServices = computed(() => {
     s => s.type === activeCategory.value
   )
 })
+const packageByGroup = computed(() => {
+  const map = new Map()
+  services.value
+    .filter(s => s.type === 'FNB' && s.is_package && s.package_group)
+    .forEach(s => map.set(s.package_group, s))
+  return map
+})
+
+const enrichService = (service) => {
+  if (service.type !== 'FNB' || service.is_package) return service
+  if (!service.package_group || !Number(service.package_qty || 0)) return service
+
+  const pkg = packageByGroup.value.get(service.package_group)
+  if (!pkg) return service
+
+  return {
+    ...service,
+    package_service_id: pkg.id,
+    package_price: Number(pkg.base_price || 0),
+    package_label: 'PAKET'
+  }
+}
+
+const maybeOfferPackage = async (cartKey) => {
+  const item = pos.findByCartKey(cartKey)
+  if (!item || item.is_package) return
+
+  const packageQty = Number(item.package_qty || 0)
+  if (!packageQty || item.qty % packageQty !== 0) return
+
+  const packageService = services.value.find(s => s.id === item.package_service_id)
+  if (!packageService) return
+
+  const confirm = await Swal.fire({
+    icon: 'question',
+    title: 'Jadikan paket?',
+    text: `Qty ${item.name} sudah ${item.qty}. Gunakan harga paket?`,
+    showCancelButton: true,
+    confirmButtonText: 'Ya, jadikan paket',
+    cancelButtonText: 'Tidak'
+  })
+
+  if (confirm.isConfirmed) {
+    pos.convertToPackage(item.cart_key, packageService)
+  }
+}
 
 //const select = (service) => {
 //  emit("select", service)
@@ -113,7 +161,17 @@ const select = async (service) => {
 //    await pos.createOrder()
 //  }
 
-  pos.addService(service)
+  const enriched = enrichService(service)
+  pos.addService(enriched)
+
+  const key = [
+    enriched.id,
+    Number(enriched.base_price || 0),
+    enriched.price_label || "",
+    enriched.is_package ? "P" : "N"
+  ].join(":")
+
+  await maybeOfferPackage(key)
 }
 const format = (v) =>
   Number(v || 0).toLocaleString("id-ID")
@@ -195,6 +253,13 @@ const format = (v) =>
   border-radius: 12px;
   font-size: 12px;
   width: fit-content;
+}
+
+
+.price-badge {
+  margin-left: 6px;
+  background: #f5c518;
+  color: #111;
 }
 
 .card-bottom {
