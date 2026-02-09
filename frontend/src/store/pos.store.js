@@ -98,7 +98,9 @@ function findByCartKey(cartKey) {
       items.value = items.value.filter(i => i.cart_key !== cartKey)
     }
 
-    const packageTotal = Number(packageService.base_price || 0)
+    const packageTotal = Number(
+      packageService.package_price ?? packageService.base_price ?? 0
+    )
     const unitPriceInPackage = packageQty > 0 ? packageTotal / packageQty : packageTotal
 
     for (let idx = 0; idx < bundles; idx += 1) {

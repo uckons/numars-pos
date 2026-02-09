@@ -194,50 +194,23 @@ const stopTimer = async (timerId) => {
     })
   }
 }
-/* KODE KAMU DI SINI */
 const createManualTimer = async (data) => {
   showStartModal.value = false
 
-  const slot = timers.value.find(t => t.slot === selectedSlot.value)
-  if (!slot) return
-
-  const start = new Date()
-  const end = new Date(start.getTime() + data.duration_minutes * 60000)
-
-  Object.assign(slot, {
-    status: "RUNNING",
-    service_type: data.service_type,
-    therapist_id: data.therapist_id,
-    room_id: data.room_id,
-    start_time: start,
-    planned_end_time: end,
-    paused: false,
-    warned: false
-  })
-
-  // SIMPAN KE BACKEND
   try {
     await api.post("/timers/start", {
       slot: selectedSlot.value,
       service_id: data.service_id,
       therapist_id: data.therapist_id,
+      therapist_ids: data.therapist_ids || [],
       room_id: data.room_id,
-      duration_minutes: data.duration_minutes,
-      start_time: start,
-      planned_end_time: end
+      duration_minutes: data.duration_minutes
     })
+
+    await syncTimers()
   } catch (err) {
     console.error("Failed to start timer:", err)
-    // Revert slot status on error
-    Object.assign(slot, {
-      status: "EMPTY",
-      service_type: null,
-      therapist_id: null,
-      room_id: null,
-      start_time: null,
-      planned_end_time: null
-    })
-    alert("Gagal memulai timer. Silakan coba lagi.")
+    alert(err.response?.data?.message || "Gagal memulai timer. Silakan coba lagi.")
   }
 }
 const syncTimers = async () => {

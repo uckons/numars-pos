@@ -120,12 +120,25 @@ exports.stopTimer = async (db, timerId) => {
   if (timer.order_id !== null && timer.service_id !== null) {
     await db.query(
       `
-      UPDATE order_items
+      WITH target AS (
+        SELECT id
+        FROM order_items
+        WHERE order_id = $3
+          AND service_id = $4
+          AND (
+            therapist_name IS NULL
+            OR therapist_name = ''
+            OR therapist_name = $1
+          )
+        ORDER BY id ASC
+        LIMIT 1
+      )
+      UPDATE order_items oi
       SET
         therapist_name = $1,
         room_name = $2
-      WHERE order_id = $3
-        AND service_id = $4
+      FROM target
+      WHERE oi.id = target.id
       `,
       [
         timer.therapist_name || null,

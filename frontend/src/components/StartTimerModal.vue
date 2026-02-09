@@ -1,7 +1,6 @@
 <template>
 <div class="overlay">
   <div class="modal">
-    <!-- HEADER -->
     <div class="modal-header">
       <h2>Mulai Timer</h2>
       <span class="subtitle">Atur service & terapis</span>
@@ -9,34 +8,65 @@
 
     <div class="divider"></div>
 
-    <!-- SERVICE -->
     <div class="field">
-      <label>Pilih Service</label>
-      <select v-model="selectedServiceId" @change="onServiceChange" :disabled="loadingServices">
-        <option value="">-- Pilih Service --</option>
-        <option v-for="svc in services" :key="svc.id" :value="svc.id">
-          <!--{{ svc.name }} • {{ svc.duration_minutes }} menit-->
-          {{ svc.name }}
-          •
-          {{ svc.duration_minutes ? `${svc.duration_minutes} menit` : 'Durasi manual' }}
-        </option>
+      <label>Tipe Layanan</label>
+      <select v-model="selectedOrderType" @change="onTypeChange" :disabled="loadingServices">
+        <option value="SINGLE">Single</option>
+        <option value="COMBO">Combo</option>
       </select>
+    </div>
+
+    <div class="field">
+      <label>Qty Service</label>
+      <select
+        v-model.number="selectedServiceQty"
+        @change="onQtyChange"
+        :disabled="loadingServices || selectedOrderType === 'SINGLE'"
+      >
+        <option v-for="n in serviceQtyOptions" :key="n" :value="n">{{ n }}</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>{{ selectedServiceQty > 1 ? 'Service per Slot' : 'Pilih Service' }}</label>
+      <div class="therapist-grid">
+        <select
+          v-for="idx in selectedServiceQty"
+          :key="`svc-${idx}`"
+          v-model="selectedServiceIds[idx - 1]"
+          @change="onServiceSelectionChange"
+          :disabled="loadingServices"
+        >
+          <option value="">-- Pilih Service #{{ idx }} --</option>
+          <option v-for="svc in selectableServices" :key="`opt-${idx}-${svc.id}`" :value="svc.id">
+            {{ svc.name }} • {{ svc.duration_minutes ? `${svc.duration_minutes} menit` : 'Durasi manual' }}
+          </option>
+        </select>
+      </div>
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
-    <!-- THERAPIST -->
     <div class="field" v-if="serviceType && serviceType !== 'LOUNGE'">
-      <label>Nama Terapis</label>
-      <select v-model="selectedTherapistId" :disabled="loadingTherapists || !serviceType">
-        <option value="">-- Pilih Terapis --</option>
-        <option v-for="t in therapists" :key="t.id" :value="t.id">
-          {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
-        </option>
-      </select>
+      <label>
+        Nama Terapis
+        <small v-if="selectedServiceQty > 1">(wajib {{ selectedServiceQty }} terapis)</small>
+      </label>
+      <div class="therapist-grid">
+        <select
+          v-for="idx in selectedServiceQty"
+          :key="`ther-${idx}`"
+          v-model="selectedTherapistIds[idx - 1]"
+          :disabled="loadingTherapists || !serviceType"
+        >
+          <option value="">-- Pilih Terapis #{{ idx }} --</option>
+          <option v-for="t in therapists" :key="`ther-opt-${idx}-${t.id}`" :value="t.id">
+            {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
+          </option>
+        </select>
+      </div>
       <span v-if="loadingTherapists" class="loading-text">Memuat terapis…</span>
     </div>
 
-    <!-- ROOM / SOFA -->
     <div class="field" v-if="serviceType">
       <label>{{ serviceType === 'SPA' ? 'Room' : 'Tabel / Sofa' }}</label>
       <select v-model="selectedRoomId" :disabled="loadingRooms">
@@ -47,7 +77,7 @@
       </select>
       <span v-if="loadingRooms" class="loading-text">Memuat data…</span>
     </div>
-    <!-- MANUAL DURATION -->
+
     <div class="field" v-if="serviceType && duration === 0">
       <label>Durasi (menit)</label>
       <input
@@ -57,18 +87,16 @@
         placeholder="Masukkan durasi"
       />
     </div>
-    <!-- DURATION -->
+
     <div class="duration-box" v-if="duration">
       ⏱ Durasi Service
       <strong>{{ duration }} menit</strong>
     </div>
 
-    <!-- ERROR -->
     <div v-if="errorMessage" class="error-message">
       {{ errorMessage }}
     </div>
 
-    <!-- ACTION -->
     <div class="actions">
       <button class="cancel" @click="$emit('close')">Batal</button>
       <button class="start" @click="submit" :disabled="isSubmitting">
@@ -81,18 +109,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import api from "@/services/api"
 
 const emit = defineEmits(["close", "start"])
 
-// State
 const services = ref([])
 const therapists = ref([])
 const rooms = ref([])
 
-const selectedServiceId = ref("")
-const selectedTherapistId = ref("")
+const selectedOrderType = ref("SINGLE")
+const selectedServiceQty = ref(1)
+const selectedServiceIds = ref([""])
+const selectedTherapistIds = ref([""])
 const selectedRoomId = ref("")
 const manualDuration = ref(0)
 
@@ -102,48 +131,145 @@ const loadingRooms = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref("")
 
-// Computed
-const selectedService = computed(() => {
-  return services.value.find(s => s.id === parseInt(selectedServiceId.value))
+const serviceQtyOptions = [1, 2, 3, 4, 5, 6]
+
+const selectedServices = computed(() => {
+  const ids = selectedServiceIds.value
+    .map(id => Number(id))
+    .filter(id => Number.isInteger(id) && id > 0)
+
+  return ids
+    .map(id => services.value.find(s => Number(s.id) === id))
+    .filter(Boolean)
 })
 
-const serviceType = computed(() => {
-  return selectedService.value?.type || ""
-})
+const selectedService = computed(() => selectedServices.value[0] || null)
+
+const serviceType = computed(() => selectedService.value?.type || "")
 
 const duration = computed(() => {
-  return selectedService.value?.duration_minutes || 0
+  if (!selectedServices.value.length) return 0
+  return Number(selectedServices.value[0].duration_minutes || 0)
 })
-const effectiveDuration = computed(() => {
-  return duration.value || manualDuration.value
+
+const effectiveDuration = computed(() => duration.value || manualDuration.value)
+const isComboMode = computed(() => selectedOrderType.value === "COMBO" && Number(selectedServiceQty.value || 1) > 1)
+
+const selectableServices = computed(() => {
+  if (!services.value.length) return []
+
+  // Combo should allow picking SPA or LC as starting/alternate selection.
+  // Type consistency is validated on submit/backend.
+  if (isComboMode.value) {
+    return services.value.filter(s => ["SPA", "LC"].includes(s.type))
+  }
+
+  if (!serviceType.value) return services.value
+  return services.value.filter(s => s.type === serviceType.value)
 })
-// Methods
+
+const normalizeServicePayload = (payload) => {
+  if (Array.isArray(payload)) return payload
+
+  const candidates = [
+    payload?.data,
+    payload?.rows,
+    payload?.items,
+    payload?.results,
+    payload?.services,
+    payload?.data?.data,
+    payload?.data?.rows,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.services
+  ]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate
+  }
+
+  return []
+}
+
+const initSelections = () => {
+  const qty = Number(selectedServiceQty.value || 1)
+  const firstService = selectedServiceIds.value[0] || ""
+  selectedServiceIds.value = Array(qty).fill(firstService)
+  selectedTherapistIds.value = Array(qty).fill("")
+}
+
+const ensureComboBaseService = () => {
+  if (selectedOrderType.value !== "COMBO" || Number(selectedServiceQty.value || 1) <= 1) return
+  const allowed = services.value.filter(s => ["SPA", "LC"].includes(s.type))
+  if (!allowed.length) return
+
+  const firstId = Number(selectedServiceIds.value[0] || 0)
+  const valid = allowed.some(s => Number(s.id) === firstId)
+  if (!valid) {
+    selectedServiceIds.value = [String(allowed[0].id)]
+  }
+}
+
+const onTypeChange = () => {
+  if (selectedOrderType.value === "SINGLE") {
+    selectedServiceQty.value = 1
+  }
+  ensureComboBaseService()
+  initSelections()
+}
+
+const onQtyChange = () => {
+  if (selectedOrderType.value === "SINGLE") {
+    selectedServiceQty.value = 1
+  }
+  ensureComboBaseService()
+  initSelections()
+}
+
+const onServiceSelectionChange = async () => {
+  if (!serviceType.value) return
+  await fetchTherapists()
+  await fetchRooms()
+}
+
 const fetchServices = async () => {
   try {
     loadingServices.value = true
     errorMessage.value = ""
-    
-    // Fetch all services (will be filtered by active services on backend)
-    const res = await api.get("/services")
-    //services.value = res.data.filter(s => s.is_active && s.duration_minutes > 0)
-    services.value = res.data.filter(
-      s => s.is_active && s.type !== "FNB"
-    )
+
+    const res = await api.get("/services", {
+      params: { is_active: true, _ts: Date.now() },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache"
+      }
+    })
+
+    const allServices = normalizeServicePayload(res.data)
+    services.value = allServices.filter(s => s?.type !== "FNB")
+
+    if (!services.value.length) {
+      errorMessage.value = "Tidak ada service aktif yang bisa dipilih"
+      return
+    }
+
+    const first = services.value.find(s => ["SPA", "LC"].includes(s.type)) || services.value[0]
+    selectedServiceIds.value = [String(first.id)]
+    await onServiceSelectionChange()
   } catch (err) {
     console.error("Error fetching services:", err)
-    errorMessage.value = "Gagal memuat daftar service"
+    errorMessage.value = err.response?.data?.message || "Gagal memuat daftar service"
   } finally {
     loadingServices.value = false
   }
 }
 
 const fetchTherapists = async () => {
-  //if (!serviceType.value) return
   if (!serviceType.value || serviceType.value === "LOUNGE") return
   try {
     loadingTherapists.value = true
     errorMessage.value = ""
-    
+
     const res = await api.get("/timers/therapists", {
       params: { service_type: serviceType.value }
     })
@@ -158,11 +284,11 @@ const fetchTherapists = async () => {
 
 const fetchRooms = async () => {
   if (!serviceType.value) return
-  
+
   try {
     loadingRooms.value = true
     errorMessage.value = ""
-    
+
     const res = await api.get("/timers/rooms", {
       params: { service_type: serviceType.value }
     })
@@ -175,62 +301,88 @@ const fetchRooms = async () => {
   }
 }
 
-const onServiceChange = () => {
-  // Reset selections when service changes
-  selectedTherapistId.value = ""
+watch(serviceType, async (newType, oldType) => {
+  if (!newType || newType === oldType) return
   selectedRoomId.value = ""
-  manualDuration.value = 0
-  // Fetch therapists and rooms for the new service type
-  if (serviceType.value) {
-    fetchTherapists()
-    fetchRooms()
-  }
-}
+  selectedTherapistIds.value = Array(selectedServiceQty.value).fill("")
+  await fetchTherapists()
+  await fetchRooms()
+})
 
 const submit = () => {
   errorMessage.value = ""
-  
-  // Validation
-  if (!selectedServiceId.value) {
+
+  const qty = Number(selectedServiceQty.value || 1)
+  const normalizedServiceIds = selectedServiceIds.value
+    .map(id => Number(id))
+    .filter(id => Number.isInteger(id) && id > 0)
+
+  if (normalizedServiceIds.length !== qty) {
+    errorMessage.value = "Pilih service sesuai Qty Service"
+    return
+  }
+
+  const selectedType = serviceType.value
+  if (!selectedType) {
     errorMessage.value = "Silakan pilih service"
     return
   }
-  
-  //if (!selectedTherapistId.value) {
-  if (serviceType.value !== "LOUNGE" && !selectedTherapistId.value) {  
-    errorMessage.value = "Silakan pilih terapis"
+
+  if (selectedServices.value.some(s => s.type !== selectedType)) {
+    errorMessage.value = "Semua service harus 1 tipe layanan"
     return
   }
-  
-  if (!selectedRoomId.value && serviceType.value) {
-    errorMessage.value = `Silakan pilih ${serviceType.value === 'SPA' ? 'room' : 'tabel/sofa'}`
+
+  if (qty > 1 && !["SPA", "LC"].includes(selectedType)) {
+    errorMessage.value = "Combo hanya berlaku untuk SPA dan LC"
     return
   }
+
+  const normalizedTherapistIds = selectedTherapistIds.value
+    .map(id => Number(id))
+    .filter(id => Number.isInteger(id) && id > 0)
+
+  if (selectedType !== "LOUNGE") {
+    if (normalizedTherapistIds.length !== qty) {
+      errorMessage.value = "Pilih terapis sesuai Qty Service"
+      return
+    }
+
+    if (new Set(normalizedTherapistIds).size !== normalizedTherapistIds.length) {
+      errorMessage.value = "Terapis harus berbeda"
+      return
+    }
+  }
+
+  if (!selectedRoomId.value) {
+    errorMessage.value = `Silakan pilih ${selectedType === 'SPA' ? 'room' : 'tabel/sofa'}`
+    return
+  }
+
   if (duration.value === 0 && !manualDuration.value) {
     errorMessage.value = "Silakan isi durasi service"
     return
   }
+
   isSubmitting.value = true
-  
+
   emit("start", {
-    service_id: parseInt(selectedServiceId.value),
-    service_type: serviceType.value,
-    //therapist_id: parseInt(selectedTherapistId.value),
-    therapist_id: selectedTherapistId.value
-      ? parseInt(selectedTherapistId.value)
-      : null,  
+    service_id: normalizedServiceIds[0],
+    service_ids: normalizedServiceIds,
+    service_type: selectedType,
+    therapist_id: normalizedTherapistIds[0] || null,
+    therapist_ids: normalizedTherapistIds,
+    combo_qty: qty,
     room_id: parseInt(selectedRoomId.value),
-    //duration_minutes: duration.value
-    duration_minutes: effectiveDuration.value
+    duration_minutes: effectiveDuration.value,
+    order_type: selectedOrderType.value
   })
-  
-  // Reset submitting state after a delay
+
   setTimeout(() => {
     isSubmitting.value = false
   }, 1000)
 }
 
-// Lifecycle
 onMounted(() => {
   fetchServices()
 })
@@ -252,9 +404,16 @@ onMounted(() => {
   background: linear-gradient(180deg, #0f0f0f, #0a0a0a);
   border: 1px solid #2a2a2a;
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  border-radius: 16px;
+  padding: 20px;
 }
 .modal-header {
   text-align: center;
+}
+
+.therapist-grid {
+  display: grid;
+  gap: 8px;
 }
 .modal-header h2 {
   margin: 0;
@@ -270,124 +429,69 @@ onMounted(() => {
   background: #222;
   margin: 14px 0 18px;
 }
-.field select {
+.field {
+  margin-bottom: 10px;
+}
+.field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #bbb;
+}
+.field select,
+.field input {
+  width: 100%;
   height: 42px;
+  border-radius: 10px;
+  border: 1px solid #2c2c2c;
+  background: #101010;
+  color: #fff;
+  padding: 0 12px;
+}
+.loading-text {
+  font-size: 12px;
+  color: #9a9a9a;
 }
 .duration-box {
-  background: rgba(201,162,77,.1);
-  border: 1px solid rgba(201,162,77,.3);
+  margin-top: 12px;
+  border: 1px solid #6c5417;
+  background: rgba(201,162,77,.08);
+  border-radius: 12px;
   padding: 12px;
-  border-radius: 14px;
   text-align: center;
-  margin: 16px 0;
-  font-size: 14px;
+  color: #f0d58b;
 }
-
 .duration-box strong {
   display: block;
-  font-size: 20px;
   margin-top: 4px;
-}
-.actions button {
-  height: 44px;
-  font-size: 14px;
-}
-h2 {
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: .5px;
-}
-
-.field {
-  margin-bottom: 12px;
-  position: relative;
-}
-
-label {
-  font-size: 12px;
-  color: #aaa;
-  display: block;
-  margin-bottom: 4px;
-}
-
-input, select {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid #222;
-  background: #111;
   color: #fff;
+  font-size: 34px;
+  font-weight: 800;
 }
-
-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-select option:disabled {
-  color: #666;
-}
-
-.loading-text {
-  font-size: 11px;
-  color: #c9a24d;
-  margin-top: 4px;
-  display: block;
-}
-
-.duration {
-  margin: 14px 0;
-  font-size: 14px;
-  color: #c9a24d;
-  text-align: center;
-}
-
 .error-message {
-  background: rgba(255, 59, 48, 0.1);
-  border: 1px solid rgba(255, 59, 48, 0.3);
-  color: #ff3b30;
-  padding: 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  margin: 10px 0;
-  text-align: center;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #ff6b6b;
 }
-
 .actions {
+  margin-top: 16px;
   display: flex;
   gap: 10px;
-  margin-top: 10px;
 }
-
-button {
+.cancel, .start {
   flex: 1;
-  padding: 10px;
+  height: 44px;
   border-radius: 12px;
   border: none;
   font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.2s;
 }
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .cancel {
-  background: #222;
-  color: #aaa;
+  background: #2b2b2b;
+  color: #bbb;
 }
-
 .start {
-  background: linear-gradient(135deg, #c9a24d, #e0c068);
-  color: #000;
-}
-
-.start:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-.cancel:hover {
-  background: #333;
+  background: #c9a24d;
+  color: #111;
 }
 </style>

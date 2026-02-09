@@ -7,6 +7,7 @@ exports.start = async (req, res) => {
     const {
       order_id,
       service_id,
+      service_ids,
       therapist_id,
       room_id
     } = req.body
@@ -19,6 +20,7 @@ exports.start = async (req, res) => {
       db,
       order_id,
       service_id,
+      service_ids,
       therapist_id,
       room_id
     )
@@ -37,6 +39,60 @@ exports.getActive = async (req, res) => {
 }
 
 exports.startTimer = async (req, res) => {
+  const parseComboQtyFromName = (serviceName, serviceType) => {
+    if (!['SPA', 'LC', 'LOUNGE'].includes(serviceType)) return 1
+    const match = String(serviceName || '').match(/combo\s*(\d+)/i)
+    const qty = match ? Number(match[1]) : 1
+    return Number.isInteger(qty) && qty > 1 ? qty : 1
+  }
+
+  const normalizeTherapistIds = (therapist_id, therapist_ids) => {
+    const raw = Array.isArray(therapist_ids) && therapist_ids.length
+      ? therapist_ids
+      : (therapist_id ? [therapist_id] : [])
+
+    return [...new Set(raw
+      .map(v => Number(v))
+      .filter(v => Number.isInteger(v) && v > 0))]
+  }
+
+  const allocateSlots = async (db, branchId, requestedSlot, neededCount) => {
+    if (!requestedSlot || requestedSlot < 1 || requestedSlot > 30) {
+      throw new Error('Nomor slot harus 1–30')
+    }
+
+    const { rows: occupiedRows } = await db.query(
+      `SELECT slot_number
+       FROM timers
+       WHERE branch_id = $1
+         AND end_time IS NULL
+         AND slot_number IS NOT NULL`,
+      [branchId]
+    )
+
+    const occupied = new Set(
+      occupiedRows
+        .map(r => Number(r.slot_number))
+        .filter(v => Number.isInteger(v) && v >= 1 && v <= 30)
+    )
+
+    if (occupied.has(requestedSlot)) {
+      throw new Error(`Slot ${requestedSlot} sudah terisi`)
+    }
+
+    const freeSlots = []
+    for (let i = 1; i <= 30; i += 1) {
+      if (!occupied.has(i) && i !== requestedSlot) freeSlots.push(i)
+    }
+
+    const assigned = [requestedSlot, ...freeSlots].slice(0, neededCount)
+    if (assigned.length < neededCount) {
+      throw new Error('Slot timer tidak cukup untuk combo ini')
+    }
+
+    return assigned
+  }
+
   try {
     const db = req.app.get("db")
     const user = req.user
@@ -57,25 +113,69 @@ exports.startTimer = async (req, res) => {
     const {
       order_id,
       service_id,
+      service_ids,
       therapist_id,
+      therapist_ids,
       room_id,
       duration_minutes,
       slot
     } = req.body
 
-        // 🔒 VALIDASI MINIMAL
-   // if (!service_id || !therapist_id || !room_id || !duration_minutes) {
-      if (!service_id || !room_id || !duration_minutes) {
+    if (!service_id || !room_id || !duration_minutes) {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
     }
 
-    // =========================
-    // 🆕 1. AMBIL DATA SERVICE     
-    // =========================
     const { rows: serviceRows } = await db.query(
-      `SELECT id, name, type, base_price, duration_minutes 
-       FROM services 
-       WHERE id = $1`,
+      `SELECT
+         s.id,
+         s.name,
+         s.type,
+         s.duration_minutes,
+         CASE
+           WHEN s.type = 'FNB'
+             AND fi.is_beverage = true
+             AND COALESCE(fi.is_package, false) = false
+             AND fi.happy_hour_enabled = true
+             AND fi.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN fi.happy_hour_price
+           WHEN s.type IN ('SPA', 'LC', 'LOUNGE')
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN s.happy_hour_price
+           ELSE COALESCE(fi.price, s.base_price)
+         END AS base_price
+       FROM services s
+       LEFT JOIN fnb_items fi ON fi.service_id = s.id
+       LEFT JOIN LATERAL (
+         SELECT true AS active
+         FROM happy_hours hh
+         WHERE hh.branch_id = s.branch_id
+           AND hh.is_active = true
+           AND (
+             (
+               hh.start_time <= hh.end_time
+               AND (timezone('Asia/Jakarta', now()))::time BETWEEN hh.start_time AND hh.end_time
+             )
+             OR (
+               hh.start_time > hh.end_time
+               AND (
+                 (timezone('Asia/Jakarta', now()))::time >= hh.start_time
+                 OR (timezone('Asia/Jakarta', now()))::time <= hh.end_time
+               )
+             )
+           )
+           AND (
+             hh.service_type IS NULL
+             OR hh.service_type = s.type::text
+             OR hh.service_type = 'ALL'
+             OR (hh.service_type = 'LC' AND s.type = 'LOUNGE')
+             OR (hh.service_type = 'LOUNGE' AND s.type = 'LC')
+           )
+         LIMIT 1
+       ) hh_active ON true
+       WHERE s.id = $1`,
       [service_id]
     )
 
@@ -83,152 +183,261 @@ exports.startTimer = async (req, res) => {
       return res.status(400).json({ message: "Service tidak ditemukan" })
     }
 
-    const service = serviceRows[0]
-    const requiresTherapist = service.type !== "LOUNGE"
+    const selectedService = serviceRows[0]
+    const requiresTherapist = selectedService.type !== "LOUNGE"
+    const requestedComboQty = Number(req.body.combo_qty || 0)
+    const comboQtyFromName = parseComboQtyFromName(selectedService.name, selectedService.type)
+    const comboQtyFromPayload = Math.max(
+      Array.isArray(service_ids) ? service_ids.length : 0,
+      Array.isArray(therapist_ids) ? therapist_ids.length : 0
+    )
+    const comboQty = Number.isInteger(requestedComboQty) && requestedComboQty > 1
+      ? requestedComboQty
+      : comboQtyFromPayload > 1
+        ? comboQtyFromPayload
+        : comboQtyFromName
+    const selectedTherapistIds = normalizeTherapistIds(therapist_id, therapist_ids)
 
-    if (requiresTherapist && !therapist_id) {
-      return res.status(400).json({ message: "Data timer tidak lengkap" })
+    if (comboQty > 1 && !['SPA', 'LC'].includes(selectedService.type)) {
+      return res.status(400).json({ message: 'Combo hanya berlaku untuk SPA dan LC' })
     }
 
-    // =========================
-    // 🔑 2. PASTIKAN ORDER ADA
-    // =========================
+    if (requiresTherapist) {
+      if (!selectedTherapistIds.length) {
+        return res.status(400).json({ message: "Silakan pilih terapis" })
+      }
+
+      if (comboQty > 1 && selectedTherapistIds.length !== comboQty) {
+        return res.status(400).json({ message: `Combo membutuhkan ${comboQty} terapis` })
+      }
+
+      if (comboQty === 1 && selectedTherapistIds.length !== 1) {
+        return res.status(400).json({ message: "Pilih 1 terapis" })
+      }
+    }
+
+    const therapistIds = requiresTherapist ? selectedTherapistIds : [null]
+
+    const rawServiceIds = Array.isArray(service_ids) && service_ids.length
+      ? service_ids
+      : Array(comboQty).fill(service_id)
+
+    const normalizedServiceIds = rawServiceIds
+      .map(v => Number(v))
+      .filter(v => Number.isInteger(v) && v > 0)
+
+    if (normalizedServiceIds.length !== comboQty) {
+      return res.status(400).json({ message: `Combo membutuhkan ${comboQty} service` })
+    }
+
+    const uniqueServiceIds = [...new Set(normalizedServiceIds)]
+    const { rows: comboServiceRows } = await db.query(
+      `SELECT
+         s.id,
+         s.name,
+         s.type,
+         s.duration_minutes,
+         CASE
+           WHEN s.type = 'FNB'
+             AND fi.is_beverage = true
+             AND COALESCE(fi.is_package, false) = false
+             AND fi.happy_hour_enabled = true
+             AND fi.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN fi.happy_hour_price
+           WHEN s.type IN ('SPA', 'LC', 'LOUNGE')
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN s.happy_hour_price
+           ELSE COALESCE(fi.price, s.base_price)
+         END AS base_price
+       FROM services s
+       LEFT JOIN fnb_items fi ON fi.service_id = s.id
+       LEFT JOIN LATERAL (
+         SELECT true AS active
+         FROM happy_hours hh
+         WHERE hh.branch_id = s.branch_id
+           AND hh.is_active = true
+           AND (
+             (
+               hh.start_time <= hh.end_time
+               AND (timezone('Asia/Jakarta', now()))::time BETWEEN hh.start_time AND hh.end_time
+             )
+             OR (
+               hh.start_time > hh.end_time
+               AND (
+                 (timezone('Asia/Jakarta', now()))::time >= hh.start_time
+                 OR (timezone('Asia/Jakarta', now()))::time <= hh.end_time
+               )
+             )
+           )
+           AND (
+             hh.service_type IS NULL
+             OR hh.service_type = s.type::text
+             OR hh.service_type = 'ALL'
+             OR (hh.service_type = 'LC' AND s.type = 'LOUNGE')
+             OR (hh.service_type = 'LOUNGE' AND s.type = 'LC')
+           )
+         LIMIT 1
+       ) hh_active ON true
+       WHERE s.id = ANY($1::int[])`,
+      [uniqueServiceIds]
+    )
+
+    const serviceMap = new Map(comboServiceRows.map(row => [Number(row.id), row]))
+    if (serviceMap.size !== uniqueServiceIds.length) {
+      return res.status(400).json({ message: 'Ada service combo yang tidak ditemukan' })
+    }
+
+    const invalidTypeService = comboServiceRows.find(row => row.type !== selectedService.type)
+    const invalidComboTypeService = comboQty > 1
+      ? comboServiceRows.find(row => !['SPA', 'LC'].includes(row.type))
+      : null
+    if (invalidTypeService) {
+      return res.status(400).json({ message: 'Semua service combo harus 1 tipe layanan' })
+    }
+
+    if (invalidComboTypeService) {
+      return res.status(400).json({ message: 'Combo hanya berlaku untuk SPA dan LC' })
+    }
+
+    const comboSelections = normalizedServiceIds.map((sid, idx) => ({
+      therapistId: therapistIds[idx] ?? null,
+      service: serviceMap.get(sid)
+    }))
+
+    const slotNumbers = await allocateSlots(
+      db,
+      branchId,
+      Number(slot),
+      therapistIds.length
+    )
+
+    const durationNum = Number(duration_minutes)
+    if (!durationNum || durationNum <= 0) {
+      return res.status(400).json({ message: "Durasi service tidak valid" })
+    }
+
     let finalOrderId = order_id
 
-    if (!finalOrderId) {
-      const { rows } = await db.query(
-        `
-        INSERT INTO orders
-          (branch_id, user_id, status, total)
-        VALUES
-          ($1, $2, 'DRAFT', 0)
-        RETURNING id
-        `,
-        [branchId, user.id]
-      )
-      finalOrderId = rows[0].id
-    }
-    // 🆕 UPDATE ORDER dengan therapist_id & room_id
-    await db.query(
-      `UPDATE orders 
-       SET therapist_id = $1, room_id = $2 
-       WHERE id = $3`,
-       [therapist_id || null, room_id, finalOrderId] 
-    )
+    await db.query('BEGIN')
 
-    // Check if order_items already exists for this service
-    const { rows: existingItems } = await db.query(
-      `SELECT id, qty, subtotal 
-       FROM order_items 
-       WHERE order_id = $1 AND service_id = $2`,
-      [finalOrderId, service_id]
-    )
-
-    if (existingItems.length === 0) {
-      // Create new order_item
-      await db.query(
-        `
-        INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal)
-        VALUES
-          ($1, $2, $3, 1, $4, $4)
-        `,
-        [finalOrderId, service.id, service.name, service.base_price]
-      )
-
-      // Update order total
-      await db.query(
-        `UPDATE orders 
-         SET total = total + $1 
-         WHERE id = $2`,
-        [service.base_price, finalOrderId]
-      )
-    } else {
-      // Item already exists, increment qty (for extend case)
-      const newQty = existingItems[0].qty + 1
-      const newSubtotal = service.base_price * newQty
-
-      await db.query(
-        `UPDATE order_items 
-         SET qty = $1, subtotal = $2 
-         WHERE id = $3`,
-        [newQty, newSubtotal, existingItems[0].id]
-      )
-
-      // Update order total
-      await db.query(
-        `UPDATE orders 
-         SET total = total + $1 
-         WHERE id = $2`,
-        [service.base_price, finalOrderId]
-      )
-    }
-
-    // =========================
-    // 🔒 3. VALIDASI SLOT (JIKA ADA)
-    // =========================
-    let slot_number = slot ?? null
-    if (slot_number !== null) {
-      if (slot_number < 1 || slot_number > 30) {
-        return res.status(400).json({ message: "Nomor slot harus 1–30" })
-      }
-
-      const { rows: used } = await db.query(
-        `
-        SELECT 1 FROM timers
-        WHERE branch_id = $1
-          AND slot_number = $2
-          AND end_time IS NULL
-        `,
-        [branchId, slot_number]
-      )
-
-      if (used.length) {
-        return res.status(400).json({ message: `Slot ${slot_number} sudah terisi` })
-      }
-    }
-
-    // =========================
-    // ⏱️ 4. HITUNG WAKTU
-    // =========================
-    const start = new Date()
-    const plannedEnd = new Date(start.getTime() + duration_minutes * 60000)
-
-    // =========================
-    // 🧠 5. INSERT TIMER (LENGKAP)
-    // =========================
-    const { rows } = await db.query(
-      `
-      INSERT INTO timers
-        (
-          order_id,
-          therapist_id,
-          service_id,
-          room_id,
-          start_time,
-          planned_end_time,
-          paused,
-          branch_id,
-          slot_number,
-          status
+    try {
+      if (!finalOrderId) {
+        const { rows } = await db.query(
+          `
+          INSERT INTO orders
+            (branch_id, user_id, status, total)
+          VALUES
+            ($1, $2, 'DRAFT', 0)
+          RETURNING id
+          `,
+          [branchId, user.id]
         )
-      VALUES
-        ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
-      RETURNING *
-      `,
-      [
-        finalOrderId,
-        therapist_id,
-        service_id,
-        room_id,
-        start,
-        plannedEnd,
-        branchId,
-        slot_number
-      ]
-    )
+        finalOrderId = rows[0].id
+      }
 
-    res.json(rows[0])
+      await db.query(
+        `UPDATE orders
+         SET therapist_id = $1, room_id = $2
+         WHERE id = $3`,
+         [therapistIds[0], room_id, finalOrderId]
+      )
+
+      let therapistNameById = new Map()
+      if (requiresTherapist) {
+        const { rows: therapistRows } = await db.query(
+          `SELECT id, name FROM therapists WHERE id = ANY($1::int[])`,
+          [therapistIds]
+        )
+        therapistNameById = new Map(therapistRows.map(t => [Number(t.id), t.name]))
+
+        if (therapistNameById.size !== therapistIds.length) {
+          throw new Error('Terapis tidak ditemukan')
+        }
+      }
+
+      let comboTotal = 0
+      for (const selection of comboSelections) {
+        await db.query(
+          `
+          INSERT INTO order_items
+            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+          VALUES
+            ($1, $2, $3, 1, $4, $4, $5)
+          `,
+          [
+            finalOrderId,
+            selection.service.id,
+            selection.service.name,
+            selection.service.base_price,
+            selection.therapistId ? therapistNameById.get(selection.therapistId) : null
+          ]
+        )
+        comboTotal += Number(selection.service.base_price || 0)
+      }
+
+      await db.query(
+        `UPDATE orders
+         SET total = total + $1
+         WHERE id = $2`,
+        [comboTotal, finalOrderId]
+      )
+
+      const start = new Date()
+      const createdTimers = []
+      for (let idx = 0; idx < comboSelections.length; idx += 1) {
+        const selection = comboSelections[idx]
+        const slotNumber = slotNumbers[idx]
+        const timerDuration = Number(selection.service.duration_minutes || durationNum)
+        const plannedEndPerService = new Date(start.getTime() + timerDuration * 60000)
+
+        const { rows } = await db.query(
+          `
+          INSERT INTO timers
+            (
+              order_id,
+              therapist_id,
+              service_id,
+              room_id,
+              start_time,
+              planned_end_time,
+              paused,
+              branch_id,
+              slot_number,
+              status
+            )
+          VALUES
+            ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
+          RETURNING *
+          `,
+          [
+            finalOrderId,
+            selection.therapistId,
+            selection.service.id,
+            room_id,
+            start,
+            plannedEndPerService,
+            branchId,
+            slotNumber
+          ]
+        )
+
+        createdTimers.push(rows[0])
+      }
+
+      await db.query('COMMIT')
+
+      res.json({
+        order_id: finalOrderId,
+        combo_qty: therapistIds.length,
+        timers: createdTimers
+      })
+    } catch (error) {
+      await db.query('ROLLBACK')
+      throw error
+    }
   } catch (err) {
     console.error("START TIMER ERROR:", err)
     res.status(500).json({ message: err.message })
