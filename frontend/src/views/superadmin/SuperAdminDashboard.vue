@@ -12,6 +12,7 @@
         <button :class="{active:tab==='audit'}" @click="tab='audit'"> <ShieldCheck size="18" /> Audit Logs</button>
         <button :class="{active:tab==='services'}" @click="tab='services'"> <Store size="18" /> Services</button>
         <button :class="{active:tab==='therapists'}" @click="tab='therapists'"> <UsersIcon size="18" /> Therapists</button>
+        <button :class="{active:tab==='rooms'}" @click="tab='rooms'"> <Store size="18" /> Rooms</button>
         <button :class="{active:tab==='stock'}" @click="tab='stock'"> <Package size="18" /> FNB Stock</button>
         <button :class="{active:tab==='grades'}" @click="tab='grades'"> 🏆 Grades</button>
       </nav>
@@ -28,6 +29,7 @@
       <Timers v-if="tab==='timers'" />
       <Services v-if="tab==='services'" :branch-id="1" />
       <Therapists v-if="tab==='therapists'" />
+      <Rooms v-if="tab==='rooms'" />
       <StockDashboard v-if="tab==='stock'" />
       <Grades v-if="tab==='grades'" />
     </main>
@@ -48,6 +50,7 @@ import Orders from "./Orders.vue"
 import Timers from "./Timers.vue"
 import Services from "./Services.vue"
 import Therapists from './Therapists.vue'
+import Rooms from './Rooms.vue'
 import Grades from './Grades.vue'
 
 

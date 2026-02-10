@@ -67,6 +67,12 @@ const routes = [
   component: () => import("@/views/kasir/KasirOrders.vue"),
   meta: { requiresAuth: true }
 },
+{
+  path: "/kasir/reports",
+  name: "KasirReports",
+  component: () => import("@/views/kasir/KasirReports.vue"),
+  meta: { requiresAuth: true }
+},
 
 //AUDIT
 {

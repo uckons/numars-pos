@@ -184,7 +184,7 @@ exports.startTimer = async (req, res) => {
     }
 
     const selectedService = serviceRows[0]
-    const requiresTherapist = selectedService.type !== "LOUNGE"
+    const requiresTherapist = !['LOUNGE', 'KARAOKE'].includes(selectedService.type)
     const requestedComboQty = Number(req.body.combo_qty || 0)
     const comboQtyFromName = parseComboQtyFromName(selectedService.name, selectedService.type)
     const comboQtyFromPayload = Math.max(
@@ -358,46 +358,46 @@ exports.startTimer = async (req, res) => {
         }
       }
 
-      const comboTotal = comboSelections.reduce(
+      const comboTotalRaw = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.base_price || 0),
         0
       )
+      const comboTotal = Math.round(comboTotalRaw)
       const comboDurationMinutes = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
         0
       ) || durationNum
-      const comboTherapistNames = comboSelections
-        .map(selection => (selection.therapistId ? therapistNameById.get(selection.therapistId) : null))
-        .filter(Boolean)
       const comboServiceNames = comboSelections
         .map(selection => selection.service.name)
         .filter(Boolean)
 
-      const comboLabel = comboQty > 1
-        ? `COMBO SERVICE (${comboQty})`
-        : (comboServiceNames[0] || selectedService.name)
-      const comboDetail = comboServiceNames.join(' + ')
-      const serviceNameSnapshot = comboDetail
-        ? `${comboLabel}: ${comboDetail}`
-        : comboLabel
+      const comboLabel = comboQty > 1 ? `COMBO SERVICE (${comboQty})` : null
 
-      await db.query(
-        `
-        INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
-        VALUES
-          ($1, $2, $3, $4, $5, $6, $7)
-        `,
-        [
-          finalOrderId,
-          comboSelections[0].service.id,
-          serviceNameSnapshot,
-          comboQty,
-          comboQty > 0 ? comboTotal / comboQty : comboTotal,
-          comboTotal,
-          comboTherapistNames.join(', ') || null
-        ]
-      )
+      for (const selection of comboSelections) {
+        const unitPrice = Math.round(Number(selection.service.base_price || 0))
+        const baseServiceName = selection.service.name || selectedService.name
+        const serviceNameSnapshot = comboLabel
+          ? `${comboLabel}: ${baseServiceName}`
+          : baseServiceName
+
+        await db.query(
+          `
+          INSERT INTO order_items
+            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+          VALUES
+            ($1, $2, $3, $4, $5, $6, $7)
+          `,
+          [
+            finalOrderId,
+            selection.service.id,
+            serviceNameSnapshot,
+            1,
+            unitPrice,
+            unitPrice,
+            selection.therapistId ? therapistNameById.get(selection.therapistId) || null : null
+          ]
+        )
+      }
 
       await db.query(
         `UPDATE orders
@@ -595,14 +595,21 @@ exports.getTherapists = async (req, res) => {
   try {
     const db = req.app.get("db")
     const branch_id = req.query.branch_id || req.user.branch_id
-    const service_type = req.query.service_type
-
     let query = `
       SELECT 
         t.id,
         t.name,
         t.grade_id,
-        tg.name AS grade_name
+        tg.name AS grade_name,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM timers tm
+            WHERE tm.therapist_id = t.id
+              AND tm.end_time IS NULL
+          ) THEN true
+          ELSE false
+        END AS is_occupied
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
       WHERE t.active = true
@@ -650,11 +657,15 @@ exports.getRooms = async (req, res) => {
     const params = [branch_id]
     
     if (service_type) {
-       if (service_type === "LOUNGE") {
-        query += ` AND r.type IN ('LOUNGE','LC')`
-      } else {
+      if (service_type === "SPA") {
         query += ` AND r.type = $2`
-        params.push(service_type)
+        params.push('SPA')
+      } else if (service_type === "LC") {
+        query += ` AND r.type IN ('LC','LOUNGE')`
+      } else if (service_type === "LOUNGE") {
+        query += ` AND r.type IN ('LC','LOUNGE')`
+      } else if (service_type === "KARAOKE") {
+        query += ` AND r.type IN ('KTV','KARAOKE')`
       }
     }
     

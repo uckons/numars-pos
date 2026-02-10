@@ -42,17 +42,27 @@ const loadOrder = async (orderId) => {
       // 🆕 Set current order ID
       pos.currentOrderId = Number(orderId)
       order.items.forEach(item => {
+        const itemQty = Number(item.qty || 1)
+        const itemPrice = Number(item.price || 0)
+        const itemSubtotal = Number(item.subtotal || (itemPrice * itemQty) || 0)
+        const isComboSnapshot = /^COMBO SERVICE\s*\(/i.test(String(item.service_name || ""))
+
+        const normalizedQty = isComboSnapshot ? 1 : Math.max(1, itemQty)
+        const normalizedBasePrice = isComboSnapshot
+          ? Math.round(itemSubtotal)
+          : Math.round(itemPrice)
+
         const cartItem = {
           id: item.service_id,
           name: item.service_name,
-          base_price: item.price,
+          base_price: normalizedBasePrice,
           price_label: item.price_label || null,
           is_package: Boolean(item.is_package),
           qty: 1
         }
-        
-        // Add sebanyak qty
-        for (let i = 0; i < item.qty; i++) {
+
+        // Add sebanyak qty (combo disimpan sebagai 1 baris total)
+        for (let i = 0; i < normalizedQty; i++) {
           pos.addService(cartItem)
         }
       })

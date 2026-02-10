@@ -9,6 +9,16 @@ const parseOrderId = (rawId) => {
   return orderId
 }
 
+const VOID_UNDO_WINDOW_MINUTES = 10
+
+const writeAuditLog = async (db, userId, action, payload = {}) => {
+  await db.query(
+    `INSERT INTO audit_logs (user_id, action, target)
+     VALUES ($1, $2, $3)`,
+    [userId, action, JSON.stringify(payload)]
+  )
+}
+
 exports.create = async (req, res) => {
   try {
     const db = req.app.get("db")
@@ -61,25 +71,70 @@ exports.close = async (req, res) => {
       return res.status(400).json({ message: "Cannot close order with empty items" })
     }
 
+    const { rows: existingOrderItems } = await db.query(
+      `SELECT service_id, service_name, qty, price, subtotal, therapist_name, room_name
+       FROM order_items
+       WHERE order_id = $1
+       ORDER BY id ASC`,
+      [orderId]
+    )
+
+    const existingByKey = new Map()
+    for (const row of existingOrderItems) {
+      const serviceId = Number(row.service_id)
+      const serviceName = String(row.service_name || "")
+      const key = `${serviceId}::${serviceName}`
+      const bucket = existingByKey.get(key) || []
+      bucket.push(row)
+      existingByKey.set(key, bucket)
+    }
+
     // Hapus items lama
     await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
-      
-      // Insert items baru
-      for (const i of items) {
-        const svcResult = await db.query(
-          `SELECT name FROM services WHERE id = $1`,
-          [i.id]
-        )
-        const serviceName = i.name || svcResult.rows[0]?.name || "Unknown Service"
-        const qty = Number(i.qty || 1)
-        const unitPrice = Number(i.base_price ?? 0)
 
-        await db.query(
-          `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-           [orderId, i.id, serviceName, qty, unitPrice, qty * unitPrice, i.price_label || null, Boolean(i.is_package)]
-        )
+    // Insert items baru
+    for (const i of items) {
+      const svcResult = await db.query(
+        `SELECT name FROM services WHERE id = $1`,
+        [i.id]
+      )
+
+      const serviceName = i.name || svcResult.rows[0]?.name || "Unknown Service"
+      const qty = Number(i.qty || 1)
+      const serviceId = Number(i.id)
+      const key = `${serviceId}::${serviceName}`
+      const existingSnapshot = (existingByKey.get(key) || []).shift() || null
+
+      let unitPrice = Math.round(Number(i.base_price ?? 0))
+      let subtotal = Math.round(qty * unitPrice)
+
+      if (existingSnapshot) {
+        const snapshotQty = Number(existingSnapshot.qty || 0)
+        if (snapshotQty === qty) {
+          subtotal = Math.round(Number(existingSnapshot.subtotal || subtotal))
+          if (!(unitPrice > 0)) {
+            unitPrice = Math.round(Number(existingSnapshot.price || unitPrice))
+          }
+        }
       }
+
+      await db.query(
+        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          orderId,
+          serviceId,
+          serviceName,
+          qty,
+          unitPrice,
+          subtotal,
+          i.therapist_name || existingSnapshot?.therapist_name || null,
+          i.room_name || existingSnapshot?.room_name || null,
+          i.price_label || null,
+          Boolean(i.is_package)
+        ]
+      )
+    }
   
     // Hitung total baru
     const totalResult = await db.query(
@@ -88,7 +143,7 @@ exports.close = async (req, res) => {
        WHERE order_id = $1`,
       [orderId]
     )
-    const total = totalResult.rows[0].total
+    const total = Math.round(Number(totalResult.rows[0].total || 0))
 
     // Update order dengan payment & status PAID
     const result = await db.query(
@@ -139,13 +194,155 @@ exports.close = async (req, res) => {
 exports.cancel = async (req, res) => {
   const db = req.app.get("db")
   const orderId = parseOrderId(req.params.id)
+  const reason = String(req.body?.reason || "").trim()
 
-  await db.query(
-    "UPDATE orders SET status='CANCELLED' WHERE id=$1",
-    [orderId]
-  )
+  if (!reason) {
+    return res.status(400).json({ message: "Void reason wajib diisi" })
+  }
 
-  res.json({ success: true })
+  try {
+    await db.query('BEGIN')
+
+    const { rows: orderRows } = await db.query(
+      `SELECT id, status FROM orders WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    )
+
+    if (!orderRows.length) {
+      await db.query('ROLLBACK')
+      return res.status(404).json({ message: 'Order tidak ditemukan' })
+    }
+
+    const status = String(orderRows[0].status || '').toUpperCase()
+    if (status !== 'DRAFT') {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: 'Void hanya untuk order DRAFT' })
+    }
+
+    const { rows: fnbItems } = await db.query(
+      [
+        "SELECT fi.id AS fnb_item_id, oi.qty",
+        "FROM order_items oi",
+        "JOIN services s ON s.id = oi.service_id",
+        "JOIN fnb_items fi ON fi.service_id = s.id",
+        "WHERE oi.order_id=$1 AND s.type='FNB'"
+      ].join(" "),
+      [orderId]
+    )
+
+    for (const item of fnbItems) {
+      await stockService.increaseFnbStock(
+        db,
+        item.fnb_item_id,
+        Number(item.qty || 0)
+      )
+    }
+
+    await db.query(`DELETE FROM commissions WHERE order_id = $1`, [orderId])
+    await db.query(`DELETE FROM timers WHERE order_id = $1`, [orderId])
+
+    await db.query(
+      "UPDATE orders SET status='CANCELLED' WHERE id=$1",
+      [orderId]
+    )
+
+    await writeAuditLog(db, req.user.id, 'VOID_DRAFT_ORDER', {
+      order_id: orderId,
+      reason,
+      at: new Date().toISOString()
+    })
+
+    await db.query('COMMIT')
+    res.json({ success: true, reason })
+  } catch (err) {
+    try { await db.query('ROLLBACK') } catch (_) {}
+    console.error('VOID ORDER ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.undoVoid = async (req, res) => {
+  const db = req.app.get("db")
+  const orderId = parseOrderId(req.params.id)
+
+  try {
+    await db.query('BEGIN')
+
+    const { rows: orderRows } = await db.query(
+      `SELECT id, status FROM orders WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    )
+
+    if (!orderRows.length) {
+      await db.query('ROLLBACK')
+      return res.status(404).json({ message: 'Order tidak ditemukan' })
+    }
+
+    const status = String(orderRows[0].status || '').toUpperCase()
+    if (status !== 'CANCELLED') {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: 'Undo hanya untuk order CANCELLED' })
+    }
+
+    const { rows: voidRows } = await db.query(
+      `SELECT created_at
+       FROM audit_logs
+       WHERE action = 'VOID_DRAFT_ORDER'
+         AND target::text LIKE $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [`%\"order_id\":${orderId}%`]
+    )
+
+    if (!voidRows.length) {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: 'Data audit void tidak ditemukan' })
+    }
+
+    const voidedAt = new Date(voidRows[0].created_at)
+    const maxUndoAt = new Date(voidedAt.getTime() + VOID_UNDO_WINDOW_MINUTES * 60 * 1000)
+    if (new Date() > maxUndoAt) {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: `Undo hanya bisa dalam ${VOID_UNDO_WINDOW_MINUTES} menit setelah void` })
+    }
+
+    const { rows: fnbItems } = await db.query(
+      [
+        "SELECT fi.id AS fnb_item_id, oi.qty",
+        "FROM order_items oi",
+        "JOIN services s ON s.id = oi.service_id",
+        "JOIN fnb_items fi ON fi.service_id = s.id",
+        "WHERE oi.order_id=$1 AND s.type='FNB'"
+      ].join(" "),
+      [orderId]
+    )
+
+    for (const item of fnbItems) {
+      await stockService.reduceFnbStock(
+        db,
+        item.fnb_item_id,
+        Number(item.qty || 0)
+      )
+    }
+
+    await db.query(
+      "UPDATE orders SET status='DRAFT' WHERE id=$1",
+      [orderId]
+    )
+
+    await writeAuditLog(db, req.user.id, 'UNDO_VOID_DRAFT_ORDER', {
+      order_id: orderId,
+      at: new Date().toISOString(),
+      window_minutes: VOID_UNDO_WINDOW_MINUTES
+    })
+
+    await db.query('COMMIT')
+    res.json({ success: true, status: 'DRAFT' })
+  } catch (err) {
+    try { await db.query('ROLLBACK') } catch (_) {}
+    console.error('UNDO VOID ORDER ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
 }
 
 

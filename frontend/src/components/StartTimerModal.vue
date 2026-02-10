@@ -46,7 +46,7 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
-    <div class="field" v-if="serviceType && serviceType !== 'LOUNGE'">
+    <div class="field" v-if="serviceType && !['LOUNGE', 'KARAOKE'].includes(serviceType)">
       <label>
         Nama Terapis
         <small v-if="selectedServiceQty > 1">(wajib {{ selectedServiceQty }} terapis)</small>
@@ -59,7 +59,12 @@
           :disabled="loadingTherapists || !serviceType"
         >
           <option value="">-- Pilih Terapis #{{ idx }} --</option>
-          <option v-for="t in therapists" :key="`ther-opt-${idx}-${t.id}`" :value="t.id">
+          <option
+            v-for="t in therapists"
+            :key="`ther-opt-${idx}-${t.id}`"
+            :value="t.id"
+            :disabled="isTherapistDisabled(t.id, idx - 1)"
+          >
             {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
           </option>
         </select>
@@ -68,10 +73,10 @@
     </div>
 
     <div class="field" v-if="serviceType">
-      <label>{{ serviceType === 'SPA' ? 'Room' : 'Tabel / Sofa' }}</label>
+      <label>{{ roomLabel }}</label>
       <select v-model="selectedRoomId" :disabled="loadingRooms">
         <option value="">-- Pilih --</option>
-        <option v-for="r in rooms" :key="r.id" :value="r.id" :disabled="r.is_occupied">
+        <option v-for="r in rooms" :key="r.id" :value="r.id" :disabled="isRoomDisabled(r)">
           {{ r.name }} {{ r.is_occupied ? '• Occupied' : '' }}
         </option>
       </select>
@@ -164,18 +169,22 @@ const duration = computed(() => {
 
 const effectiveDuration = computed(() => duration.value || manualDuration.value)
 const isComboMode = computed(() => selectedOrderType.value === "COMBO" && Number(selectedServiceQty.value || 1) > 1)
+const timerServiceTypes = ['SPA', 'LC', 'LOUNGE', 'KARAOKE']
+
+const roomLabel = computed(() => {
+  if (serviceType.value === 'SPA') return 'Room'
+  if (serviceType.value === 'KARAOKE') return 'Ruang KTV'
+  return 'Tabel / Sofa'
+})
 
 const selectableServices = computed(() => {
   if (!services.value.length) return []
 
-  // Combo should allow picking SPA or LC as starting/alternate selection.
-  // Type consistency is validated on submit/backend.
   if (isComboMode.value) {
-    return services.value.filter(s => ["SPA", "LC"].includes(s.type))
+    return services.value.filter(s => ['SPA', 'LC'].includes(s.type))
   }
 
-  if (!serviceType.value) return services.value
-  return services.value.filter(s => s.type === serviceType.value)
+  return services.value.filter(s => timerServiceTypes.includes(String(s.type || '').toUpperCase()))
 })
 
 const normalizeServicePayload = (payload) => {
@@ -201,11 +210,19 @@ const normalizeServicePayload = (payload) => {
   return []
 }
 
+const resizeSelection = (currentValues, qty, { keepFirstValue = false } = {}) => {
+  const next = Array.from({ length: qty }, (_, idx) => {
+    if (currentValues[idx] !== undefined) return currentValues[idx]
+    if (keepFirstValue && idx === 0) return currentValues[0] || ""
+    return ""
+  })
+  return next
+}
+
 const initSelections = () => {
   const qty = Number(selectedServiceQty.value || 1)
-  const firstService = selectedServiceIds.value[0] || ""
-  selectedServiceIds.value = Array(qty).fill(firstService)
-  selectedTherapistIds.value = Array(qty).fill("")
+  selectedServiceIds.value = resizeSelection(selectedServiceIds.value, qty, { keepFirstValue: true })
+  selectedTherapistIds.value = resizeSelection(selectedTherapistIds.value, qty)
 }
 
 const ensureComboBaseService = () => {
@@ -242,6 +259,26 @@ const onServiceSelectionChange = async () => {
   await fetchRooms()
 }
 
+const isTherapistDisabled = (therapistId, currentIndex) => {
+  const normalizedId = Number(therapistId)
+  if (!Number.isInteger(normalizedId) || normalizedId <= 0) return false
+
+  if (therapists.value.find(t => Number(t.id) === normalizedId)?.is_occupied) {
+    return true
+  }
+
+  return selectedTherapistIds.value.some((selectedId, idx) => {
+    if (idx === currentIndex) return false
+    return Number(selectedId) === normalizedId
+  })
+}
+
+const isRoomDisabled = (room) => {
+  if (!room) return false
+  if (['LC', 'LOUNGE'].includes(serviceType.value)) return false
+  return Boolean(room.is_occupied)
+}
+
 const fetchServices = async () => {
   try {
     loadingServices.value = true
@@ -256,7 +293,7 @@ const fetchServices = async () => {
     })
 
     const allServices = normalizeServicePayload(res.data)
-    services.value = allServices.filter(s => s?.type !== "FNB")
+    services.value = allServices.filter(s => timerServiceTypes.includes(String(s?.type || '').toUpperCase()))
 
     if (!services.value.length) {
       errorMessage.value = "Tidak ada service aktif yang bisa dipilih"
@@ -275,7 +312,7 @@ const fetchServices = async () => {
 }
 
 const fetchTherapists = async () => {
-  if (!serviceType.value || serviceType.value === "LOUNGE") return
+  if (!serviceType.value || ['LOUNGE', 'KARAOKE'].includes(serviceType.value)) return
   try {
     loadingTherapists.value = true
     errorMessage.value = ""
@@ -352,7 +389,7 @@ const submit = () => {
     .map(id => Number(id))
     .filter(id => Number.isInteger(id) && id > 0)
 
-  if (selectedType !== "LOUNGE") {
+  if (!['LOUNGE', 'KARAOKE'].includes(selectedType)) {
     if (normalizedTherapistIds.length !== qty) {
       errorMessage.value = "Pilih terapis sesuai Qty Service"
       return
@@ -365,7 +402,7 @@ const submit = () => {
   }
 
   if (!selectedRoomId.value) {
-    errorMessage.value = `Silakan pilih ${selectedType === 'SPA' ? 'room' : 'tabel/sofa'}`
+    errorMessage.value = `Silakan pilih ${selectedType === 'SPA' ? 'room' : (selectedType === 'KARAOKE' ? 'ruang KTV' : 'tabel/sofa')}`
     return
   }
 

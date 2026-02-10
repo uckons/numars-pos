@@ -45,6 +45,7 @@ router.post("/:id/items", auth, controller.addItem)
 // CLOSE / DRAFT / CANCEL ORDER
 router.post("/:id/close", auth, controller.close)
 router.post("/:id/draft", auth, controller.saveDraft)
+router.post("/:id/undo-void", auth, controller.undoVoid)
 router.delete("/:id", auth, controller.cancel)
 
 module.exports = router
