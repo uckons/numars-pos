@@ -120,7 +120,7 @@
             <!-- BRANCH BADGE (FIXED) -->
             <td>
               <span class="badge branch">
-                {{ s.branch_name || s.branch?.name || '—' }}
+                {{ s.branch_name || s.branch || s.branch?.name || '—' }}
               </span>
             </td>
 
@@ -211,8 +211,8 @@ const selectedIds = ref([])
 
 /* LOAD BRANCHES */
 const loadBranches = async () => {
-  const res = await api.get("/branches")
-  branches.value = res.data.data || res.data
+  const res = await api.get("/superadmin/branches")
+  branches.value = Array.isArray(res.data) ? res.data : (res.data.data || [])
 }
 
 /* LOAD SERVICES */

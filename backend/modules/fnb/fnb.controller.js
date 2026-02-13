@@ -2,7 +2,7 @@ const service = require("./fnb.service")
 
 exports.getAll = async (req, res) => {
   const db = req.app.get("db")
-  const items = await service.getAll(db, req.user)
+  const items = await service.getAll(db, req.user, req.query)
   res.json(items)
 }
 

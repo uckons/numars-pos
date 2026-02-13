@@ -27,6 +27,7 @@
       <Branches v-if="tab==='branches'" />
       <Orders v-if="tab==='orders'" />
       <Timers v-if="tab==='timers'" />
+      <AuditLogs v-if="tab==='audit'" />
       <Services v-if="tab==='services'" :branch-id="1" />
       <Therapists v-if="tab==='therapists'" />
       <Rooms v-if="tab==='rooms'" />
@@ -40,7 +41,7 @@
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/store/auth.store"
-import { Users as UsersIcon, Store, ClipboardList, Timer, LogOut, Package } from "lucide-vue-next"
+import { Users as UsersIcon, Store, Package } from "lucide-vue-next"
 import AuditLogs from "./AuditLogs.vue"
 import { ShieldCheck } from "lucide-vue-next"
 import StockDashboard from "@/views/stock/StockDashboard.vue"
@@ -63,7 +64,6 @@ const logout = () => {
   router.push("/login")
 }
 </script>
-<AuditLogs v-if="tab==='audit'" />
 
 <style scoped>
 .layout {

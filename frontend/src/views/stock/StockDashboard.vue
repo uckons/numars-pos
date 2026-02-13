@@ -66,6 +66,11 @@
         <option value="OUT">Out of Stock</option>
       </select>
 
+      <select v-model="selectedBranch" class="select">
+        <option value="ALL">All Outlet</option>
+        <option v-for="b in branches" :key="b.id" :value="String(b.id)">{{ b.name }}</option>
+      </select>
+
       <div class="per-page">
         <span>Show</span>
         <select v-model="perPage" class="select">
@@ -81,6 +86,7 @@
         <thead>
           <tr>
             <th>Name</th>
+            <th>Outlet</th>
             <th>Stock</th>
             <th>Alert</th>
             <th>Harga Modal</th>
@@ -94,10 +100,10 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="10" class="empty">Loading...</td>
+            <td colspan="11" class="empty">Loading...</td>
           </tr>
           <tr v-else-if="!paginatedItems.length">
-            <td colspan="10" class="empty">No stock items found</td>
+            <td colspan="11" class="empty">No stock items found</td>
           </tr>
           <tr
             v-for="item in paginatedItems"
@@ -105,6 +111,7 @@
             class="row"
           >
             <td class="name">{{ item.name }}</td>
+            <td>{{ item.branch_name || "-" }}</td>
             <td>{{ item.stock }}</td>
             <td>{{ item.alert_stock }}</td>
             <td>Rp {{ format(item.cost_price) }}</td>
@@ -270,6 +277,8 @@ import "sweetalert2/dist/sweetalert2.min.css"
 import api from "@/services/api"
 
 const items = ref([])
+const branches = ref([])
+const selectedBranch = ref("ALL")
 const loading = ref(false)
 const keyword = ref("")
 const statusFilter = ref("ALL")
@@ -301,7 +310,8 @@ const form = ref({
 const loadItems = async () => {
   loading.value = true
   try {
-    const res = await api.get("/fnb")
+    const params = selectedBranch.value !== "ALL" ? { branch_id: selectedBranch.value } : undefined
+    const res = await api.get("/fnb", { params })
     items.value = res.data || []
   } catch (error) {
     console.error("Load FNB stock failed:", error)
@@ -357,14 +367,21 @@ const saveHappyHour = async (entry) => {
   }
 }
 
-onMounted(() => {
-  loadItems()
-  loadHappyHours()
+const loadBranches = async () => {
+  const res = await api.get("/superadmin/branches")
+  branches.value = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : []
+}
+
+onMounted(async () => {
+  await loadBranches()
+  await loadItems()
+  await loadHappyHours()
 })
 
 const filteredItems = computed(() => {
   const normalizedKeyword = keyword.value.toLowerCase()
   return items.value.filter(item => {
+    if (selectedBranch.value !== "ALL" && String(item.branch_id) !== String(selectedBranch.value)) return false
     const matchesName = item.name?.toLowerCase().includes(normalizedKeyword)
     if (!matchesName) return false
     if (statusFilter.value === "LOW") {
@@ -394,8 +411,12 @@ const outOfStockCount = computed(() =>
   items.value.filter(item => item.stock <= 0).length
 )
 
-watch([keyword, statusFilter, perPage], () => {
+watch([keyword, statusFilter, perPage, selectedBranch], () => {
   page.value = 1
+})
+
+watch(selectedBranch, () => {
+  loadItems()
 })
 
 const openAdd = () => {

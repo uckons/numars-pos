@@ -55,8 +55,8 @@
             <th>Qty</th>
             <th>Happy Hour</th>
             <th>Non Happy Hour</th>
-            <th>Non HH Paket</th>
-            <th>Non HH Non Paket</th>
+            <th>Paket</th>
+            <th>Non Paket</th>
             <th>Total</th>
           </tr>
         </thead>
@@ -67,8 +67,8 @@
             <td>{{ row.qty }}</td>
             <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_package_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_non_package_revenue) }}</td>
+            <td>{{ row.category === 'FNB' ? `Rp ${formatCurrency(row.package_revenue ?? row.non_happy_package_revenue)}` : '-' }}</td>
+            <td>{{ row.category === 'FNB' ? `Rp ${formatCurrency(row.non_package_revenue ?? row.non_happy_non_package_revenue)}` : '-' }}</td>
             <td>Rp {{ formatCurrency(row.total_revenue) }}</td>
           </tr>
           <tr v-if="!(report.pnl_services || []).length"><td colspan="8" class="muted">Belum ada data service.</td></tr>
@@ -123,10 +123,11 @@
             <th>Grade</th>
             <th>Service</th>
             <th>Kategori</th>
+            <th>Qty</th>
             <th>Happy Hour</th>
             <th>Non Happy Hour</th>
-            <th>Non HH Paket</th>
-            <th>Non HH Non Paket</th>
+            <th>Paket</th>
+            <th>Non Paket</th>
             <th>Total Kerja</th>
           </tr>
         </thead>
@@ -136,13 +137,14 @@
             <td>{{ row.grade_name }}</td>
             <td>{{ row.service_name }}</td>
             <td>{{ row.category }}</td>
+            <td>{{ row.qty }}</td>
             <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_package_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_non_package_revenue) }}</td>
+            <td>{{ row.category === 'FNB' ? `Rp ${formatCurrency(row.package_revenue ?? row.non_happy_package_revenue)}` : '-' }}</td>
+            <td>{{ row.category === 'FNB' ? `Rp ${formatCurrency(row.non_package_revenue ?? row.non_happy_non_package_revenue)}` : '-' }}</td>
             <td>Rp {{ formatCurrency(row.therapist_total_kerja) }}</td>
           </tr>
-          <tr v-if="!filteredTherapistPnl.length"><td colspan="9" class="muted">Belum ada data terapis.</td></tr>
+          <tr v-if="!filteredTherapistPnl.length"><td colspan="10" class="muted">Belum ada data terapis.</td></tr>
         </tbody>
       </table>
 
@@ -226,25 +228,6 @@
       </div>
     </section>
 
-    <section class="card">
-      <div class="section-head"><h3>Laporan Pendapatan Detail (PNL Base)</h3></div>
-      <div class="toolbar">
-        <input class="input" type="date" v-model="reportFilters.date_from" />
-        <input class="input" type="date" v-model="reportFilters.date_to" />
-        <button class="btn-primary" @click="loadReport">Terapkan</button>
-      </div>
-      <div class="summary-grid">
-        <div><p class="muted">Revenue</p><h4>Rp {{ formatCurrency(report.summary.revenue) }}</h4></div>
-        <div><p class="muted">Paid Orders</p><h4>{{ report.summary.paid_orders }}</h4></div>
-        <div><p class="muted">Items Sold</p><h4>{{ report.summary.items_sold }}</h4></div>
-      </div>
-      <table class="table">
-        <thead><tr><th>Kategori</th><th>Qty</th><th>Revenue</th></tr></thead>
-        <tbody>
-          <tr v-for="row in report.breakdown" :key="row.category"><td>{{ row.category }}</td><td>{{ row.qty }}</td><td>Rp {{ formatCurrency(row.revenue) }}</td></tr>
-        </tbody>
-      </table>
-    </section>
   </div>
 </template>
 

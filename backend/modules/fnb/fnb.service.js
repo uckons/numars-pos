@@ -1,4 +1,4 @@
-exports.getAll = async (db, user) => {
+exports.getAll = async (db, user, query = {}) => {
   const { rows } = await db.query(
   //  `SELECT * FROM fnb_items WHERE branch_id=$1 ORDER BY name`,
     `SELECT
@@ -6,6 +6,7 @@ exports.getAll = async (db, user) => {
       fi.branch_id,
       fi.service_id,
       fi.name,
+      b.name AS branch_name,
       fi.cost_price,
       fi.stock,
       fi.alert_stock,
@@ -31,11 +32,24 @@ exports.getAll = async (db, user) => {
          AND (hh.service_type IS NULL OR hh.service_type = 'FNB' OR hh.service_type = 'ALL')
        LIMIT 1
      ) hh_active ON true
-     WHERE fi.branch_id=$1
+     LEFT JOIN branches b ON b.id = fi.branch_id
+     WHERE 1=1
+       AND (
+         $1::text = 'ALL'
+         OR fi.branch_id = $1::int
+       )
      ORDER BY fi.name`,
-    [user.branch_id]
+    [
+      (query.branch_id && String(query.branch_id).toUpperCase() !== 'ALL')
+        ? String(query.branch_id)
+        : (['SuperAdmin','Manager','Owner'].includes(user.role) ? 'ALL' : String(user.branch_id || '0'))
+    ]
   )
-  return rows
+
+  return rows.map((r) => ({
+    ...r,
+    branch_name: r.branch_name || r.branch || null
+  }))
 }
 
 exports.create = async (db, user, data) => {

@@ -14,12 +14,12 @@
         <div class="card-value">{{ grades.length }}</div>
       </div>
       <div class="card">
-        <div class="card-label">Min Komisi</div>
-        <div class="card-value">{{ minCommission }}%</div>
+        <div class="card-label">Min Komisi (Rp)</div>
+        <div class="card-value">Rp {{ formatCurrency(minCommission) }}</div>
       </div>
       <div class="card">
-        <div class="card-label">Max Komisi</div>
-        <div class="card-value">{{ maxCommission }}%</div>
+        <div class="card-label">Max Komisi (Rp)</div>
+        <div class="card-value">Rp {{ formatCurrency(maxCommission) }}</div>
       </div>
     </div>
 
@@ -30,7 +30,7 @@
           <tr>
             <th>#</th>
             <th>Nama Grade</th>
-            <th>Komisi (%)</th>
+            <th>Komisi Fix (Rp)</th>
             <th>Jumlah Terapis</th>
             <th>Aksi</th>
           </tr>
@@ -50,7 +50,7 @@
               </span>
             </td>
             <td class="commission">
-              <strong>{{ grade.commission_percent }}%</strong>
+              <strong>Rp {{ formatCurrency(grade.commission_amount ?? grade.commission_percent) }}</strong>
             </td>
             <td>
               <span class="therapist-count">
@@ -95,25 +95,24 @@
           </div>
 
           <div class="form-group">
-            <label>Komisi (%) *</label>
+            <label>Komisi Fix (Rp) *</label>
             <input 
               type="number" 
-              v-model.number="form.commission_percent" 
-              placeholder="0 - 100"
+              v-model.number="form.commission_amount" 
+              placeholder="Contoh: 25000"
               min="0"
-              max="100"
-              step="0.01"
+              step="1000"
               required
             />
-            <small class="hint">Persentase komisi untuk terapis (0-100)</small>
+            <small class="hint">Nominal komisi fix rupiah per jumlah kerja (>= 0)</small>
           </div>
 
           <!-- Preview -->
-          <div class="preview" v-if="form.name && form.commission_percent">
+          <div class="preview" v-if="form.name && form.commission_amount !== ''">
             <div class="preview-label">Preview:</div>
             <div class="preview-badge">
               <span class="badge badge-preview">{{ form.name }}</span>
-              <span class="preview-commission">{{ form.commission_percent }}%</span>
+              <span class="preview-commission">Rp {{ formatCurrency(form.commission_amount) }}</span>
             </div>
           </div>
 
@@ -146,7 +145,7 @@ const showModal = ref(false)
 const isEdit = ref(false)
 const form = ref({
   name: '',
-  commission_percent: ''
+  commission_amount: ''
 })
 
 // SweetAlert Theme
@@ -165,12 +164,12 @@ const SwalTheme = Swal.mixin({
 // Computed
 const minCommission = computed(() => {
   if (grades.value.length === 0) return 0
-  return Math.min(...grades.value.map(g => g.commission_percent))
+  return Math.min(...grades.value.map(g => Number(g.commission_amount ?? g.commission_percent ?? 0)))
 })
 
 const maxCommission = computed(() => {
   if (grades.value.length === 0) return 0
-  return Math.max(...grades.value.map(g => g.commission_percent))
+  return Math.max(...grades.value.map(g => Number(g.commission_amount ?? g.commission_percent ?? 0)))
 })
 
 // Fetch Grades with therapist count
@@ -209,7 +208,7 @@ const openAddModal = () => {
   isEdit.value = false
   form.value = {
     name: '',
-    commission_percent: ''
+    commission_amount: ''
   }
   showModal.value = true
 }
@@ -220,7 +219,7 @@ const openEditModal = (grade) => {
   form.value = {
     id: grade.id,
     name: grade.name,
-    commission_percent: grade.commission_percent
+    commission_amount: grade.commission_amount ?? grade.commission_percent
   }
   showModal.value = true
 }
@@ -230,7 +229,7 @@ const closeModal = () => {
   showModal.value = false
   form.value = {
     name: '',
-    commission_percent: ''
+    commission_amount: ''
   }
 }
 
@@ -242,7 +241,7 @@ const submitForm = async () => {
     if (isEdit.value) {
       await api.put(`/grades/${form.value.id}`, {
         name: form.value.name,
-        commission_percent: form.value.commission_percent
+        commission_amount: form.value.commission_amount
       })
       await SwalTheme.fire({
         icon: 'success',
@@ -254,7 +253,7 @@ const submitForm = async () => {
     } else {
       await api.post('/grades', {
         name: form.value.name,
-        commission_percent: form.value.commission_percent
+        commission_amount: form.value.commission_amount
       })
       await SwalTheme.fire({
         icon: 'success',
@@ -286,7 +285,7 @@ const deleteGrade = async (grade) => {
     title: 'Hapus Grade?',
     html: `
       <p>Anda yakin ingin menghapus grade:</p>
-      <strong>${grade.name} (${grade.commission_percent}%)</strong>
+      <strong>${grade.name} (Rp ${formatCurrency(grade.commission_amount ?? grade.commission_percent)})</strong>
       <p style="margin-top:10px;color:#e74c3c;font-size:13px;">
         ⚠️ Grade yang masih digunakan tidak bisa dihapus!
       </p>
@@ -331,6 +330,8 @@ const deleteGrade = async (grade) => {
     }
   }
 }
+
+const formatCurrency = (value) => Number(value || 0).toLocaleString("id-ID")
 
 // Lifecycle
 onMounted(() => {

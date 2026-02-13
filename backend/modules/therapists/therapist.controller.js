@@ -1,3 +1,39 @@
+
+const ensureGradeCommissionStorage = async (db) => {
+  await db.query(`
+    ALTER TABLE therapist_grades
+    ALTER COLUMN commission_percent TYPE NUMERIC(14,2)
+  `)
+
+  await db.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'therapist_grades' AND column_name = 'commission_amount'
+      ) THEN
+        ALTER TABLE therapist_grades ADD COLUMN commission_amount NUMERIC(14,2);
+        UPDATE therapist_grades SET commission_amount = COALESCE(commission_percent, 0);
+      END IF;
+    END $$;
+  `)
+}
+
+const resolveGradeCommissionExpression = async (db) => {
+  const { rows } = await db.query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'therapist_grades'
+        AND column_name = 'commission_amount'
+    ) AS has_commission_amount
+  `)
+
+  return rows[0]?.has_commission_amount
+    ? 'COALESCE(tg.commission_amount, tg.commission_percent, 0)'
+    : 'COALESCE(tg.commission_percent, 0)'
+}
+
 // 📋 GET ALL THERAPISTS (with pagination & filters)
 exports.getTherapists = async (req, res) => {
   try {
@@ -12,6 +48,7 @@ exports.getTherapists = async (req, res) => {
     } = req.query
 
     const offset = (page - 1) * limit
+    const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
     
     // Build WHERE clause
     let whereConditions = []
@@ -73,7 +110,8 @@ exports.getTherapists = async (req, res) => {
         t.grade_id,
         t.active,
         tg.name AS grade_name,
-        tg.commission_percent,
+        ${gradeCommissionExpr} AS commission_amount,
+        ${gradeCommissionExpr} AS commission_percent,
         b.name AS branch_name
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
@@ -106,6 +144,7 @@ exports.getTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
     const { id } = req.params
+    const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
 
     const { rows } = await db.query(`
       SELECT 
@@ -115,7 +154,8 @@ exports.getTherapist = async (req, res) => {
         t.grade_id,
         t.active,
         tg.name AS grade_name,
-        tg.commission_percent,
+        ${gradeCommissionExpr} AS commission_amount,
+        ${gradeCommissionExpr} AS commission_percent,
         b.name AS branch_name
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
@@ -283,10 +323,14 @@ exports.getGrades = async (req, res) => {
   try {
     const db = req.app.get("db")
     
+    const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
+
     const { rows } = await db.query(`
-      SELECT id, name, commission_percent
-      FROM therapist_grades
-      ORDER BY commission_percent ASC
+      SELECT id, name,
+        ${gradeCommissionExpr} AS commission_amount,
+        ${gradeCommissionExpr} AS commission_percent
+      FROM therapist_grades tg
+      ORDER BY ${gradeCommissionExpr} ASC
     `)
 
     res.json(rows)
@@ -300,18 +344,20 @@ exports.getGrades = async (req, res) => {
 exports.createGrade = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { name, commission_percent } = req.body
+    const { name, commission_amount, commission_percent } = req.body
 
     // Validation
-    if (!name || commission_percent === undefined) {
+    const commissionValue = Number(commission_amount ?? commission_percent)
+
+    if (!name || Number.isNaN(commissionValue)) {
       return res.status(400).json({ 
-        message: "Name and commission percent are required" 
+        message: "Name and commission amount are required" 
       })
     }
 
-    if (commission_percent < 0 || commission_percent > 100) {
+    if (commissionValue < 0) {
       return res.status(400).json({ 
-        message: "Commission percent must be between 0 and 100" 
+        message: "Commission amount must be greater than or equal to 0" 
       })
     }
 
@@ -326,11 +372,27 @@ exports.createGrade = async (req, res) => {
       })
     }
 
-    const { rows } = await db.query(`
+    await ensureGradeCommissionStorage(db)
+    const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
+    const hasCommissionAmount = gradeCommissionExpr.includes("commission_amount")
+
+    const insertSql = hasCommissionAmount
+      ? `
+      INSERT INTO therapist_grades (name, commission_amount, commission_percent)
+      VALUES ($1, $2, $3)
+      RETURNING id, name, ${gradeCommissionExpr} AS commission_amount, ${gradeCommissionExpr} AS commission_percent
+    `
+      : `
       INSERT INTO therapist_grades (name, commission_percent)
       VALUES ($1, $2)
-      RETURNING id, name, commission_percent
-    `, [name, commission_percent])
+      RETURNING id, name, ${gradeCommissionExpr} AS commission_amount, ${gradeCommissionExpr} AS commission_percent
+    `
+
+    const insertParams = hasCommissionAmount
+      ? [name, commissionValue, commissionValue]
+      : [name, commissionValue]
+
+    const { rows } = await db.query(insertSql, insertParams)
 
     res.status(201).json(rows[0])
   } catch (err) {
@@ -344,7 +406,7 @@ exports.updateGrade = async (req, res) => {
   try {
     const db = req.app.get("db")
     const { id } = req.params
-    const { name, commission_percent } = req.body
+    const { name, commission_amount, commission_percent } = req.body
 
     // Build update fields
     let updateFields = []
@@ -369,15 +431,25 @@ exports.updateGrade = async (req, res) => {
       paramIndex++
     }
 
-    if (commission_percent !== undefined) {
-      if (commission_percent < 0 || commission_percent > 100) {
+    const commissionValue = commission_amount ?? commission_percent
+    if (commissionValue !== undefined) {
+      const normalizedCommission = Number(commissionValue)
+      if (Number.isNaN(normalizedCommission) || normalizedCommission < 0) {
         return res.status(400).json({ 
-          message: "Commission percent must be between 0 and 100" 
+          message: "Commission amount must be greater than or equal to 0" 
         })
       }
 
+      await ensureGradeCommissionStorage(db)
+      const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
+      if (gradeCommissionExpr.includes("commission_amount")) {
+        updateFields.push(`commission_amount = $${paramIndex}`)
+        params.push(normalizedCommission)
+        paramIndex++
+      }
+
       updateFields.push(`commission_percent = $${paramIndex}`)
-      params.push(commission_percent)
+      params.push(normalizedCommission)
       paramIndex++
     }
 
@@ -391,7 +463,7 @@ exports.updateGrade = async (req, res) => {
       UPDATE therapist_grades
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, name, commission_percent
+      RETURNING id, name, COALESCE(commission_amount, commission_percent, 0) AS commission_amount, COALESCE(commission_amount, commission_percent, 0) AS commission_percent
     `, params)
 
     if (rows.length === 0) {

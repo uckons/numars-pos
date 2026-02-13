@@ -1,4 +1,5 @@
 const service = require("./timer.service")
+const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
 
 exports.start = async (req, res) => {
   try {
@@ -24,6 +25,8 @@ exports.start = async (req, res) => {
       therapist_id,
       room_id
     )
+
+    await writeAuditEntry(db, req.user?.id, "TIMER_ADD", { order_id, service_id, therapist_id, room_id, timer_id: timer?.id })
 
     res.json(timer)
   } catch (err) {
@@ -504,6 +507,13 @@ exports.startTimer = async (req, res) => {
 
       await db.query('COMMIT')
 
+      await writeAuditEntry(db, req.user?.id, "TIMER_START", {
+        order_id: finalOrderId,
+        service_id: selectedService.id,
+        timer_ids: createdTimers.map((t) => t.id),
+        combo_qty: therapistIds.length
+      })
+
       res.json({
         order_id: finalOrderId,
         combo_qty: therapistIds.length,
@@ -528,6 +538,7 @@ exports.stop = async (req, res) => {
     const id = req.params.id
 
     const timer = await service.stopTimer(db, id)
+    await writeAuditEntry(db, req.user?.id, "TIMER_STOP", { timer_id: Number(id), order_id: timer?.order_id })
     res.json(timer)
   } catch (err) {
     console.error(err)
@@ -542,15 +553,18 @@ exports.create = async (req, res) => {
   const start = new Date()
   const end = new Date(start.getTime() + duration_minutes * 60000)
 
-  await db.query(
+  const created = await db.query(
     `
     INSERT INTO timers
       (order_id, service_id, branch_id, start_time, planned_end_time)
     VALUES
       ($1,$2,$3,$4,$5)
+    RETURNING id
     `,
     [order_id, service_id, branch_id, start, end]
   )
+
+  await writeAuditEntry(db, req.user?.id, "TIMER_CREATE_MANUAL", { order_id, service_id, timer_id: created.rows[0]?.id })
 
   res.json({ success: true })
 }
@@ -559,6 +573,7 @@ exports.startManual = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    const branchId = user.branch_id
     const { order_id, service_id } = req.body
 
     const { rows } = await db.query(
@@ -570,13 +585,14 @@ exports.startManual = async (req, res) => {
       return res.status(400).json({ message: "Service tidak punya durasi" })
     }
 
-    await db.query(
+    const started = await db.query(
       `
       INSERT INTO timers
         (order_id, service_id, branch_id, start_time, planned_end_time)
       VALUES
         ($1,$2,$3, now(),
          now() + ($4 || ' minutes')::interval)
+      RETURNING id
       `,
       [
         order_id,
@@ -585,6 +601,8 @@ exports.startManual = async (req, res) => {
         `${rows[0].duration_minutes} minutes`
       ]
     )
+
+    await writeAuditEntry(db, req.user?.id, "TIMER_START_MANUAL", { order_id, service_id, timer_id: started.rows[0]?.id })
 
     res.json({ success: true })
   } catch (err) {
