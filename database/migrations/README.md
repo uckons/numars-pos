@@ -44,3 +44,12 @@ Or connect to your database and execute the SQL file:
 **Execution Notes:**
 - Jalankan di staging terlebih dahulu.
 - Untuk index `CONCURRENTLY`, jalankan di luar transaksi seperti komentar di akhir file migration.
+
+
+**Node Runner (fallback when `psql` is unavailable):**
+
+```bash
+node backend/scripts/apply-migration-007.js
+```
+
+This runner loads `backend/.env` (or root `.env`) and prints a clearer hint for SCRAM password parsing issues.
