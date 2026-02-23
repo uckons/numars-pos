@@ -92,3 +92,12 @@ Atau gunakan runner Node yang sudah ada untuk migrasi tabel utama terlebih dahul
 cd backend
 npm run migrate:007
 ```
+
+
+## Sprint 1 Deliverable Artifacts (Current)
+
+- S1-05 Approval Matrix v1: `docs/execution-pack/sprint-1/approval-matrix-v1.md`
+- S1-06 Formula Variable Dictionary v1: `docs/execution-pack/sprint-1/formula-variable-dictionary-v1.md`
+- S1-08 Feature Flags Namespace v1: `docs/execution-pack/sprint-1/feature-flags-v1.md`
+- S1-09 POS Smoke Test: `docs/execution-pack/sprint-1/smoke-test-pos-post-migration.md`
+- S1-10 Rollback Runbook v1: `docs/execution-pack/sprint-1/rollback-runbook-v1.md`
