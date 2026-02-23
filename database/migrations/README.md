@@ -27,3 +27,29 @@ Or connect to your database and execute the SQL file:
 - Seeds sample room data for branches 1 and 2
 
 **Note:** This migration uses `IF NOT EXISTS` clauses to ensure it's safe to run multiple times.
+
+## Migration 007: Sprint 1 Foundation (Accounting/Approval/Formula)
+
+**File:** `007_sprint1_foundation_accounting.sql`
+
+**Purpose:** Menyediakan fondasi tabel additive (non-breaking) untuk memulai roadmap 12 minggu tanpa mengganggu operasional POS.
+
+**Changes:**
+- Creates `chart_of_accounts`
+- Creates `journal_entries` + `journal_lines`
+- Creates `approval_requests`
+- Creates `formula_definitions` + `formula_versions`
+- Includes recommended `CREATE INDEX CONCURRENTLY` statements (manual/off-peak)
+
+**Execution Notes:**
+- Jalankan di staging terlebih dahulu.
+- Untuk index `CONCURRENTLY`, jalankan di luar transaksi seperti komentar di akhir file migration.
+
+
+**Node Runner (fallback when `psql` is unavailable):**
+
+```bash
+node backend/scripts/apply-migration-007.js
+```
+
+This runner loads `backend/.env` (or root `.env`) and prints a clearer hint for SCRAM password parsing issues.
