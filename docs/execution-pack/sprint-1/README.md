@@ -68,3 +68,27 @@ Paket ini adalah breakdown eksekusi operasional untuk Sprint 1 (2 minggu) dari `
   - **Mitigation:** additive DDL only + eksekusi off-peak + observasi lock.
 - **Risk:** mismatch mapping jurnal.
   - **Mitigation:** event-to-journal walkthrough dengan finance sebelum coding.
+
+## S1-03 & S1-04 Final Output (Locked)
+
+- COA level 1–4 difinalkan via migration `database/migrations/008_seed_coa_and_posting_rules.sql`.
+- Event-to-journal mapping dikunci untuk event prioritas:
+  - `POS_PAYMENT` (variant `CASH`, `QRIS`, `TRANSFER`)
+  - `POS_REVERT` (variant `CASH`, `QRIS`, `TRANSFER`)
+  - `THERAPIST_COMMISSION_SETTLE`
+  - `PAYROLL_SETTLE`
+
+### Off-peak Concurrent Index Runbook
+
+Jalankan saat traffic rendah dan **di luar transaction block**:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/007_indexes_concurrently.sql
+```
+
+Atau gunakan runner Node yang sudah ada untuk migrasi tabel utama terlebih dahulu:
+
+```bash
+cd backend
+npm run migrate:007
+```

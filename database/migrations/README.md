@@ -53,3 +53,31 @@ node backend/scripts/apply-migration-007.js
 ```
 
 This runner loads `backend/.env` (or root `.env`) and prints a clearer hint for SCRAM password parsing issues.
+
+
+## Migration 008: COA Level 1-4 + Posting Rules Lock
+
+**File:** `008_seed_coa_and_posting_rules.sql`
+
+**Purpose:** Menyelesaikan Sprint 1 task S1-03 & S1-04 dengan finalisasi COA level 1-4 dan lock event-to-journal mapping untuk event prioritas.
+
+**Changes:**
+- Creates `accounting_posting_rules`
+- Seeds COA hierarchy level 1-4 pada `chart_of_accounts`
+- Locks posting rules untuk `POS_PAYMENT`, `POS_REVERT`, `THERAPIST_COMMISSION_SETTLE`, `PAYROLL_SETTLE`
+
+**Execution:**
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/008_seed_coa_and_posting_rules.sql
+```
+
+## Concurrent Index File (Off-Peak)
+
+**File:** `007_indexes_concurrently.sql`
+
+**Purpose:** Menjalankan index recommendation dari Migration 007 secara aman (di luar transaction, traffic rendah).
+
+**Execution:**
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/007_indexes_concurrently.sql
+```
