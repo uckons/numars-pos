@@ -7,7 +7,9 @@
     "start": "node server.js",
     "dev": "NODE_ENV=development node server.js",
     "print-agent": "node scripts/local-print-agent.js",
-    "print-agent:win": "node scripts/local-print-agent.js"
+    "print-agent:win": "node scripts/local-print-agent.js",
+    "migrate:007": "node scripts/apply-migration-007.js",
+    "journal:dedupe:pos-payment": "node scripts/dedupe-pos-payment-journals.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
