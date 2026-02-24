@@ -36,3 +36,8 @@ export FEATURE_ACCOUNTING_V2=false
 export FEATURE_APPROVAL_MATRIX_V1=false
 export FEATURE_FORMULA_ENGINE_V1=false
 ```
+
+
+## Env Template
+
+Gunakan template `backend/.env.example` sebagai baseline agar semua feature flag terdefinisi.

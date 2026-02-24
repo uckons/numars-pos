@@ -41,3 +41,18 @@ LIMIT 50;
 
 - Keep `FEATURE_ACCOUNTING_V2` OFF by default, enable by pilot branch only.
 - Monitor mismatch: jumlah order paid vs jurnal event `POS_PAYMENT`.
+
+## VPS Setup Note (Feature Flag)
+
+Jika di VPS belum ada `FEATURE_ACCOUNTING_V2`, tambahkan manual di `backend/.env`:
+
+```bash
+FEATURE_ACCOUNTING_V2=false
+```
+
+Rekomendasi: copy dari template baru `backend/.env.example` agar namespace flags lengkap.
+
+```bash
+cp backend/.env.example backend/.env
+# lalu sesuaikan DB credential sesuai server
+```
