@@ -4,6 +4,7 @@ const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
 const dashboardService = require("../dashboard/dashboard.service")
 const printerService = require("../printers/printer.service")
 const printerTargetService = require("../printers/printer-target.service")
+const journalPostingService = require("../accounting/journal-posting.service")
 
 const parseOrderId = (rawId) => {
   const orderId = Number(rawId)
@@ -448,6 +449,17 @@ exports.close = async (req, res) => {
         )
       }
     }
+
+
+    await journalPostingService.postAutoJournal({
+      event_code: 'POS_PAYMENT',
+      variant: paymentMethod,
+      amount: total,
+      branch_id: result.rows[0].branch_id || req.user?.branch_id || null,
+      actor_id: req.user?.id || null,
+      source_ref: `ORDER:${result.rows[0].id}`,
+      description: `Auto jurnal payment order #${result.rows[0].id}`
+    }, { client: db })
 
     await writeAuditEntry(db, req.user?.id, "ORDER_PAID", {
       order_id: result.rows[0].id,
@@ -914,6 +926,17 @@ exports.createFromPos = async (req, res) => {
         item.qty
       )
     } 
+
+
+    await journalPostingService.postAutoJournal({
+      event_code: 'POS_PAYMENT',
+      variant: paymentMethod,
+      amount: finalTotal,
+      branch_id: branchId,
+      actor_id: req.user?.id || null,
+      source_ref: `ORDER:${orderId}`,
+      description: `Auto jurnal payment order #${orderId}`
+    }, { client: db })
     res.json({
       success: true,
       order_id: orderId,
@@ -947,7 +970,7 @@ exports.payBulk = async (req, res) => {
     await client.query("BEGIN")
 
     const { rows } = await client.query(
-      `SELECT id, status, total
+      `SELECT id, status, total, branch_id
        FROM orders
        WHERE id = ANY($1::int[])
          AND branch_id = $2
@@ -981,6 +1004,19 @@ exports.payBulk = async (req, res) => {
        WHERE id = ANY($1::int[])`,
       [orderIds, paymentMethod]
     )
+
+
+    for (const order of rows) {
+      await journalPostingService.postAutoJournal({
+        event_code: 'POS_PAYMENT',
+        variant: paymentMethod,
+        amount: Number(order.total || 0),
+        branch_id: order.branch_id || req.user?.branch_id || null,
+        actor_id: req.user?.id || null,
+        source_ref: `ORDER:${order.id}`,
+        description: `Auto jurnal payment bulk order #${order.id}`
+      }, { client })
+    }
 
     for (const order of rows) {
       await writeAuditEntry(client, req.user?.id, "ORDER_PAID", {
