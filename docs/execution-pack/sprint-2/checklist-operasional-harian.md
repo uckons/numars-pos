@@ -40,6 +40,21 @@ Jika semua mismatch nol (selain `OK` dan `NO_JOURNAL_EXPECTED_ZERO_TOTAL`), tand
 - [ ] Jika ada duplikasi, jadwalkan eksekusi script dedupe dalam mode dry-run terlebih dahulu.
 
 
+
+Contoh repair `MISSING_JOURNAL` (dry-run lalu apply):
+
+```bash
+cd /workspace/numars-pos/backend
+# Dry-run per tanggal
+RECON_DATE="$(date +%F)" BRANCH_ID="1" npm run journal:repair:missing-pos-payment
+
+# Apply per tanggal
+RECON_DATE="$(date +%F)" BRANCH_ID="1" APPLY=true npm run journal:repair:missing-pos-payment
+
+# Atau target 1 order
+ORDER_ID=247 APPLY=true npm run journal:repair:missing-pos-payment
+```
+
 Contoh repair `ZERO_TOTAL_WITH_ITEMS`:
 
 ```bash

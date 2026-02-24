@@ -101,3 +101,6 @@ Default env yang didukung di `backend/.env` untuk cron runner:
 Komponen:
 - `backend/scripts/cron-recon-alert.sh`
 - `backend/scripts/recon-output-parser.js`
+
+- `RECON_DATE=YYYY-MM-DD BRANCH_ID=<id> npm --prefix backend run journal:repair:missing-pos-payment` (dry-run missing journal)
+- `RECON_DATE=YYYY-MM-DD BRANCH_ID=<id> APPLY=true npm --prefix backend run journal:repair:missing-pos-payment` (apply missing journal)
