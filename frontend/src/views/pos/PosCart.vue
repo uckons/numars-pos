@@ -189,7 +189,7 @@
       <!-- Action Buttons -->
       <div class="modal-actions">
         <button class="btn btn-print" @click="inPrintCartStep ? printReceipt() : proceedToPrintCartStep()">
-          {{ inPrintCartStep ? '🖨️ Print Sekarang' : '🧾 Lanjut Print' }}
+          {{ inPrintCartStep ? '🖨️ Print POS' : '🧾 Lanjut Print' }}
         </button>
         <button class="btn btn-close" @click="closeReceiptModal">
           Cancel
@@ -732,6 +732,44 @@ const closeReceiptModal = async () => {
   }
 }
 
+const openBrowserPrintPreview = () => {
+  const receiptNode = document.getElementById('receipt-print')
+  if (!receiptNode) {
+    window.print()
+    return
+  }
+
+  const printWindow = window.open('', '_blank', 'width=420,height=900')
+  if (!printWindow) {
+    window.print()
+    return
+  }
+
+  const styleContent = `
+    <style>
+      @page { size: 80mm auto; margin: 0; }
+      body { margin:0; background:#fff; color:#111; font-family:'Courier New', monospace; }
+      .print-shell { width:80mm; margin:0 auto; padding:4mm 3mm; box-sizing:border-box; }
+      .print-shell * { color:#111 !important; }
+      .print-shell .receipt-preview { max-height:none !important; overflow:visible !important; border:none !important; }
+      .print-shell .receipt { box-shadow:none !important; border:none !important; }
+    </style>
+  `
+
+  printWindow.document.open()
+  printWindow.document.write(`<!doctype html><html><head><title>Print POS</title>${styleContent}</head><body><div class="print-shell">${receiptNode.outerHTML}</div></body></html>`)
+  printWindow.document.close()
+
+  setTimeout(() => {
+    printWindow.focus()
+    printWindow.print()
+  }, 250)
+
+  printWindow.onafterprint = () => {
+    printWindow.close()
+  }
+}
+
 // 🖨️ PRINT RECEIPT
 const printReceipt = async () => {
   try {
@@ -740,29 +778,41 @@ const printReceipt = async () => {
       orderId = await finalizeOrderForPrint()
     }
 
-    await api.post(`/printers/print-order`, {
-      order_id: orderId,
-      printer: getPrinterAgentConfig()
-    })
+    // Browser preview (user bisa print biasa atau save PDF)
+    openBrowserPrintPreview()
+
+    // Thermal print jadi best-effort, tidak memblokir close order
+    let thermalPrinted = true
+    try {
+      await api.post(`/printers/print-order`, {
+        order_id: orderId,
+        printer: getPrinterAgentConfig()
+      })
+    } catch (err) {
+      thermalPrinted = false
+      console.warn('Thermal print failed, continue with browser/PDF print flow:', err?.message || err)
+    }
 
     pendingPrinted.value = true
     showReceiptModal.value = false
     receiptData.value = null
 
     await SwalTheme.fire({
-      icon: "success",
-      title: "Struk dikirim",
-      text: "🖨 Struk berhasil diprint.",
-      confirmButtonText: "OK"
+      icon: thermalPrinted ? 'success' : 'warning',
+      title: thermalPrinted ? 'Print POS dikirim' : 'Printer tidak terkoneksi',
+      text: thermalPrinted
+        ? '🖨 Struk dipreview di browser dan dikirim ke printer POS.'
+        : 'Printer tidak terkoneksi, silahkan lakukan print ulang jika printer sudah terkoneksi.',
+      confirmButtonText: 'OK'
     })
 
     await finalizeCompletedOrder(orderId)
   } catch (err) {
     await SwalTheme.fire({
-      icon: "error",
-      title: "Gagal cetak",
-      text: err.response?.data?.message || err.message || "Gagal cetak",
-      confirmButtonText: "OK"
+      icon: 'error',
+      title: 'Gagal print POS',
+      text: err.response?.data?.message || err.message || 'Gagal cetak',
+      confirmButtonText: 'OK'
     })
   }
 }
