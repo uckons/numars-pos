@@ -86,10 +86,17 @@ Tersedia script otomasi untuk menjalankan recon SQL, parse output, dan kirim ale
 
 ```bash
 cd /workspace/numars-pos/backend
-RECON_DATE="$(date +%F)" BRANCH_ID="1" RETENTION_DAYS="14" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh
+RECON_DATE="$(date +%F)" BRANCH_ID="1" RETENTION_DAYS="14" bash scripts/cron-recon-alert.sh
 ```
 
 Saran produksi: pasang 2 slot cron di luar jam sibuk (03:10 dan 09:30) menggunakan command yang sama.
+
+Discord webhook: simpan `ALERT_WEBHOOK_URL` di `backend/.env`; script akan auto gunakan payload `content` untuk Discord.
+
+Default env yang didukung di `backend/.env` untuk cron runner:
+- `ALERT_WEBHOOK_URL`
+- `RECON_BRANCH_ID`
+- `RECON_RETENTION_DAYS`
 
 Komponen:
 - `backend/scripts/cron-recon-alert.sh`

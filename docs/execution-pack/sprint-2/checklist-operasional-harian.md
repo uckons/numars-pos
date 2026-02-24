@@ -109,17 +109,35 @@ Script siap pakai:
 
 ```bash
 cd /workspace/numars-pos/backend
-RECON_DATE="$(date +%F)" BRANCH_ID="1" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh
+RECON_DATE="$(date +%F)" BRANCH_ID="1" bash scripts/cron-recon-alert.sh
 ```
 
 Template 2-slot cron (03:10 + 09:30) + log retention sederhana:
 
+
+Setup manual di VPS (disarankan):
+
+```bash
+# 1) simpan config di backend/.env (disarankan)
+cat >> /workspace/numars-pos/backend/.env <<'EOF'
+ALERT_WEBHOOK_URL="https://discord.com/api/webhooks/<id>/<token>"
+RECON_BRANCH_ID="1"
+RECON_RETENTION_DAYS="14"
+EOF
+
+# 2) edit crontab user service
+crontab -e
+```
+
+Untuk Discord, script otomatis kirim payload key `content` jika URL mengandung `discord.com/api/webhooks`.
+Catatan keamanan: jika URL webhook sempat terbuka di chat/log, segera rotate webhook di Discord lalu update `.env`.
+
 ```cron
 # Slot 1: post-operational close check
-10 3 * * * cd /workspace/numars-pos/backend && RECON_DATE="$(date +\%F)" BRANCH_ID="1" RETENTION_DAYS="14" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh >> /workspace/numars-pos/backend/logs/reconciliation/cron.log 2>&1
+10 3 * * * cd /workspace/numars-pos/backend && RECON_DATE="$(date +\%F)" BRANCH_ID="1" RETENTION_DAYS="14" bash scripts/cron-recon-alert.sh >> /workspace/numars-pos/backend/logs/reconciliation/cron.log 2>&1
 
 # Slot 2: pre-open sanity check
-30 9 * * * cd /workspace/numars-pos/backend && RECON_DATE="$(date +\%F)" BRANCH_ID="1" RETENTION_DAYS="14" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh >> /workspace/numars-pos/backend/logs/reconciliation/cron.log 2>&1
+30 9 * * * cd /workspace/numars-pos/backend && RECON_DATE="$(date +\%F)" BRANCH_ID="1" RETENTION_DAYS="14" bash scripts/cron-recon-alert.sh >> /workspace/numars-pos/backend/logs/reconciliation/cron.log 2>&1
 ```
 
 Catatan rotate log:
