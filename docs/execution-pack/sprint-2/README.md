@@ -92,11 +92,13 @@ RECON_DATE="$(date +%F)" BRANCH_ID="1" RETENTION_DAYS="14" bash scripts/cron-rec
 Saran produksi: pasang 2 slot cron di luar jam sibuk (03:10 dan 09:30) menggunakan command yang sama.
 
 Discord webhook: simpan `ALERT_WEBHOOK_URL` di `backend/.env`; script akan auto gunakan payload `content` untuk Discord.
+Alert kini human-readable dan label branch memakai `Nama Branch (#id)` jika branch ditemukan di DB.
 
 Default env yang didukung di `backend/.env` untuk cron runner:
 - `ALERT_WEBHOOK_URL`
 - `RECON_BRANCH_ID`
 - `RECON_RETENTION_DAYS`
+- `RECON_NOTIFY_ON_OK` (`true` untuk kirim notifikasi saat hasil OK juga; default `false`)
 
 Komponen:
 - `backend/scripts/cron-recon-alert.sh`

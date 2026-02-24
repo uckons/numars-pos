@@ -162,6 +162,7 @@ cat >> /workspace/numars-pos/backend/.env <<'EOF'
 ALERT_WEBHOOK_URL="https://discord.com/api/webhooks/<id>/<token>"
 RECON_BRANCH_ID="1"
 RECON_RETENTION_DAYS="14"
+RECON_NOTIFY_ON_OK="false"
 EOF
 
 # 2) edit crontab user service
@@ -169,6 +170,7 @@ crontab -e
 ```
 
 Untuk Discord, script otomatis kirim payload key `content` jika URL mengandung `discord.com/api/webhooks`.
+Notifikasi sudah format human-readable (ringkasan per status) dan branch akan ditampilkan sebagai `Nama Branch (#id)` jika ditemukan dari tabel `branches`.
 Catatan keamanan: jika URL webhook sempat terbuka di chat/log, segera rotate webhook di Discord lalu update `.env`.
 
 ```cron
@@ -182,6 +184,7 @@ Catatan keamanan: jika URL webhook sempat terbuka di chat/log, segera rotate web
 Catatan rotate log:
 - Script akan menghapus file `recon-*` dan `cron.log*` yang lebih lama dari `RETENTION_DAYS` (default 14 hari).
 - Bisa diubah via env `RETENTION_DAYS`.
+- Jika ingin kirim notifikasi saat hasil OK juga, set `RECON_NOTIFY_ON_OK=true` (default `false`).
 
 Exit code script:
 - `0`: recon OK (tidak ada mismatch)

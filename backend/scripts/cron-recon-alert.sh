@@ -16,10 +16,7 @@ load_env_file_if_unset() {
     [[ -z "$key" ]] && continue
     [[ "$key" =~ ^# ]] && continue
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-
-    if [[ -n "${!key+x}" ]]; then
-      continue
-    fi
+    [[ -n "${!key+x}" ]] && continue
 
     local val="${raw_val-}"
     val="${val%$'\r'}"
@@ -33,25 +30,13 @@ load_env_file_if_unset() {
   done < "$env_file"
 }
 
-# Load env defaults from file without overriding already-exported variables.
-load_env_file_if_unset "$ROOT_DIR/backend/.env"
-load_env_file_if_unset "$ROOT_DIR/.env"
-
-RECON_DATE="${RECON_DATE:-$(date +%F)}"
-BRANCH_ID="${BRANCH_ID:-${RECON_BRANCH_ID:-}}"
-DATABASE_URL="${DATABASE_URL:-}"
-ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
-RETENTION_DAYS="${RETENTION_DAYS:-${RECON_RETENTION_DAYS:-14}}"
-
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 send_alert() {
   local msg="$1"
-  if [[ -z "$ALERT_WEBHOOK_URL" ]]; then
-    return 0
-  fi
+  [[ -z "$ALERT_WEBHOOK_URL" ]] && return 0
 
   local key="text"
   if [[ "$ALERT_WEBHOOK_URL" == *"discord.com/api/webhooks"* ]] || [[ "$ALERT_WEBHOOK_URL" == *"discordapp.com/api/webhooks"* ]]; then
@@ -65,10 +50,66 @@ send_alert() {
     -d "{\"${key}\":\"${escaped}\"}" >/dev/null || true
 }
 
+resolve_branch_label() {
+  if [[ -z "$BRANCH_ID" ]]; then
+    echo "ALL"
+    return
+  fi
+
+  if ! [[ "$BRANCH_ID" =~ ^[0-9]+$ ]]; then
+    echo "$BRANCH_ID"
+    return
+  fi
+
+  local branch_name
+  branch_name="$(psql "$DATABASE_URL" -Atqc "SELECT name FROM branches WHERE id=${BRANCH_ID} LIMIT 1" 2>/dev/null || true)"
+  branch_name="$(printf '%s' "$branch_name" | head -n1 | sed 's/^\s*//; s/\s*$//')"
+
+  if [[ -n "$branch_name" ]]; then
+    echo "${branch_name} (#${BRANCH_ID})"
+  else
+    echo "#${BRANCH_ID}"
+  fi
+}
+
+format_summary_text() {
+  local summary_json="$1"
+  BRANCH_LABEL="$BRANCH_LABEL" RECON_DATE="$RECON_DATE" SUMMARY_JSON="$summary_json" node - <<'NODE'
+const s = JSON.parse(process.env.SUMMARY_JSON || '{}')
+const counts = s.counts || {}
+const lines = [
+  '📒 Recon POS vs Journal',
+  `Tanggal: ${process.env.RECON_DATE || '-'}`,
+  `Branch: ${process.env.BRANCH_LABEL || '-'}`,
+  `Status: ${s.status || 'UNKNOWN'} (mismatch=${s.mismatch_total ?? '-'})`,
+  `- OK: ${counts.OK ?? 0}`,
+  `- MISSING_JOURNAL: ${counts.MISSING_JOURNAL ?? 0}`,
+  `- UNBALANCED_JOURNAL: ${counts.UNBALANCED_JOURNAL ?? 0}`,
+  `- AMOUNT_MISMATCH: ${counts.AMOUNT_MISMATCH ?? 0}`,
+  `- ZERO_TOTAL_WITH_ITEMS: ${counts.ZERO_TOTAL_WITH_ITEMS ?? 0}`,
+  `- NO_JOURNAL_EXPECTED_ZERO_TOTAL: ${counts.NO_JOURNAL_EXPECTED_ZERO_TOTAL ?? 0}`
+]
+process.stdout.write(lines.join('\n'))
+NODE
+}
+
+# Load env defaults from file without overriding already-exported variables.
+load_env_file_if_unset "$ROOT_DIR/backend/.env"
+load_env_file_if_unset "$ROOT_DIR/.env"
+
+RECON_DATE="${RECON_DATE:-$(date +%F)}"
+BRANCH_ID="${BRANCH_ID:-${RECON_BRANCH_ID:-}}"
+DATABASE_URL="${DATABASE_URL:-}"
+ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
+RETENTION_DAYS="${RETENTION_DAYS:-${RECON_RETENTION_DAYS:-14}}"
+NOTIFY_ON_OK="${NOTIFY_ON_OK:-${RECON_NOTIFY_ON_OK:-false}}"
+
 if [[ -z "$DATABASE_URL" ]]; then
   echo "[recon-cron] ERROR: DATABASE_URL is required"
   exit 1
 fi
+
+BRANCH_LABEL="$(resolve_branch_label)"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 RAW_OUT="$LOG_DIR/recon-${RECON_DATE}-branch-${BRANCH_ID:-ALL}-${STAMP}.log"
@@ -89,7 +130,7 @@ set -e
 
 if [[ $PSQL_EXIT -ne 0 ]]; then
   echo "[recon-cron] ERROR: psql failed. See $RAW_OUT"
-  send_alert "[ALERT] Recon SQL gagal. date=$RECON_DATE branch=${BRANCH_ID:-ALL}. cek log: $RAW_OUT"
+  send_alert "🚨 Recon SQL gagal\nTanggal: $RECON_DATE\nBranch: $BRANCH_LABEL\nLog: $RAW_OUT"
   exit $PSQL_EXIT
 fi
 
@@ -99,18 +140,23 @@ PARSER_EXIT=$?
 set -e
 
 SUMMARY_JSON="$(cat "$JSON_OUT")"
+SUMMARY_TEXT="$(format_summary_text "$SUMMARY_JSON")"
 echo "[recon-cron] summary: $SUMMARY_JSON"
 
 if [[ $PARSER_EXIT -eq 2 ]]; then
   echo "[recon-cron] ALERT: mismatch detected"
-  send_alert "[ALERT] Recon mismatch date=$RECON_DATE branch=${BRANCH_ID:-ALL} summary=$SUMMARY_JSON log=$RAW_OUT"
+  send_alert "🚨 Recon mismatch terdeteksi\n${SUMMARY_TEXT}\nLog: $RAW_OUT"
   exit 2
 fi
 
 if [[ $PARSER_EXIT -ne 0 ]]; then
   echo "[recon-cron] ERROR: parser failed. See $RAW_OUT / $JSON_OUT"
+  send_alert "🚨 Recon parser gagal\nTanggal: $RECON_DATE\nBranch: $BRANCH_LABEL\nLog: $RAW_OUT"
   exit $PARSER_EXIT
 fi
 
 echo "[recon-cron] OK: no mismatch"
+if [[ "${NOTIFY_ON_OK,,}" == "true" ]]; then
+  send_alert "✅ Recon aman\n${SUMMARY_TEXT}"
+fi
 exit 0
