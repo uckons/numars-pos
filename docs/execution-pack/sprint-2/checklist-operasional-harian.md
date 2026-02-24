@@ -39,6 +39,15 @@ Jika semua mismatch nol (selain `OK` dan `NO_JOURNAL_EXPECTED_ZERO_TOTAL`), tand
 - [ ] Jalankan query duplikasi (sudah termasuk di file SQL) dan cek apakah ada `journal_count > 1`.
 - [ ] Jika ada duplikasi, jadwalkan eksekusi script dedupe dalam mode dry-run terlebih dahulu.
 
+
+Contoh repair `ZERO_TOTAL_WITH_ITEMS` (dry-run lalu apply per order):
+
+```bash
+cd /workspace/numars-pos/backend
+ORDER_ID=244 npm run journal:repair:zero-total
+ORDER_ID=244 APPLY=true npm run journal:repair:zero-total
+```
+
 Contoh dry-run dedupe:
 
 ```bash

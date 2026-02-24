@@ -71,3 +71,8 @@ Tambahan artefak untuk dipakai langsung tim operasional:
 Tujuan: memastikan mismatch `order paid` vs `journal POS_PAYMENT` cepat terdeteksi setiap hari, termasuk deteksi missing journal, jurnal tidak balance, dan amount mismatch.
 
 Catatan interpretasi report: order `PAID` dengan `total <= 0` dipisah menjadi `ZERO_TOTAL_WITH_ITEMS` (perlu investigasi karena item subtotal > 0) dan `NO_JOURNAL_EXPECTED_ZERO_TOTAL` (informational), karena auto-journal hanya dibuat untuk amount > 0.
+
+
+Tool repair tersedia untuk kasus historical `ZERO_TOTAL_WITH_ITEMS`:
+- `npm --prefix backend run journal:repair:zero-total` (dry-run)
+- `ORDER_ID=<id> APPLY=true npm --prefix backend run journal:repair:zero-total` (apply terarah)
