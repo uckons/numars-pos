@@ -101,8 +101,9 @@ async function main() {
       return
     }
 
+    let createdCount = 0
     for (const row of rows) {
-      await postAutoJournal({
+      const journalId = await postAutoJournal({
         event_code: 'POS_PAYMENT',
         variant: String(row.payment_method || 'CASH').toUpperCase(),
         amount: Number(row.order_total || 0),
@@ -111,10 +112,19 @@ async function main() {
         source_ref: `ORDER:${row.order_id}`,
         description: `Auto jurnal payment order #${row.order_id} (repair missing)`
       }, { client })
+
+      if (!journalId) {
+        throw new Error(
+          `Gagal membuat jurnal untuk ORDER:${row.order_id}. Kemungkinan posting rules POS_PAYMENT belum tersedia/aktif untuk variant ${String(row.payment_method || 'CASH').toUpperCase()}.`
+        )
+      }
+
+      createdCount += 1
+      console.log(`  created journal_id=${journalId} for ORDER:${row.order_id}`)
     }
 
     await client.query('COMMIT')
-    console.log(`Created journals for ${rows.length} orders.`)
+    console.log(`Created journals for ${createdCount} orders.`)
   } catch (err) {
     try { await client.query('ROLLBACK') } catch (_) {}
     console.error(err.message)

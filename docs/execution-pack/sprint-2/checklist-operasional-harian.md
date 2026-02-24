@@ -55,6 +55,29 @@ RECON_DATE="$(date +%F)" BRANCH_ID="1" APPLY=true npm run journal:repair:missing
 ORDER_ID=247 APPLY=true npm run journal:repair:missing-pos-payment
 ```
 
+
+Jika repair missing journal tetap tidak menghilangkan mismatch:
+
+```sql
+-- 1) cek rules POS_PAYMENT aktif
+SELECT event_code, variant, line_no, direction, account_code, is_active
+FROM accounting_posting_rules
+WHERE event_code='POS_PAYMENT'
+ORDER BY variant, line_no;
+
+-- 2) cek header jurnal order tertentu
+SELECT id, source_ref, idempotency_key, posting_date, status, description
+FROM journal_entries
+WHERE source_module='POS' AND source_ref='ORDER:248'
+ORDER BY id DESC;
+```
+
+```
+# 3) jalankan repair target order agar output journal_id terlihat
+cd /workspace/numars-pos/backend
+ORDER_ID=248 APPLY=true npm run journal:repair:missing-pos-payment
+```
+
 Contoh repair `ZERO_TOTAL_WITH_ITEMS`:
 
 ```bash
