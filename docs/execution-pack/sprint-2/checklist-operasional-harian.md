@@ -185,9 +185,22 @@ Catatan rotate log:
 - Script akan menghapus file `recon-*` dan `cron.log*` yang lebih lama dari `RETENTION_DAYS` (default 14 hari).
 - Bisa diubah via env `RETENTION_DAYS`.
 - Jika ingin kirim notifikasi saat hasil OK juga, set `RECON_NOTIFY_ON_OK=true` (default `false`).
+- Untuk test cepat webhook tanpa menunggu mismatch, jalankan dengan `RECON_TEST_ALERT=true`.
 
 Exit code script:
 - `0`: recon OK (tidak ada mismatch)
 - `2`: mismatch terdeteksi (alert)
 - `!=0/2`: error eksekusi SQL/parser
 
+
+
+## 6) Troubleshoot webhook tidak terkirim
+
+```bash
+cd /workspace/numars-pos/backend
+RECON_TEST_ALERT=true RECON_DATE="$(date +%F)" BRANCH_ID="1" bash scripts/cron-recon-alert.sh
+```
+
+Lihat output terminal:
+- jika sukses akan muncul `webhook delivered (http=200/204)`
+- jika gagal akan muncul `WARN: webhook send failed` + potongan response body.

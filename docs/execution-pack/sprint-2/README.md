@@ -99,6 +99,7 @@ Default env yang didukung di `backend/.env` untuk cron runner:
 - `RECON_BRANCH_ID`
 - `RECON_RETENTION_DAYS`
 - `RECON_NOTIFY_ON_OK` (`true` untuk kirim notifikasi saat hasil OK juga; default `false`)
+- `RECON_TEST_ALERT` (`true` untuk kirim notifikasi test webhook pada run OK)
 
 Komponen:
 - `backend/scripts/cron-recon-alert.sh`
@@ -106,3 +107,9 @@ Komponen:
 
 - `RECON_DATE=YYYY-MM-DD BRANCH_ID=<id> npm --prefix backend run journal:repair:missing-pos-payment` (dry-run missing journal)
 - `RECON_DATE=YYYY-MM-DD BRANCH_ID=<id> APPLY=true npm --prefix backend run journal:repair:missing-pos-payment` (apply missing journal)
+
+Contoh test webhook cepat:
+```bash
+cd /workspace/numars-pos/backend
+RECON_TEST_ALERT=true RECON_DATE="$(date +%F)" BRANCH_ID="1" bash scripts/cron-recon-alert.sh
+```

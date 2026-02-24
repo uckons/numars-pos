@@ -34,6 +34,14 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+parse_bool() {
+  local raw="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  case "$raw" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 send_alert() {
   local msg="$1"
   [[ -z "$ALERT_WEBHOOK_URL" ]] && return 0
@@ -45,9 +53,22 @@ send_alert() {
 
   local escaped
   escaped="$(json_escape "$msg")"
-  curl -sS -X POST "$ALERT_WEBHOOK_URL" \
+
+  local http_code
+  http_code="$(curl -sS -o /tmp/recon_webhook_resp.$$ -w "%{http_code}" -X POST "$ALERT_WEBHOOK_URL" \
     -H 'Content-Type: application/json' \
-    -d "{\"${key}\":\"${escaped}\"}" >/dev/null || true
+    -d "{\"${key}\":\"${escaped}\"}" || true)"
+
+  if [[ "$http_code" != "200" && "$http_code" != "204" ]]; then
+    echo "[recon-cron] WARN: webhook send failed (http=${http_code:-NA})"
+    [[ -f /tmp/recon_webhook_resp.$$ ]] && sed -n '1,3p' /tmp/recon_webhook_resp.$$ || true
+    rm -f /tmp/recon_webhook_resp.$$ || true
+    return 1
+  fi
+
+  rm -f /tmp/recon_webhook_resp.$$ || true
+  echo "[recon-cron] webhook delivered (http=$http_code)"
+  return 0
 }
 
 resolve_branch_label() {
@@ -103,6 +124,7 @@ DATABASE_URL="${DATABASE_URL:-}"
 ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
 RETENTION_DAYS="${RETENTION_DAYS:-${RECON_RETENTION_DAYS:-14}}"
 NOTIFY_ON_OK="${NOTIFY_ON_OK:-${RECON_NOTIFY_ON_OK:-false}}"
+RECON_TEST_ALERT="${RECON_TEST_ALERT:-false}"
 
 if [[ -z "$DATABASE_URL" ]]; then
   echo "[recon-cron] ERROR: DATABASE_URL is required"
@@ -156,7 +178,9 @@ if [[ $PARSER_EXIT -ne 0 ]]; then
 fi
 
 echo "[recon-cron] OK: no mismatch"
-if [[ "${NOTIFY_ON_OK,,}" == "true" ]]; then
-  send_alert "✅ Recon aman\n${SUMMARY_TEXT}"
+if parse_bool "$RECON_TEST_ALERT"; then
+  send_alert "🧪 Recon test notification\n${SUMMARY_TEXT}" || true
+elif parse_bool "$NOTIFY_ON_OK"; then
+  send_alert "✅ Recon aman\n${SUMMARY_TEXT}" || true
 fi
 exit 0
