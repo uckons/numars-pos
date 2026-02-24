@@ -7,6 +7,7 @@
 -- Catatan:
 -- - branch_id opsional. Jika tidak ingin filter cabang, isi branch_id dengan string kosong.
 -- - Query ini fokus event POS_PAYMENT (auto journal saat order paid).
+-- - Order PAID dengan total <= 0 ditandai NO_JOURNAL_EXPECTED_ZERO_TOTAL (bukan mismatch).
 
 DROP TABLE IF EXISTS tmp_recon_pos_payment;
 
@@ -57,6 +58,7 @@ SELECT
   pj.total_debit,
   pj.total_credit,
   CASE
+    WHEN COALESCE(po.order_total, 0) <= 0 THEN 'NO_JOURNAL_EXPECTED_ZERO_TOTAL'
     WHEN pj.journal_id IS NULL THEN 'MISSING_JOURNAL'
     WHEN ABS(COALESCE(pj.total_debit, 0) - COALESCE(pj.total_credit, 0)) > 0.01 THEN 'UNBALANCED_JOURNAL'
     WHEN ABS(COALESCE(pj.total_debit, 0) - po.order_total) > 0.01 THEN 'AMOUNT_MISMATCH'

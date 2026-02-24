@@ -69,3 +69,5 @@ Tambahan artefak untuk dipakai langsung tim operasional:
    - `docs/execution-pack/sprint-2/checklist-operasional-harian.md`
 
 Tujuan: memastikan mismatch `order paid` vs `journal POS_PAYMENT` cepat terdeteksi setiap hari, termasuk deteksi missing journal, jurnal tidak balance, dan amount mismatch.
+
+Catatan interpretasi report: order `PAID` dengan `total <= 0` akan dilabeli `NO_JOURNAL_EXPECTED_ZERO_TOTAL` (informational), karena auto-journal hanya dibuat untuk amount > 0.

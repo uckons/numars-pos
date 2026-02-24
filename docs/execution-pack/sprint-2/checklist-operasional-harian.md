@@ -23,14 +23,15 @@ Dari output query summary:
 - [ ] `MISSING_JOURNAL = 0`.
 - [ ] `UNBALANCED_JOURNAL = 0`.
 - [ ] `AMOUNT_MISMATCH = 0`.
+- [ ] `NO_JOURNAL_EXPECTED_ZERO_TOTAL` boleh ada (informational, bukan mismatch).
 
-Jika semua nol (selain OK), tandai **PASS** untuk hari tersebut.
+Jika semua mismatch nol (selain `OK` dan `NO_JOURNAL_EXPECTED_ZERO_TOTAL`), tandai **PASS** untuk hari tersebut.
 
 ## 3) Jika ada mismatch
 
 - [ ] Simpan hasil query detail mismatch (copy output ke log harian).
 - [ ] Kelompokkan masalah:
-  - `MISSING_JOURNAL`: order paid belum punya jurnal.
+  - `MISSING_JOURNAL`: order paid (total > 0) belum punya jurnal.
   - `UNBALANCED_JOURNAL`: debit ≠ credit.
   - `AMOUNT_MISMATCH`: total jurnal ≠ total order.
 - [ ] Jalankan query duplikasi (sudah termasuk di file SQL) dan cek apakah ada `journal_count > 1`.
@@ -69,6 +70,7 @@ Ringkasan:
 - MISSING_JOURNAL: <n>
 - UNBALANCED_JOURNAL: <n>
 - AMOUNT_MISMATCH: <n>
+- NO_JOURNAL_EXPECTED_ZERO_TOTAL: <n>
 
 Tindak lanjut:
 - <aksi 1>
