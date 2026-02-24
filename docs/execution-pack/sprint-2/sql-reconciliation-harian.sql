@@ -7,7 +7,9 @@
 -- Catatan:
 -- - branch_id opsional. Jika tidak ingin filter cabang, isi branch_id dengan string kosong.
 -- - Query ini fokus event POS_PAYMENT (auto journal saat order paid).
--- - Order PAID dengan total <= 0 ditandai NO_JOURNAL_EXPECTED_ZERO_TOTAL (bukan mismatch).
+-- - Order PAID dengan total <= 0 dibedakan menjadi:
+--   * ZERO_TOTAL_WITH_ITEMS: item subtotal > 0 tetapi total order 0 (perlu investigasi).
+--   * NO_JOURNAL_EXPECTED_ZERO_TOTAL: memang tidak ada nilai transaksi (informational).
 
 DROP TABLE IF EXISTS tmp_recon_pos_payment;
 
@@ -22,8 +24,14 @@ paid_orders AS (
     o.id AS order_id,
     o.branch_id,
     o.payment_method,
-    o.total AS order_total
+    o.total AS order_total,
+    COALESCE(oi.subtotal_items, 0) AS items_subtotal
   FROM orders o
+  LEFT JOIN (
+    SELECT order_id, COALESCE(SUM(subtotal), 0) AS subtotal_items
+    FROM order_items
+    GROUP BY order_id
+  ) oi ON oi.order_id = o.id
   CROSS JOIN params p
   WHERE o.status = 'PAID'
     AND o.created_at::date = p.recon_date
@@ -52,12 +60,15 @@ SELECT
   po.branch_id,
   po.payment_method,
   po.order_total,
+  po.items_subtotal,
+  (COALESCE(po.items_subtotal, 0) - COALESCE(po.order_total, 0)) AS inferred_discount,
   CONCAT('ORDER:', po.order_id) AS expected_source_ref,
   pj.journal_id,
   pj.status AS journal_status,
   pj.total_debit,
   pj.total_credit,
   CASE
+    WHEN COALESCE(po.order_total, 0) <= 0 AND COALESCE(po.items_subtotal, 0) > 0 THEN 'ZERO_TOTAL_WITH_ITEMS'
     WHEN COALESCE(po.order_total, 0) <= 0 THEN 'NO_JOURNAL_EXPECTED_ZERO_TOTAL'
     WHEN pj.journal_id IS NULL THEN 'MISSING_JOURNAL'
     WHEN ABS(COALESCE(pj.total_debit, 0) - COALESCE(pj.total_credit, 0)) > 0.01 THEN 'UNBALANCED_JOURNAL'
@@ -83,6 +94,8 @@ SELECT
   branch_id,
   payment_method,
   order_total,
+  items_subtotal,
+  inferred_discount,
   expected_source_ref,
   journal_id,
   journal_status,
