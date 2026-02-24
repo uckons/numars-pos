@@ -12,6 +12,7 @@ Implementasi awal Sprint 2 mencakup auto-journal event utama berbasis `accountin
    - `backend/modules/accounting/journal-posting.service.js`
    - Resolve rules by `event_code + variant` (fallback `DEFAULT`)
    - Idempotency dengan `journal_entries.idempotency_key`
+   - Idempotency POS payment dikunci per `source_ref` order agar tidak double jurnal saat klik bayar ulang pada order yang sama
 2. Hook ke flow pembayaran order POS:
    - `orders.close`
    - `orders.createFromPos`

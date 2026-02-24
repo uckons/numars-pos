@@ -62,7 +62,11 @@ const createJournalFromRules = async (client, payload = {}) => {
 
   if (!rules.length) return null
 
-  const idempotencyKey = `AUTO:${String(event_code).trim().toUpperCase()}:${normalizeVariant(variant)}:${String(source_ref || '-')}`
+  const normalizedEvent = String(event_code).trim().toUpperCase()
+  const normalizedSourceRef = String(source_ref || '-').trim()
+  const idempotencyKey = normalizedEvent === 'POS_PAYMENT'
+    ? `AUTO:${normalizedEvent}:${normalizedSourceRef}`
+    : `AUTO:${normalizedEvent}:${normalizeVariant(variant)}:${normalizedSourceRef}`
   const postingDateOnly = new Date(posting_date).toISOString().slice(0, 10)
 
   const existing = await client.query(
