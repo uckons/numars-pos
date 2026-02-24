@@ -778,10 +778,7 @@ const printReceipt = async () => {
       orderId = await finalizeOrderForPrint()
     }
 
-    // Browser preview (user bisa print biasa atau save PDF)
-    openBrowserPrintPreview()
-
-    // Thermal print jadi best-effort, tidak memblokir close order
+    // Thermal print best-effort, order tetap bisa difinalisasi
     let thermalPrinted = true
     try {
       await api.post(`/printers/print-order`, {
@@ -790,7 +787,7 @@ const printReceipt = async () => {
       })
     } catch (err) {
       thermalPrinted = false
-      console.warn('Thermal print failed, continue with browser/PDF print flow:', err?.message || err)
+      console.warn('Thermal print failed, order will remain paid:', err?.message || err)
     }
 
     pendingPrinted.value = true
@@ -801,7 +798,7 @@ const printReceipt = async () => {
       icon: thermalPrinted ? 'success' : 'warning',
       title: thermalPrinted ? 'Print POS dikirim' : 'Printer tidak terkoneksi',
       text: thermalPrinted
-        ? '🖨 Struk dipreview di browser dan dikirim ke printer POS.'
+        ? '🖨 Struk berhasil dikirim ke printer POS.'
         : 'Printer tidak terkoneksi, silahkan lakukan print ulang jika printer sudah terkoneksi.',
       confirmButtonText: 'OK'
     })
