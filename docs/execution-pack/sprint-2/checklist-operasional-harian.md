@@ -204,3 +204,4 @@ RECON_TEST_ALERT=true RECON_DATE="$(date +%F)" BRANCH_ID="1" bash scripts/cron-r
 Lihat output terminal:
 - jika sukses akan muncul `webhook delivered (http=200/204)`
 - jika gagal akan muncul `WARN: webhook send failed` + potongan response body.
+- jika muncul `invalid JSON`, pastikan sudah pull versi script terbaru (escape payload webhook sudah diperbaiki).

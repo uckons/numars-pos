@@ -31,7 +31,8 @@ load_env_file_if_unset() {
 }
 
 json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+  # robust JSON escaping (quotes, backslashes, newlines, tabs, etc)
+  node -e 'const s=process.argv[1] ?? ""; process.stdout.write(JSON.stringify(s).slice(1,-1))' "$1"
 }
 
 parse_bool() {
