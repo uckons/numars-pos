@@ -78,3 +78,17 @@ Tool repair tersedia untuk kasus historical `ZERO_TOTAL_WITH_ITEMS`:
 - `RECON_DATE=YYYY-MM-DD npm --prefix backend run journal:repair:zero-total` (dry-run per tanggal)
 - `ORDER_ID=<id> APPLY=true npm --prefix backend run journal:repair:zero-total` (apply terarah)
 - `RECON_DATE=YYYY-MM-DD APPLY=true npm --prefix backend run journal:repair:zero-total` (apply massal per tanggal)
+
+
+## Cron + Parser Auto Alert
+
+Tersedia script otomasi untuk menjalankan recon SQL, parse output, dan kirim alert webhook jika mismatch:
+
+```bash
+cd /workspace/numars-pos/backend
+RECON_DATE="$(date +%F)" BRANCH_ID="1" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh
+```
+
+Komponen:
+- `backend/scripts/cron-recon-alert.sh`
+- `backend/scripts/recon-output-parser.js`

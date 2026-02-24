@@ -101,3 +101,25 @@ Status akhir:
 - [ ] PASS (tidak ada mismatch)
 - [ ] FOLLOW-UP (ada mismatch)
 ```
+
+
+## 5) Otomasi cron + auto-alert
+
+Script siap pakai:
+
+```bash
+cd /workspace/numars-pos/backend
+RECON_DATE="$(date +%F)" BRANCH_ID="1" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh
+```
+
+Contoh cron (setiap jam 23:10):
+
+```cron
+10 23 * * * cd /workspace/numars-pos/backend && RECON_DATE="$(date +\%F)" BRANCH_ID="1" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh >> /workspace/numars-pos/backend/logs/reconciliation/cron.log 2>&1
+```
+
+Exit code script:
+- `0`: recon OK (tidak ada mismatch)
+- `2`: mismatch terdeteksi (alert)
+- `!=0/2`: error eksekusi SQL/parser
+
