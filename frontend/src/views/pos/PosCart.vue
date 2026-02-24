@@ -189,7 +189,7 @@
       <!-- Action Buttons -->
       <div class="modal-actions">
         <button class="btn btn-print" @click="inPrintCartStep ? printReceipt() : proceedToPrintCartStep()">
-          {{ inPrintCartStep ? '🖨️ Print Sekarang' : '🧾 Lanjut Print' }}
+          {{ inPrintCartStep ? '🖨️ Print POS' : '🧾 Lanjut Print' }}
         </button>
         <button class="btn btn-close" @click="closeReceiptModal">
           Cancel
@@ -740,29 +740,38 @@ const printReceipt = async () => {
       orderId = await finalizeOrderForPrint()
     }
 
-    await api.post(`/printers/print-order`, {
-      order_id: orderId,
-      printer: getPrinterAgentConfig()
-    })
+    // Thermal print best-effort, order tetap bisa difinalisasi
+    let thermalPrinted = true
+    try {
+      await api.post(`/printers/print-order`, {
+        order_id: orderId,
+        printer: getPrinterAgentConfig()
+      })
+    } catch (err) {
+      thermalPrinted = false
+      console.warn('Thermal print failed, order will remain paid:', err?.message || err)
+    }
 
     pendingPrinted.value = true
     showReceiptModal.value = false
     receiptData.value = null
 
     await SwalTheme.fire({
-      icon: "success",
-      title: "Struk dikirim",
-      text: "🖨 Struk berhasil diprint.",
-      confirmButtonText: "OK"
+      icon: thermalPrinted ? 'success' : 'warning',
+      title: thermalPrinted ? 'Print POS dikirim' : 'Printer tidak terkoneksi',
+      text: thermalPrinted
+        ? '🖨 Struk berhasil dikirim ke printer POS.'
+        : 'Printer tidak terkoneksi, silahkan lakukan print ulang jika printer sudah terkoneksi.',
+      confirmButtonText: 'OK'
     })
 
     await finalizeCompletedOrder(orderId)
   } catch (err) {
     await SwalTheme.fire({
-      icon: "error",
-      title: "Gagal cetak",
-      text: err.response?.data?.message || err.message || "Gagal cetak",
-      confirmButtonText: "OK"
+      icon: 'error',
+      title: 'Gagal print POS',
+      text: err.response?.data?.message || err.message || 'Gagal cetak',
+      confirmButtonText: 'OK'
     })
   }
 }
