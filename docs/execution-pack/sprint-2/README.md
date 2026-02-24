@@ -57,3 +57,15 @@ Rekomendasi: copy dari template baru `backend/.env.example` agar namespace flags
 cp backend/.env.example backend/.env
 # lalu sesuaikan DB credential sesuai server
 ```
+
+
+## Paket Operasional Harian (VPS Ready)
+
+Tambahan artefak untuk dipakai langsung tim operasional:
+
+1. SQL rekonsiliasi harian POS vs jurnal:
+   - `docs/execution-pack/sprint-2/sql-reconciliation-harian.sql`
+2. Checklist operasional harian:
+   - `docs/execution-pack/sprint-2/checklist-operasional-harian.md`
+
+Tujuan: memastikan mismatch `order paid` vs `journal POS_PAYMENT` cepat terdeteksi setiap hari, termasuk deteksi missing journal, jurnal tidak balance, dan amount mismatch.

@@ -1,0 +1,80 @@
+# Checklist Operasional Harian — Rekonsiliasi POS vs Jurnal
+
+Tujuan: memberi SOP harian yang bisa langsung dipakai tim operasional di VPS untuk memonitor auto-journal `POS_PAYMENT`.
+
+## 1) Persiapan (awal shift / pagi)
+
+- [ ] Pastikan backend service up (`pm2 status` / service manager lain).
+- [ ] Pastikan koneksi DB normal dari VPS.
+- [ ] Tentukan tanggal rekonsiliasi (`recon_date`) dan (opsional) `branch_id`.
+
+Contoh:
+
+```bash
+cd /workspace/numars-pos
+psql "$DATABASE_URL" -v recon_date="$(date +%F)" -v branch_id="1" -f docs/execution-pack/sprint-2/sql-reconciliation-harian.sql
+```
+
+## 2) Validasi hasil utama
+
+Dari output query summary:
+
+- [ ] `recon_status = OK` ada dan nilainya dominan.
+- [ ] `MISSING_JOURNAL = 0`.
+- [ ] `UNBALANCED_JOURNAL = 0`.
+- [ ] `AMOUNT_MISMATCH = 0`.
+
+Jika semua nol (selain OK), tandai **PASS** untuk hari tersebut.
+
+## 3) Jika ada mismatch
+
+- [ ] Simpan hasil query detail mismatch (copy output ke log harian).
+- [ ] Kelompokkan masalah:
+  - `MISSING_JOURNAL`: order paid belum punya jurnal.
+  - `UNBALANCED_JOURNAL`: debit ≠ credit.
+  - `AMOUNT_MISMATCH`: total jurnal ≠ total order.
+- [ ] Jalankan query duplikasi (sudah termasuk di file SQL) dan cek apakah ada `journal_count > 1`.
+- [ ] Jika ada duplikasi, jadwalkan eksekusi script dedupe dalam mode dry-run terlebih dahulu.
+
+Contoh dry-run dedupe:
+
+```bash
+cd /workspace/numars-pos/backend
+npm run journal:dedupe:pos-payment
+```
+
+Contoh apply dedupe (hanya setelah approval):
+
+```bash
+cd /workspace/numars-pos/backend
+APPLY=true npm run journal:dedupe:pos-payment
+```
+
+## 4) Penutupan harian
+
+- [ ] Rekap metrik harian: total order paid, total jurnal OK, total mismatch.
+- [ ] Simpan evidence (timestamp + command + output ringkas).
+- [ ] Jika ada issue, buat tiket insiden + cantumkan `order_id`/`journal_id` terdampak.
+- [ ] Lakukan handover ke shift berikutnya jika mismatch belum selesai.
+
+## Template log harian (copy-paste)
+
+```md
+Tanggal: YYYY-MM-DD
+Branch: <id / ALL>
+Operator: <nama>
+
+Ringkasan:
+- OK: <n>
+- MISSING_JOURNAL: <n>
+- UNBALANCED_JOURNAL: <n>
+- AMOUNT_MISMATCH: <n>
+
+Tindak lanjut:
+- <aksi 1>
+- <aksi 2>
+
+Status akhir:
+- [ ] PASS (tidak ada mismatch)
+- [ ] FOLLOW-UP (ada mismatch)
+```
