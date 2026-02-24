@@ -787,7 +787,7 @@ const printReceipt = async () => {
       })
     } catch (err) {
       thermalPrinted = false
-      console.warn('Thermal print failed, order will remain paid:', err?.message || err)
+      console.warn('Thermal print failed, order will still be finalized:', err?.message || err)
     }
 
     pendingPrinted.value = true
