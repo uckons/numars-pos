@@ -74,5 +74,7 @@ Catatan interpretasi report: order `PAID` dengan `total <= 0` dipisah menjadi `Z
 
 
 Tool repair tersedia untuk kasus historical `ZERO_TOTAL_WITH_ITEMS`:
-- `npm --prefix backend run journal:repair:zero-total` (dry-run)
+- `npm --prefix backend run journal:repair:zero-total` (dry-run semua data)
+- `RECON_DATE=YYYY-MM-DD npm --prefix backend run journal:repair:zero-total` (dry-run per tanggal)
 - `ORDER_ID=<id> APPLY=true npm --prefix backend run journal:repair:zero-total` (apply terarah)
+- `RECON_DATE=YYYY-MM-DD APPLY=true npm --prefix backend run journal:repair:zero-total` (apply massal per tanggal)

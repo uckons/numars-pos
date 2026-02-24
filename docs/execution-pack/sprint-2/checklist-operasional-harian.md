@@ -40,12 +40,21 @@ Jika semua mismatch nol (selain `OK` dan `NO_JOURNAL_EXPECTED_ZERO_TOTAL`), tand
 - [ ] Jika ada duplikasi, jadwalkan eksekusi script dedupe dalam mode dry-run terlebih dahulu.
 
 
-Contoh repair `ZERO_TOTAL_WITH_ITEMS` (dry-run lalu apply per order):
+Contoh repair `ZERO_TOTAL_WITH_ITEMS`:
 
 ```bash
 cd /workspace/numars-pos/backend
+# Dry-run per order
 ORDER_ID=244 npm run journal:repair:zero-total
+
+# Dry-run semua anomali pada tanggal tertentu
+RECON_DATE="$(date +%F)" npm run journal:repair:zero-total
+
+# Apply per order
 ORDER_ID=244 APPLY=true npm run journal:repair:zero-total
+
+# Apply semua anomali pada tanggal tertentu
+RECON_DATE="2026-02-24" APPLY=true npm run journal:repair:zero-total
 ```
 
 Contoh dry-run dedupe:

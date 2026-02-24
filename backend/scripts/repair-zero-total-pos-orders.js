@@ -14,6 +14,7 @@ if (fs.existsSync(rootEnvPath)) dotenv.config({ path: rootEnvPath, override: fal
 
 const APPLY = String(process.env.APPLY || '').toLowerCase() === 'true'
 const TARGET_ORDER_ID = Number(process.env.ORDER_ID || 0)
+const RECON_DATE = String(process.env.RECON_DATE || '').trim()
 
 const normalizeConnectionConfig = () => {
   const directUrl = process.env.DATABASE_URL
@@ -54,6 +55,11 @@ async function main() {
       whereClause += ` AND o.id = $${params.length}`
     }
 
+    if (RECON_DATE) {
+      params.push(RECON_DATE)
+      whereClause += ` AND o.created_at::date = $${params.length}::date`
+    }
+
     const { rows } = await client.query(
       `SELECT
         o.id AS order_id,
@@ -72,6 +78,7 @@ async function main() {
       params
     )
 
+    console.log(`Mode => ORDER_ID=${TARGET_ORDER_ID || '-'} RECON_DATE=${RECON_DATE || '-'} APPLY=${APPLY}`)
     console.log(`Found anomalous orders: ${rows.length}`)
     if (!rows.length) {
       await client.query('ROLLBACK')
