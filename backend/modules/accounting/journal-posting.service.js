@@ -2,6 +2,23 @@ const db = require('../../config/db')
 
 const normalizeVariant = (variant = 'DEFAULT') => String(variant || 'DEFAULT').trim().toUpperCase()
 
+const normalizePostingVariant = (eventCode, variant = 'DEFAULT') => {
+  const normalizedEvent = String(eventCode || '').trim().toUpperCase()
+  const normalizedVariant = normalizeVariant(variant)
+
+  if (normalizedEvent !== 'POS_PAYMENT') return normalizedVariant
+
+  if (['DEBIT', 'CC', 'TRANSFER BANK', 'BANK_TRANSFER', 'TRANSFERBANK'].includes(normalizedVariant)) {
+    return 'TRANSFER'
+  }
+
+  if (['E-WALLET', 'EWALLET', 'E_WALLET'].includes(normalizedVariant)) {
+    return 'QRIS'
+  }
+
+  return normalizedVariant
+}
+
 const ensurePostingRulesTable = async (client) => {
   await client.query(`
     CREATE TABLE IF NOT EXISTS accounting_posting_rules (
@@ -58,11 +75,12 @@ const createJournalFromRules = async (client, payload = {}) => {
   if (!event_code) throw new Error('event_code wajib diisi untuk auto journal')
 
   await ensurePostingRulesTable(client)
-  const rules = await resolvePostingRules(client, String(event_code).trim().toUpperCase(), variant)
+  const normalizedEvent = String(event_code).trim().toUpperCase()
+  const resolvedVariant = normalizePostingVariant(normalizedEvent, variant)
+  const rules = await resolvePostingRules(client, normalizedEvent, resolvedVariant)
 
   if (!rules.length) return null
 
-  const normalizedEvent = String(event_code).trim().toUpperCase()
   const normalizedSourceRef = String(source_ref || '-').trim()
   const idempotencyKey = normalizedEvent === 'POS_PAYMENT'
     ? `AUTO:${normalizedEvent}:${normalizedSourceRef}`

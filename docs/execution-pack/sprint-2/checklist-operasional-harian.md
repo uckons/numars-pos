@@ -64,6 +64,7 @@ SELECT event_code, variant, line_no, direction, account_code, is_active
 FROM accounting_posting_rules
 WHERE event_code='POS_PAYMENT'
 ORDER BY variant, line_no;
+-- Catatan: method DEBIT/CC/TRANSFER BANK akan dipetakan ke variant TRANSFER oleh service.
 
 -- 2) cek header jurnal order tertentu
 SELECT id, source_ref, idempotency_key, posting_date, status, description
