@@ -14,6 +14,18 @@ const parseOrderId = (rawId) => {
   return orderId
 }
 
+
+const normalizeDiscountAmount = (subtotal, rawDiscount) => {
+  const safeSubtotal = Math.max(0, Math.round(Number(subtotal || 0)))
+  const requestedDiscount = Math.max(0, Math.round(Number(rawDiscount || 0)))
+
+  if (safeSubtotal > 0 && requestedDiscount >= safeSubtotal) {
+    throw new Error('Discount harus lebih kecil dari subtotal. Gunakan void/complimentary flow jika ingin gratis 100%.')
+  }
+
+  return Math.max(0, Math.min(safeSubtotal, requestedDiscount))
+}
+
 const VOID_UNDO_WINDOW_MINUTES = 10
 
 const roleRoom = (branchId, role = "") => `branch:${branchId}:role:${String(role).toLowerCase().replace(/\s+/g, "-")}`
@@ -394,7 +406,7 @@ exports.close = async (req, res) => {
       [orderId]
     )
     const subtotal = Math.round(Number(totalResult.rows[0].total || 0))
-    const discountAmount = Math.max(0, Math.min(subtotal, Math.round(Number(discount_amount || 0))))
+    const discountAmount = normalizeDiscountAmount(subtotal, discount_amount)
     const total = Math.max(0, subtotal - discountAmount)
     const paymentMethod = String(payment_method || 'CASH').toUpperCase()
 
@@ -886,7 +898,7 @@ exports.createFromPos = async (req, res) => {
     }
 
     const subtotal = Math.round(Number(total || 0))
-    const discountAmount = Math.max(0, Math.min(subtotal, Math.round(Number(discount_amount || 0))))
+    const discountAmount = normalizeDiscountAmount(subtotal, discount_amount)
     const finalTotal = Math.max(0, subtotal - discountAmount)
     const paymentMethod = String(payment_method || "CASH").toUpperCase()
 

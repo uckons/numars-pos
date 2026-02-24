@@ -538,6 +538,10 @@ const askPaymentDetails = async () => {
       const method = String(document.getElementById("pay-method")?.value || "CASH").toUpperCase()
       const discountAmount = Math.max(0, Math.round(Number(document.getElementById("pay-discount")?.value || 0)))
       const subtotal = total
+      if (subtotal > 0 && discountAmount >= subtotal) {
+        Swal.showValidationMessage("Discount harus lebih kecil dari subtotal")
+        return false
+      }
       const finalTotal = Math.max(0, subtotal - discountAmount)
 
       let paymentAmount = Math.round(Number(document.getElementById("pay-amount")?.value || 0))
