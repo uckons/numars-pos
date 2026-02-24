@@ -11,6 +11,7 @@ RECON_DATE="${RECON_DATE:-$(date +%F)}"
 BRANCH_ID="${BRANCH_ID:-}"
 DATABASE_URL="${DATABASE_URL:-}"
 ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
+RETENTION_DAYS="${RETENTION_DAYS:-14}"
 
 if [[ -z "$DATABASE_URL" ]]; then
   echo "[recon-cron] ERROR: DATABASE_URL is required"
@@ -20,6 +21,10 @@ fi
 STAMP="$(date +%Y%m%d-%H%M%S)"
 RAW_OUT="$LOG_DIR/recon-${RECON_DATE}-branch-${BRANCH_ID:-ALL}-${STAMP}.log"
 JSON_OUT="$LOG_DIR/recon-${RECON_DATE}-branch-${BRANCH_ID:-ALL}-${STAMP}.json"
+
+# simple log rotation
+find "$LOG_DIR" -type f -name "recon-*" -mtime +"$RETENTION_DAYS" -delete 2>/dev/null || true
+find "$LOG_DIR" -type f -name "cron.log*" -mtime +"$RETENTION_DAYS" -delete 2>/dev/null || true
 
 set +e
 psql "$DATABASE_URL" \

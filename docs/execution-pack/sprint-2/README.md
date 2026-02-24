@@ -86,8 +86,10 @@ Tersedia script otomasi untuk menjalankan recon SQL, parse output, dan kirim ale
 
 ```bash
 cd /workspace/numars-pos/backend
-RECON_DATE="$(date +%F)" BRANCH_ID="1" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh
+RECON_DATE="$(date +%F)" BRANCH_ID="1" RETENTION_DAYS="14" ALERT_WEBHOOK_URL="https://example-webhook" bash scripts/cron-recon-alert.sh
 ```
+
+Saran produksi: pasang 2 slot cron di luar jam sibuk (03:10 dan 09:30) menggunakan command yang sama.
 
 Komponen:
 - `backend/scripts/cron-recon-alert.sh`
