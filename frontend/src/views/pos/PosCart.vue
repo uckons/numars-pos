@@ -799,10 +799,10 @@ const printReceipt = async () => {
 
     await SwalTheme.fire({
       icon: thermalPrinted ? 'success' : 'warning',
-      title: thermalPrinted ? 'Print POS dikirim' : 'Print POS siap',
+      title: thermalPrinted ? 'Print POS dikirim' : 'Printer tidak terkoneksi',
       text: thermalPrinted
         ? '🖨 Struk dipreview di browser dan dikirim ke printer POS.'
-        : '🧾 Browser preview/PDF tetap tersedia. Printer POS tidak terhubung.',
+        : 'Printer tidak terkoneksi, silahkan lakukan print ulang jika printer sudah terkoneksi.',
       confirmButtonText: 'OK'
     })
 
