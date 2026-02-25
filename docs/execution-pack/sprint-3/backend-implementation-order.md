@@ -84,7 +84,7 @@ Dokumen ini jadi urutan implementasi praktis untuk backend Sprint 3 (manual jour
 
 - Minimal 2 line.
 - Tiap line wajib debit xor credit (> 0, tidak boleh dua-duanya).
-- Semua account harus ada dan aktif di `chart_of_accounts`.
+- Semua line harus bawa `account_id` **atau** `account_code`, dan account harus ada + aktif di `chart_of_accounts`.
 - Header submit/approve/reject wajib state transition valid.
 - Hanya role approver (`SuperAdmin/Owner/Manager`) yang boleh approve/reject dan trigger generate.
 

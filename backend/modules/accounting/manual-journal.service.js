@@ -41,12 +41,18 @@ const validateLines = async (client, lines = []) => {
 
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i] || {}
-    const accountId = Number(raw.account_id)
+    const rawAccountId = raw.account_id
+    const rawAccountCode = raw.account_code
+    const accountId = Number(rawAccountId)
+    const accountCode = String(rawAccountCode || '').trim()
     const debit = normalizeAmount(raw.debit)
     const credit = normalizeAmount(raw.credit)
 
-    if (!Number.isInteger(accountId) || accountId <= 0) {
-      throw new HttpError(400, 'VALIDATION_ERROR', `account_id invalid di line ${i + 1}`)
+    const hasValidAccountId = Number.isInteger(accountId) && accountId > 0
+    const hasAccountCode = Boolean(accountCode)
+
+    if (!hasValidAccountId && !hasAccountCode) {
+      throw new HttpError(400, 'VALIDATION_ERROR', `account_id/account_code wajib valid di line ${i + 1}`)
     }
 
     if ((debit > 0 && credit > 0) || (debit === 0 && credit === 0)) {
@@ -57,17 +63,34 @@ const validateLines = async (client, lines = []) => {
       })
     }
 
-    const accountCheck = await client.query(
-      'SELECT id, is_active FROM chart_of_accounts WHERE id=$1 LIMIT 1',
-      [accountId]
-    )
+    let accountCheck
+    if (hasValidAccountId) {
+      accountCheck = await client.query(
+        'SELECT id, code, is_active FROM chart_of_accounts WHERE id=$1 LIMIT 1',
+        [accountId]
+      )
+
+      // Backward compatibility: some payloads pass account code numeric in account_id (e.g. 5101)
+      if (!accountCheck.rows.length && !hasAccountCode) {
+        accountCheck = await client.query(
+          'SELECT id, code, is_active FROM chart_of_accounts WHERE code=$1 LIMIT 1',
+          [String(rawAccountId)]
+        )
+      }
+    } else {
+      accountCheck = await client.query(
+        'SELECT id, code, is_active FROM chart_of_accounts WHERE code=$1 LIMIT 1',
+        [accountCode]
+      )
+    }
 
     if (!accountCheck.rows.length) {
-      throw new HttpError(400, 'VALIDATION_ERROR', `Account ${accountId} tidak ditemukan`)
+      const identifier = hasAccountCode ? `code ${accountCode}` : `id/code ${rawAccountId}`
+      throw new HttpError(400, 'VALIDATION_ERROR', `Account ${identifier} tidak ditemukan`)
     }
 
     if (!accountCheck.rows[0].is_active) {
-      throw new HttpError(400, 'VALIDATION_ERROR', `Account ${accountId} tidak aktif`)
+      throw new HttpError(400, 'VALIDATION_ERROR', `Account ${accountCheck.rows[0].code || accountCheck.rows[0].id} tidak aktif`)
     }
 
     totalDebit += debit
@@ -75,7 +98,7 @@ const validateLines = async (client, lines = []) => {
 
     normalized.push({
       line_no: i + 1,
-      account_id: accountId,
+      account_id: Number(accountCheck.rows[0].id),
       debit,
       credit,
       memo: raw.memo || null

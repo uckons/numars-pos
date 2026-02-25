@@ -14,11 +14,15 @@ Request:
   "journal_date": "2026-02-25",
   "description": "Penyesuaian biaya listrik",
   "lines": [
-    { "account_id": 5101, "debit": 1000000, "credit": 0, "memo": "beban" },
-    { "account_id": 1101, "debit": 0, "credit": 1000000, "memo": "kas" }
+    { "account_code": "5101", "debit": 1000000, "credit": 0, "memo": "beban" },
+    { "account_code": "1101", "debit": 0, "credit": 1000000, "memo": "kas" }
   ]
 }
 ```
+
+Rules tambahan line:
+- Boleh kirim `account_id` (PK table `chart_of_accounts`) **atau** `account_code` (mis. `"5101"`).
+- Jika keduanya dikirim, backend prioritaskan `account_id`.
 
 Response `201`:
 ```json
@@ -107,8 +111,8 @@ Request:
   "end_date": null,
   "description": "Akrual biaya sewa",
   "lines": [
-    { "account_id": 5102, "debit": 5000000, "credit": 0 },
-    { "account_id": 2101, "debit": 0, "credit": 5000000 }
+    { "account_code": "5102", "debit": 5000000, "credit": 0 },
+    { "account_code": "2101", "debit": 0, "credit": 5000000 }
   ]
 }
 ```

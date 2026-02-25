@@ -9,29 +9,29 @@ set -euo pipefail
 #
 # Optional env:
 #   BRANCH_ID=1
-#   DEBIT_ACCOUNT_ID=5101
-#   CREDIT_ACCOUNT_ID=1101
-#   RECUR_DEBIT_ACCOUNT_ID=5102
-#   RECUR_CREDIT_ACCOUNT_ID=2101
+#   DEBIT_ACCOUNT_CODE=5101
+#   CREDIT_ACCOUNT_CODE=1101
+#   RECUR_DEBIT_ACCOUNT_CODE=5102
+#   RECUR_CREDIT_ACCOUNT_CODE=2101
 #   RUN_APPLY=true|false   (default: false)
 #   JOURNAL_AMOUNT=100000
 #   RECUR_AMOUNT=500000
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:4000/api/accounting}"
-TOKEN="${TOKEN:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwicm9sZSI6IlN1cGVyQWRtaW4iLCJuYW1lIjoiU3VwZXIgQWRtaW4iLCJicmFuY2hfaWQiOjEsImlhdCI6MTc3MTk5NjkxMCwiZXhwIjoxNzcyMDgzMzEwfQ._V0pxRbyhl1NFKEXKOPbphWvGEv2dTV539_V9_1mmWk}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:3000/api/accounting}"
+TOKEN="${TOKEN:-}"
 
 BRANCH_ID="${BRANCH_ID:-1}"
-DEBIT_ACCOUNT_ID="${DEBIT_ACCOUNT_ID:-5101}"
-CREDIT_ACCOUNT_ID="${CREDIT_ACCOUNT_ID:-1101}"
-RECUR_DEBIT_ACCOUNT_ID="${RECUR_DEBIT_ACCOUNT_ID:-5102}"
-RECUR_CREDIT_ACCOUNT_ID="${RECUR_CREDIT_ACCOUNT_ID:-2101}"
+DEBIT_ACCOUNT_CODE="${DEBIT_ACCOUNT_CODE:-5101}"
+CREDIT_ACCOUNT_CODE="${CREDIT_ACCOUNT_CODE:-1101}"
+RECUR_DEBIT_ACCOUNT_CODE="${RECUR_DEBIT_ACCOUNT_CODE:-5102}"
+RECUR_CREDIT_ACCOUNT_CODE="${RECUR_CREDIT_ACCOUNT_CODE:-2101}"
 RUN_APPLY="${RUN_APPLY:-false}"
 JOURNAL_AMOUNT="${JOURNAL_AMOUNT:-100000}"
 RECUR_AMOUNT="${RECUR_AMOUNT:-500000}"
 
 if [[ -z "$TOKEN" ]]; then
   echo "[ERROR] TOKEN wajib diisi"
-  echo "Contoh: TOKEN='xxx' BASE_URL='http://127.0.0.1:4000/api/accounting' bash backend/scripts/test-sprint3-accounting.sh"
+  echo "Contoh: TOKEN='xxx' BASE_URL='http://127.0.0.1:3000/api/accounting' bash backend/scripts/test-sprint3-accounting.sh"
   exit 1
 fi
 
@@ -93,16 +93,16 @@ CREATE_PAYLOAD="$(jq -n \
   --argjson branch_id "$BRANCH_ID" \
   --arg journal_date "$TODAY" \
   --arg description "UAT Sprint3 - Manual Journal Create" \
-  --argjson debit_account_id "$DEBIT_ACCOUNT_ID" \
-  --argjson credit_account_id "$CREDIT_ACCOUNT_ID" \
+  --arg debit_account_code "$DEBIT_ACCOUNT_CODE" \
+  --arg credit_account_code "$CREDIT_ACCOUNT_CODE" \
   --argjson amount "$JOURNAL_AMOUNT" \
   '{
     branch_id: $branch_id,
     journal_date: $journal_date,
     description: $description,
     lines: [
-      { account_id: $debit_account_id, debit: $amount, credit: 0, memo: "beban test" },
-      { account_id: $credit_account_id, debit: 0, credit: $amount, memo: "kas test" }
+      { account_code: $debit_account_code, debit: $amount, credit: 0, memo: "beban test" },
+      { account_code: $credit_account_code, debit: 0, credit: $amount, memo: "kas test" }
     ]
   }')"
 
@@ -155,8 +155,8 @@ TEMPLATE_PAYLOAD="$(jq -n \
   --argjson branch_id "$BRANCH_ID" \
   --arg start_date "$TODAY" \
   --arg name "UAT Sprint3 - Akrual Bulanan" \
-  --argjson debit_account_id "$RECUR_DEBIT_ACCOUNT_ID" \
-  --argjson credit_account_id "$RECUR_CREDIT_ACCOUNT_ID" \
+  --arg debit_account_code "$RECUR_DEBIT_ACCOUNT_CODE" \
+  --arg credit_account_code "$RECUR_CREDIT_ACCOUNT_CODE" \
   --argjson amount "$RECUR_AMOUNT" \
   '{
     branch_id: $branch_id,
@@ -167,8 +167,8 @@ TEMPLATE_PAYLOAD="$(jq -n \
     end_date: null,
     description: "Template recurring untuk UAT",
     lines: [
-      { account_id: $debit_account_id, debit: $amount, credit: 0, memo: "beban" },
-      { account_id: $credit_account_id, debit: 0, credit: $amount, memo: "utang" }
+      { account_code: $debit_account_code, debit: $amount, credit: 0, memo: "beban" },
+      { account_code: $credit_account_code, debit: 0, credit: $amount, memo: "utang" }
     ]
   }')"
 
