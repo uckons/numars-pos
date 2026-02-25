@@ -1,6 +1,7 @@
 const db = require("../../config/db")
 const bcrypt = require("bcrypt")
 const printerTargetService = require("../printers/printer-target.service")
+const journalPostingService = require("../accounting/journal-posting.service")
 
 exports.dashboard = async () => {
   const users = await db.query("SELECT COUNT(*) FROM users")
@@ -316,10 +317,23 @@ exports.settleTherapistPayroll = async (user, { branch_id, date_from, date_to, n
     )
   }
 
+
+  const settledAmount = settleRows.reduce((a, r) => a + Number(r.unsettled_amount || 0), 0)
+
+  await journalPostingService.postAutoJournal({
+    event_code: 'THERAPIST_COMMISSION_SETTLE',
+    variant: 'DEFAULT',
+    amount: settledAmount,
+    branch_id: summary.range.branch_id === 'ALL' ? null : summary.range.branch_id,
+    actor_id: user?.id || null,
+    source_ref: `THERAPIST_PAYROLL:${dateFrom}:${dateTo}:${summary.range.branch_id || 'ALL'}`,
+    description: `Auto jurnal settle payroll terapis ${dateFrom} s/d ${dateTo}`
+  })
+
   return {
     message: 'Payroll terapis berhasil disettle',
     settled_count: settleRows.length,
-    settled_amount: settleRows.reduce((a, r) => a + Number(r.unsettled_amount || 0), 0)
+    settled_amount: settledAmount
   }
 }
 
