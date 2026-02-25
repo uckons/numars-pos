@@ -29,6 +29,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - SQL reconciliation AP/AR/payroll (`sql-reconciliation-ap-ar-payroll.sql`).
 - Checklist operasional harian (`checklist-operasional-harian.md`).
 - Rollback runbook Sprint 4 (`rollback-runbook-v1.md`).
+- Next step 24–72 jam pasca merge (`next-step-24h.md`).
+- Pilot control sheet template (`pilot-control-sheet-template.md`).
 
 ## Dependency
 
