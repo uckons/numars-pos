@@ -55,3 +55,14 @@
 - Rollout ke 1 branch pilot.
 - Monitor error rate, aging mismatch, payroll anomalies.
 - Output: keputusan COND PASS / PASS / NO-GO.
+
+
+## D11 — Go/No-Go Gate
+- Review hasil pilot H+48/H+72 dan incident log.
+- Validasi AP/AR aging consistency + payroll close integrity.
+- Output: keputusan GO / NO-GO.
+
+## D12 — Wave Rollout + Stabilization
+- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil.
+- Stabilization H+1 s/d H+3 + handover operasi.
+- Output: status Sprint 4 final (PASS/COND PASS).

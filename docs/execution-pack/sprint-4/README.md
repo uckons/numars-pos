@@ -21,7 +21,9 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Task board harian D1–D10.
 - UAT checklist AP/AR/Payroll Staff.
 - Draft migration additive AP/AR/payroll staff.
-- API contract awal untuk AP/AR/payroll run.
+- API contract awal untuk AP/AR/payroll run (`api-contract-ap-ar-payroll-v1.md`).
+- Backend implementation order (`backend-implementation-order.md`).
+- Pilot + go-live checklist (`pilot-go-live-checklist.md`).
 
 ## Dependency
 
