@@ -26,6 +26,9 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Pilot + go-live checklist (`pilot-go-live-checklist.md`).
 - Migration plan AP/AR/payroll (`migration-plan-ap-ar-payroll-v1.md`).
 - Feature flags AP/AR/payroll (`feature-flags-v1.md`).
+- SQL reconciliation AP/AR/payroll (`sql-reconciliation-ap-ar-payroll.sql`).
+- Checklist operasional harian (`checklist-operasional-harian.md`).
+- Rollback runbook Sprint 4 (`rollback-runbook-v1.md`).
 
 ## Dependency
 
