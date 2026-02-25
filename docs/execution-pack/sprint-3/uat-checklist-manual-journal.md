@@ -51,5 +51,5 @@
 - UAT Date:
 - QA:
 - Accounting Representative:
-- Result: PASS / CONDITIONAL PASS / FAIL
-- Catatan:
+- Result: **CONDITIONAL PASS** (Sprint 3 lanjut pilot)
+- Catatan: Target close final setelah 2–3 hari pilot tanpa incident major.

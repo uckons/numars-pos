@@ -55,7 +55,8 @@
 ## D10 — Pilot Release
 - Deploy ke pilot branch.
 - Monitoring error rate + backlog pending approval.
-- Output: keputusan go/no-go untuk rollout luas.
+- Status saat ini: **CONDITIONAL PASS**, lanjut pilot.
+- Target close final: 2–3 hari pilot tanpa incident major sebelum go/no-go rollout luas.
 
 ---
 

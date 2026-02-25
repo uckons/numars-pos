@@ -2,6 +2,12 @@
 
 Sprint 3 berfokus ke penguatan kontrol akuntansi operasional: entry jurnal manual yang terkontrol, recurring journal template, dan approval flow yang jelas.
 
+## Status Update
+
+- Status saat ini: **CONDITIONAL PASS**.
+- Keputusan: **lanjut pilot** (scope terbatas: 1 branch + 1 approver).
+- Target close final: setelah **2–3 hari pilot** tanpa incident major.
+
 ## Scope Sprint 3
 
 1. **Manual Journal Workflow**
@@ -50,6 +56,7 @@ Sprint 3 berfokus ke penguatan kontrol akuntansi operasional: entry jurnal manua
 - Tidak ada jurnal manual `POSTED` yang tidak balance.
 - Approval trail lengkap (actor, action, timestamp, note).
 - Recurring generator idempotent (tidak double-generate untuk periode sama).
+- Pilot 2–3 hari berjalan tanpa incident major (loss data, double post, atau blocking operasional).
 
 ## Risk dan Mitigasi
 
