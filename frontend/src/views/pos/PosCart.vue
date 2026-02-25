@@ -736,6 +736,44 @@ const closeReceiptModal = async () => {
   }
 }
 
+const openBrowserPrintPreview = () => {
+  const receiptNode = document.getElementById('receipt-print')
+  if (!receiptNode) {
+    window.print()
+    return
+  }
+
+  const printWindow = window.open('', '_blank', 'width=420,height=900')
+  if (!printWindow) {
+    window.print()
+    return
+  }
+
+  const styleContent = `
+    <style>
+      @page { size: 80mm auto; margin: 0; }
+      body { margin:0; background:#fff; color:#111; font-family:'Courier New', monospace; }
+      .print-shell { width:80mm; margin:0 auto; padding:4mm 3mm; box-sizing:border-box; }
+      .print-shell * { color:#111 !important; }
+      .print-shell .receipt-preview { max-height:none !important; overflow:visible !important; border:none !important; }
+      .print-shell .receipt { box-shadow:none !important; border:none !important; }
+    </style>
+  `
+
+  printWindow.document.open()
+  printWindow.document.write(`<!doctype html><html><head><title>Print POS</title>${styleContent}</head><body><div class="print-shell">${receiptNode.outerHTML}</div></body></html>`)
+  printWindow.document.close()
+
+  setTimeout(() => {
+    printWindow.focus()
+    printWindow.print()
+  }, 250)
+
+  printWindow.onafterprint = () => {
+    printWindow.close()
+  }
+}
+
 // 🖨️ PRINT RECEIPT
 const printReceipt = async () => {
   try {
