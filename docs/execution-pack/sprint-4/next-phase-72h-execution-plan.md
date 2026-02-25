@@ -65,3 +65,9 @@ Hentikan ekspansi rollout jika salah satu terjadi:
 - [ ] Recon siang/sore 3 hari lengkap.
 - [ ] KPI stabil vs baseline pilot.
 - [ ] Sign-off Finance + Payroll + QA + Engineering + Ops.
+
+
+## 6) Referensi Cepat
+
+- Gunakan `h0-h24-filled-example.md` sebagai baseline pengisian hari pertama.
+- Jika UI operasional belum lengkap, ikuti prioritas di `ui-gap-assessment-ap-ar-payroll.md`.

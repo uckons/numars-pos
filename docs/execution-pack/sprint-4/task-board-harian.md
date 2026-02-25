@@ -44,7 +44,7 @@
 - Form AP/AR invoice & payment v1.
 - List aging AP/AR.
 - Payroll run summary + slip generation status.
-- Output: UI staging terhubung API.
+- Output: UI staging terhubung API + gap list prioritas (`ui-gap-assessment-ap-ar-payroll.md`).
 
 ## D8 — QA Internal
 - Happy path + negative path AP/AR/payroll.
@@ -69,6 +69,7 @@
 - Output: keputusan GO / NO-GO + notulen `gate-decision-minutes-template.md`.
 
 ## D12 — Wave Rollout + Stabilization
+- Gunakan contoh hari pertama `h0-h24-filled-example.md` untuk percepat eksekusi shift.
 - Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil (lihat `phase-5-wave-rollout-plan.md`).
 - Stabilization H+1 s/d H+3 + handover operasi (lihat `post-go-live-handover-checklist.md`).
 - Output: status Sprint 4 final (PASS/COND PASS) + `wave-rollout-tracker-template.md`, `h-plus-3-stabilization-report-template.md`, dan handover checklist selesai.

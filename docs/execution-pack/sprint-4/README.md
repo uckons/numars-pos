@@ -39,6 +39,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Stakeholder communication template (`stakeholder-communication-template.md`).
 - Next phase 72h execution plan (`next-phase-72h-execution-plan.md`).
 - Governance readiness scorecard (`governance-readiness-scorecard.md`).
+- Contoh terisi hari pertama H+0..H+24 (`h0-h24-filled-example.md`).
+- UI gap assessment AP/AR/payroll (`ui-gap-assessment-ap-ar-payroll.md`).
 
 ## Dependency
 
