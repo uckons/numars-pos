@@ -28,7 +28,7 @@ Checklist ini dipakai setelah wave rollout selesai dan masuk fase BAU (business 
 - [ ] Pilot Control Sheet diarsipkan beserta evidence referensi.
 - [ ] Task board Sprint 4 ditutup dengan tanggal final.
 - [ ] Dokumen next-phase dan handover diberi versi + tanggal efektif.
-- [ ] Ringkasan final PASS/COND PASS/NO-GO dipublikasikan.
+- [ ] Ringkasan final PASS/COND PASS/NO-GO dipublikasikan (gunakan `stakeholder-communication-template.md`).
 
 ## 5) Sign-off
 

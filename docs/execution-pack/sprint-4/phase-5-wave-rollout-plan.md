@@ -89,3 +89,11 @@ Pastikan dua dokumen ini aktif dipakai selama rollout:
 
 - `wave-rollout-tracker-template.md` untuk tracking cohort, checkpoint, dan keputusan wave.
 - `gate-decision-minutes-template.md` untuk notulen resmi GO/NO-GO.
+
+
+## 10) Closure Output Setelah Stabilization
+
+Di akhir H+3, publish:
+
+- `h-plus-3-stabilization-report-template.md` (status stabilisasi resmi).
+- Ringkasan ke stakeholder menggunakan `stakeholder-communication-template.md`.

@@ -35,6 +35,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Post go-live handover checklist (`post-go-live-handover-checklist.md`).
 - Wave rollout tracker template (`wave-rollout-tracker-template.md`).
 - Gate decision minutes template (`gate-decision-minutes-template.md`).
+- H+3 stabilization report template (`h-plus-3-stabilization-report-template.md`).
+- Stakeholder communication template (`stakeholder-communication-template.md`).
 
 ## Dependency
 
