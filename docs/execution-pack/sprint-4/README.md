@@ -37,6 +37,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Gate decision minutes template (`gate-decision-minutes-template.md`).
 - H+3 stabilization report template (`h-plus-3-stabilization-report-template.md`).
 - Stakeholder communication template (`stakeholder-communication-template.md`).
+- Next phase 72h execution plan (`next-phase-72h-execution-plan.md`).
+- Governance readiness scorecard (`governance-readiness-scorecard.md`).
 
 ## Dependency
 

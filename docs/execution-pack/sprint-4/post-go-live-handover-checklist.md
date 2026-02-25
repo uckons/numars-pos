@@ -29,6 +29,7 @@ Checklist ini dipakai setelah wave rollout selesai dan masuk fase BAU (business 
 - [ ] Task board Sprint 4 ditutup dengan tanggal final.
 - [ ] Dokumen next-phase dan handover diberi versi + tanggal efektif.
 - [ ] Ringkasan final PASS/COND PASS/NO-GO dipublikasikan (gunakan `stakeholder-communication-template.md`).
+- [ ] Governance readiness scorecard dihitung dan diarsipkan (`governance-readiness-scorecard.md`).
 
 ## 5) Sign-off
 

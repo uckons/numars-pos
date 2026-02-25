@@ -97,3 +97,11 @@ Di akhir H+3, publish:
 
 - `h-plus-3-stabilization-report-template.md` (status stabilisasi resmi).
 - Ringkasan ke stakeholder menggunakan `stakeholder-communication-template.md`.
+
+
+## 11) Governance Check Sebelum BAU
+
+Sebelum handover, nilai readiness memakai:
+
+- `next-phase-72h-execution-plan.md` untuk tracking eksekusi H+0..H+72.
+- `governance-readiness-scorecard.md` untuk keputusan readiness BAU.

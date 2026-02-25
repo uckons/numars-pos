@@ -72,3 +72,9 @@
 - Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil (lihat `phase-5-wave-rollout-plan.md`).
 - Stabilization H+1 s/d H+3 + handover operasi (lihat `post-go-live-handover-checklist.md`).
 - Output: status Sprint 4 final (PASS/COND PASS) + `wave-rollout-tracker-template.md`, `h-plus-3-stabilization-report-template.md`, dan handover checklist selesai.
+
+
+## D13 — BAU Readiness Governance
+- Review `next-phase-72h-execution-plan.md` untuk memastikan seluruh output H+0..H+72 lengkap.
+- Hitung skor `governance-readiness-scorecard.md` sebelum deklarasi handover BAU.
+- Output: keputusan READY FOR BAU / CONDITIONAL READY / NOT READY.
