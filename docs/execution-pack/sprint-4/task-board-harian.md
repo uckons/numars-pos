@@ -4,7 +4,7 @@
 - Lock 1 pilot branch + approver Finance + approver Payroll.
 - Aktifkan feature flag AP/AR/payroll staff hanya untuk pilot branch.
 - Jalankan 3 transaksi bukti (AP, AR, payroll close) + recon siang/sore.
-- Publish daily status + incident log untuk gate H+48/H+72.
+- Publish daily status + incident log untuk gate H+48/H+72 (pakai `pilot-control-sheet-template.md`).
 
 ## D1 — Kickoff Scope & Owner Lock
 - Finalisasi scope AP/AR/Payroll Staff v1.
