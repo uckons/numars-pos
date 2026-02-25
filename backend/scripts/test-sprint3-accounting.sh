@@ -17,8 +17,8 @@ set -euo pipefail
 #   JOURNAL_AMOUNT=100000
 #   RECUR_AMOUNT=500000
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:3000/api/accounting}"
-TOKEN="${TOKEN:-}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:4000/api/accounting}"
+TOKEN="${TOKEN:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwicm9sZSI6IlN1cGVyQWRtaW4iLCJuYW1lIjoiU3VwZXIgQWRtaW4iLCJicmFuY2hfaWQiOjEsImlhdCI6MTc3MTk5NjkxMCwiZXhwIjoxNzcyMDgzMzEwfQ._V0pxRbyhl1NFKEXKOPbphWvGEv2dTV539_V9_1mmWk}"
 
 BRANCH_ID="${BRANCH_ID:-1}"
 DEBIT_ACCOUNT_ID="${DEBIT_ACCOUNT_ID:-5101}"
@@ -31,7 +31,7 @@ RECUR_AMOUNT="${RECUR_AMOUNT:-500000}"
 
 if [[ -z "$TOKEN" ]]; then
   echo "[ERROR] TOKEN wajib diisi"
-  echo "Contoh: TOKEN='xxx' BASE_URL='http://127.0.0.1:3000/api/accounting' bash backend/scripts/test-sprint3-accounting.sh"
+  echo "Contoh: TOKEN='xxx' BASE_URL='http://127.0.0.1:4000/api/accounting' bash backend/scripts/test-sprint3-accounting.sh"
   exit 1
 fi
 
