@@ -49,23 +49,18 @@ FROM ar_payments ap
 WHERE ap.journal_entry_id IS NULL
 ORDER BY ap.id DESC;
 
--- 6) Quick trial-balance subset for Sprint 4 events
+-- 6) Quick trial-balance subset for Sprint 4 modules
+-- NOTE: current schema uses source_module/source_ref (not reference_type/reference_id)
 SELECT
   je.id,
-  je.reference_type,
-  je.reference_id,
+  je.source_module,
+  je.source_ref,
   SUM(jl.debit) AS total_debit,
   SUM(jl.credit) AS total_credit,
   (SUM(jl.debit) - SUM(jl.credit)) AS delta
 FROM journal_entries je
 JOIN journal_lines jl ON jl.journal_entry_id = je.id
-WHERE je.reference_type IN (
-  'AP_INVOICE_POSTED',
-  'AP_PAYMENT_POSTED',
-  'AR_INVOICE_POSTED',
-  'AR_PAYMENT_RECEIVED',
-  'STAFF_PAYROLL_POSTED'
-)
-GROUP BY je.id, je.reference_type, je.reference_id
+WHERE je.source_module IN ('AP', 'AR', 'PAYROLL')
+GROUP BY je.id, je.source_module, je.source_ref
 HAVING SUM(jl.debit) <> SUM(jl.credit)
 ORDER BY je.id DESC;
