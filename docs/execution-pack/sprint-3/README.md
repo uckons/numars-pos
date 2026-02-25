@@ -32,6 +32,7 @@ Sprint 3 berfokus ke penguatan kontrol akuntansi operasional: entry jurnal manua
 - Next phase plan (pilot -> full rollout): `phase-4-full-rollout-plan.md`.
 - Pilot execution checklist 48 jam: `pilot-48h-operational-checklist.md`.
 - GO-live wave rollout runbook: `go-live-wave-rollout-runbook.md`.
+- Post go-live handover checklist: `post-go-live-handover-checklist.md`.
 
 ## Dependency
 

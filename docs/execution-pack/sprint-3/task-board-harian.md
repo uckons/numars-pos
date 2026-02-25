@@ -90,3 +90,8 @@
 - Rollout ke sisa branch jika wave-1 stabil.
 - Stabilization H+1 s/d H+3 dan penutupan isu prioritas tinggi.
 - Output: final close Sprint 3 = PASS.
+
+## D16 — Post Go-Live Handover
+- Jalankan handover checklist ke tim operasi.
+- Pastikan evidence pack lengkap dan sign-off lintas fungsi.
+- Output: transisi proyek -> operasi harian selesai.
