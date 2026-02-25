@@ -69,6 +69,6 @@
 - Output: keputusan GO / NO-GO.
 
 ## D12 — Wave Rollout + Stabilization
-- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil.
-- Stabilization H+1 s/d H+3 + handover operasi.
-- Output: status Sprint 4 final (PASS/COND PASS).
+- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil (lihat `phase-5-wave-rollout-plan.md`).
+- Stabilization H+1 s/d H+3 + handover operasi (lihat `post-go-live-handover-checklist.md`).
+- Output: status Sprint 4 final (PASS/COND PASS) + handover checklist selesai.

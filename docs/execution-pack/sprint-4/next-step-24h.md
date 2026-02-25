@@ -115,3 +115,11 @@ Ikuti rollback runbook Sprint 4:
    - 1 payroll run close.
 4. Jalankan recon SQL siang dan sore.
 5. Tulis daily status + incident log (jika ada).
+
+## Lanjut Next Phase (Setelah Gate GO)
+
+Jika gate H+48/H+72 menghasilkan GO, lanjutkan dengan:
+
+- Eksekusi `phase-5-wave-rollout-plan.md` untuk wave-1, wave-2, dan stabilization H+3.
+- Tutup rollout menggunakan `post-go-live-handover-checklist.md`.
+

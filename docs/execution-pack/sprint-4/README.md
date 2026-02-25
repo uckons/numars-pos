@@ -31,6 +31,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Rollback runbook Sprint 4 (`rollback-runbook-v1.md`).
 - Next step 24–72 jam pasca merge (`next-step-24h.md`).
 - Pilot control sheet template (`pilot-control-sheet-template.md`).
+- Next phase plan (pilot -> wave rollout -> handover) (`phase-5-wave-rollout-plan.md`).
+- Post go-live handover checklist (`post-go-live-handover-checklist.md`).
 
 ## Dependency
 
