@@ -24,6 +24,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - API contract awal untuk AP/AR/payroll run (`api-contract-ap-ar-payroll-v1.md`).
 - Backend implementation order (`backend-implementation-order.md`).
 - Pilot + go-live checklist (`pilot-go-live-checklist.md`).
+- Migration plan AP/AR/payroll (`migration-plan-ap-ar-payroll-v1.md`).
+- Feature flags AP/AR/payroll (`feature-flags-v1.md`).
 
 ## Dependency
 
