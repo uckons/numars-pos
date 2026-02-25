@@ -14,15 +14,16 @@ Request:
   "journal_date": "2026-02-25",
   "description": "Penyesuaian biaya listrik",
   "lines": [
-    { "account_code": "5101", "debit": 1000000, "credit": 0, "memo": "beban" },
-    { "account_code": "1101", "debit": 0, "credit": 1000000, "memo": "kas" }
+    { "account_code": "5111", "debit": 1000000, "credit": 0, "memo": "beban revert" },
+    { "account_code": "1111", "debit": 0, "credit": 1000000, "memo": "kas outlet" }
   ]
 }
 ```
 
 Rules tambahan line:
-- Boleh kirim `account_id` (PK table `chart_of_accounts`) **atau** `account_code` (mis. `"5101"`).
+- Boleh kirim `account_id` (PK table `chart_of_accounts`) **atau** `account_code` (mis. `"5111"`).
 - Jika keduanya dikirim, backend prioritaskan `account_id`.
+- Default seed Sprint 1 (`008_seed_coa_and_posting_rules.sql`) menggunakan kode detail seperti `1111`, `2111`, `4131`, `5111`, `5211`, `5311`.
 
 Response `201`:
 ```json
@@ -111,8 +112,8 @@ Request:
   "end_date": null,
   "description": "Akrual biaya sewa",
   "lines": [
-    { "account_code": "5102", "debit": 5000000, "credit": 0 },
-    { "account_code": "2101", "debit": 0, "credit": 5000000 }
+    { "account_code": "5311", "debit": 5000000, "credit": 0 },
+    { "account_code": "2111", "debit": 0, "credit": 5000000 }
   ]
 }
 ```
