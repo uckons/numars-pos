@@ -80,3 +80,13 @@
 - Konfirmasi rollout penuh dan stabil H+3.
 - Finalisasi sign-off Engineering + Finance + QA.
 - Output: Sprint 3 status final PASS.
+
+## D14 — GO Live Wave-1
+- Eksekusi runbook rollout wave-1 (30–40% branch).
+- Monitor 24 jam + recon 2x/hari.
+- Output: keputusan lanjut wave-2 / hold.
+
+## D15 — GO Live Wave-2 & Stabilization
+- Rollout ke sisa branch jika wave-1 stabil.
+- Stabilization H+1 s/d H+3 dan penutupan isu prioritas tinggi.
+- Output: final close Sprint 3 = PASS.
