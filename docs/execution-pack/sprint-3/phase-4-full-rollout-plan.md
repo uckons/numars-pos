@@ -66,3 +66,8 @@ Untuk NO-GO, kembali ke scope pilot, jalankan perbaikan, ulangi monitoring windo
 - Gate Decision Date:
 - Final Decision: GO / NO-GO
 - Notes:
+
+## 7) Referensi Eksekusi
+
+- Gunakan checklist operasional detail: `pilot-48h-operational-checklist.md`.
+- Simpan evidence (screenshot dashboard/error logs/recon output) per checkpoint H+12/H+24/H+48.

@@ -30,6 +30,7 @@ Sprint 3 berfokus ke penguatan kontrol akuntansi operasional: entry jurnal manua
 - UAT checklist end-to-end workflow.
 - Task board harian D1–D10 agar eksekusi tim sinkron.
 - Next phase plan (pilot -> full rollout): `phase-4-full-rollout-plan.md`.
+- Pilot execution checklist 48 jam: `pilot-48h-operational-checklist.md`.
 
 ## Dependency
 
