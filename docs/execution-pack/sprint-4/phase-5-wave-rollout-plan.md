@@ -81,3 +81,11 @@ Rollout dianggap selesai jika:
 - Final decision: PASS / CONDITIONAL PASS / NO-GO
 - Date:
 - Notes:
+
+
+## 9) Artefak Wajib Selama Next Phase
+
+Pastikan dua dokumen ini aktif dipakai selama rollout:
+
+- `wave-rollout-tracker-template.md` untuk tracking cohort, checkpoint, dan keputusan wave.
+- `gate-decision-minutes-template.md` untuk notulen resmi GO/NO-GO.

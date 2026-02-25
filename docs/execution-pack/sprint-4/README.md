@@ -33,6 +33,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Pilot control sheet template (`pilot-control-sheet-template.md`).
 - Next phase plan (pilot -> wave rollout -> handover) (`phase-5-wave-rollout-plan.md`).
 - Post go-live handover checklist (`post-go-live-handover-checklist.md`).
+- Wave rollout tracker template (`wave-rollout-tracker-template.md`).
+- Gate decision minutes template (`gate-decision-minutes-template.md`).
 
 ## Dependency
 

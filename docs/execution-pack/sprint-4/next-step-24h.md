@@ -64,7 +64,7 @@ Sebelum masuk gate GO/NO-GO, pastikan artefak ini sudah ada:
 
 - 1 dokumen **Pilot Control Sheet** (gunakan `pilot-control-sheet-template.md`).
 - 1 ringkasan **daily status** per hari (minimal H+0, H+1, H+2).
-- 1 catatan keputusan gate H+48/H+72 (GO/NO-GO + alasan + sign-off).
+- 1 catatan keputusan gate H+48/H+72 (GO/NO-GO + alasan + sign-off) memakai `gate-decision-minutes-template.md`.
 
 ## Urutan Eksekusi Cepat (Disarankan)
 
