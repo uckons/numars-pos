@@ -81,3 +81,27 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/008_seed_coa_and_
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/007_indexes_concurrently.sql
 ```
+
+
+## Migration 010: Sprint 4 AP/AR + Payroll Staff v1
+
+**File:** `010_sprint4_ap_ar_payroll_staff.sql`
+
+**Purpose:** Menambahkan fondasi additive untuk modul AP/AR dan Payroll Staff v1, termasuk linkage ke jurnal (`journal_entry_id`) untuk posting accounting yang konsisten.
+
+**Changes:**
+- Creates `vendors`, `ap_invoices`, `ap_invoice_lines`, `ap_payments`
+- Creates `customers`, `customer_credit_limits`, `ar_invoices`, `ar_invoice_lines`, `ar_payments`
+- Creates `staff_payroll_runs`, `staff_payroll_items`, `staff_payroll_slips`
+- Adds index utama untuk query status/due-date/period
+- Adds `touch_updated_at` triggers untuk tabel Sprint 4
+
+**Execution:**
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/010_sprint4_ap_ar_payroll_staff.sql
+```
+
+**Post-check (recommended):**
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/execution-pack/sprint-4/sql-reconciliation-ap-ar-payroll.sql
+```
