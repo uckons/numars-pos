@@ -1,5 +1,11 @@
 # Sprint 4 Task Board Harian (D1–D10)
 
+## Immediate (Pasca Merge Terakhir)
+- Lock 1 pilot branch + approver Finance + approver Payroll.
+- Aktifkan feature flag AP/AR/payroll staff hanya untuk pilot branch.
+- Jalankan 3 transaksi bukti (AP, AR, payroll close) + recon siang/sore.
+- Publish daily status + incident log untuk gate H+48/H+72 (pakai `pilot-control-sheet-template.md`).
+
 ## D1 — Kickoff Scope & Owner Lock
 - Finalisasi scope AP/AR/Payroll Staff v1.
 - Tetapkan owner (Eng, QA, Finance, Payroll).
@@ -63,6 +69,6 @@
 - Output: keputusan GO / NO-GO.
 
 ## D12 — Wave Rollout + Stabilization
-- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil.
-- Stabilization H+1 s/d H+3 + handover operasi.
-- Output: status Sprint 4 final (PASS/COND PASS).
+- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil (lihat `phase-5-wave-rollout-plan.md`).
+- Stabilization H+1 s/d H+3 + handover operasi (lihat `post-go-live-handover-checklist.md`).
+- Output: status Sprint 4 final (PASS/COND PASS) + handover checklist selesai.
