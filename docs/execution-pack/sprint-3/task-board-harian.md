@@ -65,3 +65,18 @@
 - API contract konsisten dengan implementasi.
 - UAT critical PASS.
 - Runbook rollback tersedia.
+
+## D11 — Go/No-Go Gate
+- Review hasil monitoring pilot 2–3 hari.
+- Validasi KPI operasional + KPI akuntansi terhadap threshold.
+- Output: keputusan GO / NO-GO terdokumentasi.
+
+## D12 — Wave Rollout
+- Jika GO: aktifkan wave-1 branch (30–40%).
+- Monitor 24 jam sebelum wave-2.
+- Output: status rollout per wave + isu terbuka.
+
+## D13 — Final Close
+- Konfirmasi rollout penuh dan stabil H+3.
+- Finalisasi sign-off Engineering + Finance + QA.
+- Output: Sprint 3 status final PASS.

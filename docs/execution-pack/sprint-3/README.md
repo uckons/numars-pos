@@ -29,6 +29,7 @@ Sprint 3 berfokus ke penguatan kontrol akuntansi operasional: entry jurnal manua
 - Draft migration additive untuk tabel baru Sprint 3.
 - UAT checklist end-to-end workflow.
 - Task board harian D1–D10 agar eksekusi tim sinkron.
+- Next phase plan (pilot -> full rollout): `phase-4-full-rollout-plan.md`.
 
 ## Dependency
 
