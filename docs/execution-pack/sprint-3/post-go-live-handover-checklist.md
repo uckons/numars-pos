@@ -36,6 +36,6 @@ Checklist ini dipakai setelah rollout wave selesai untuk memastikan transisi dar
 - Finance Lead:
 - QA Lead:
 - Ops Lead:
-- Final status: PASS / HOLD
+- Final status: PASS
 - Date:
-- Notes:
+- Notes: Go-Live Handover done.

@@ -4,9 +4,9 @@ Sprint 3 berfokus ke penguatan kontrol akuntansi operasional: entry jurnal manua
 
 ## Status Update
 
-- Status saat ini: **CONDITIONAL PASS**.
-- Keputusan: **lanjut pilot** (scope terbatas: 1 branch + 1 approver).
-- Target close final: setelah **2–3 hari pilot** tanpa incident major.
+- Status saat ini: **PASS** (Go-Live Handover done).
+- Keputusan: pilot selesai, rollout wave selesai, handover operasional selesai.
+- Final close: tercapai setelah pilot 2–3 hari, GO rollout, dan post go-live handover.
 
 ## Scope Sprint 3
 
