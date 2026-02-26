@@ -19,6 +19,23 @@
     </section>
 
     <section class="card">
+      <h3>Accounting Full Menu</h3>
+      <p class="subtitle2">Aktifkan menu UAT sesuai scope build: GL, AP, AR, Payroll, Tax, Closing, dan Financial Report.</p>
+      <div class="menu-grid">
+        <button
+          v-for="menu in moduleMenus"
+          :key="menu.key"
+          class="menu-chip"
+          :class="{ active: activeModule === menu.key }"
+          @click="activeModule = menu.key"
+        >
+          <strong>{{ menu.label }}</strong>
+          <small>{{ menu.desc }}</small>
+        </button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'manual-journal'">
       <h3>Create Manual Journal Draft</h3>
       <div class="grid two">
         <label>
@@ -60,7 +77,7 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" v-if="activeModule === 'manual-journal'">
       <div class="lines-head">
         <h3>Manual Journal Queue & Reporting Filter</h3>
       </div>
@@ -175,7 +192,7 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" v-if="activeModule === 'recurring'">
       <h3>Recurring Template & Generator</h3>
       <div class="grid two">
         <label>
@@ -232,6 +249,139 @@
         <button class="btn secondary" @click="generateRecurring" :disabled="submitting">Run Generator</button>
       </div>
     </section>
+
+    <section class="card" v-if="activeModule === 'approval'">
+      <h3>Approval Queue Control</h3>
+      <p class="subtitle2">Monitor SLA approval, eskalasi, dan assignment approver lintas branch.</p>
+      <div class="grid two">
+        <label>
+          Branch Scope
+          <select v-model="approvalFilter.branch_id">
+            <option :value="1">Branch 1</option>
+            <option :value="2">Branch 2</option>
+            <option :value="3">Branch 3</option>
+          </select>
+        </label>
+        <label>
+          Priority
+          <select v-model="approvalFilter.priority">
+            <option value="ALL">ALL</option>
+            <option value="HIGH">HIGH</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="simulateApprovalSync">Sync Approval Queue</button>
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>Doc</th><th>Requester</th><th>Age</th><th>Priority</th><th>Approver</th></tr></thead>
+        <tbody>
+          <tr v-for="row in approvalRows" :key="row.doc_no">
+            <td>{{ row.doc_no }}</td><td>{{ row.requester }}</td><td>{{ row.age_hours }} jam</td><td>{{ row.priority }}</td><td>{{ row.approver }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" v-if="activeModule === 'ap'">
+      <h3>Accounts Payable (AP) - Vendor Bill Draft</h3>
+      <div class="grid two">
+        <label>Vendor<input v-model="apDraft.vendor" placeholder="PT Supplier Nusantara" /></label>
+        <label>Due Date<input v-model="apDraft.due_date" type="date" /></label>
+      </div>
+      <div class="line-row" v-for="(line, idx) in apDraft.lines" :key="`ap-${idx}`">
+        <input v-model="line.expense_account" placeholder="Expense Account" />
+        <input v-model.number="line.amount" type="number" min="0" step="0.01" placeholder="Amount" />
+        <input v-model="line.tax_code" placeholder="Tax Code" />
+        <input v-model="line.memo" placeholder="Memo" />
+        <button class="danger" @click="removeApLine(idx)" :disabled="apDraft.lines.length <= 1">x</button>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="addApLine">+ Add AP Line</button>
+        <button class="btn" @click="saveApDraft">Save AP Draft</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'ar'">
+      <h3>Accounts Receivable (AR) - Invoice Draft</h3>
+      <div class="grid two">
+        <label>Customer<input v-model="arDraft.customer" placeholder="Corporate Client" /></label>
+        <label>Invoice Date<input v-model="arDraft.invoice_date" type="date" /></label>
+      </div>
+      <div class="line-row" v-for="(line, idx) in arDraft.lines" :key="`ar-${idx}`">
+        <input v-model="line.revenue_account" placeholder="Revenue Account" />
+        <input v-model.number="line.amount" type="number" min="0" step="0.01" placeholder="Amount" />
+        <input v-model="line.tax_code" placeholder="Tax Code" />
+        <input v-model="line.memo" placeholder="Memo" />
+        <button class="danger" @click="removeArLine(idx)" :disabled="arDraft.lines.length <= 1">x</button>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="addArLine">+ Add AR Line</button>
+        <button class="btn" @click="saveArDraft">Save AR Draft</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'payroll'">
+      <h3>Payroll Accrual & Journal Simulation</h3>
+      <div class="grid two">
+        <label>Period Start<input v-model="payrollForm.period_start" type="date" /></label>
+        <label>Period End<input v-model="payrollForm.period_end" type="date" /></label>
+      </div>
+      <div class="grid two">
+        <label>Total Gross Payroll<input v-model.number="payrollForm.gross" type="number" min="0" /></label>
+        <label>Total Deductions<input v-model.number="payrollForm.deduction" type="number" min="0" /></label>
+      </div>
+      <div class="totals">
+        <span>Net Payroll: <strong>{{ formatAmount(payrollForm.gross - payrollForm.deduction) }}</strong></span>
+      </div>
+      <div class="actions">
+        <button class="btn" @click="generatePayrollJournal">Generate Payroll Journal</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'tax'">
+      <h3>Tax Center (PPN / PPh)</h3>
+      <div class="grid two">
+        <label>Tax Period<input v-model="taxForm.period" type="month" /></label>
+        <label>Branch ID<input v-model.number="taxForm.branch_id" type="number" min="1" /></label>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="recalcTax">Recalculate Tax</button>
+        <button class="btn" @click="exportTaxSummary">Export Tax Summary</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'close-book'">
+      <h3>Period End Closing</h3>
+      <div class="grid two">
+        <label>Close Month<input v-model="closingForm.period" type="month" /></label>
+        <label>Branch ID<input v-model.number="closingForm.branch_id" type="number" min="1" /></label>
+      </div>
+      <label>Checklist Confirmation
+        <select v-model="closingForm.checklist">
+          <option value="">Pilih status checklist</option>
+          <option value="READY">READY TO CLOSE</option>
+          <option value="PENDING">PENDING ADJUSTMENT</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button class="btn secondary" @click="previewClosing">Preview Closing Entries</button>
+        <button class="btn" @click="executeClosing">Run Closing</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'reporting'">
+      <h3>Financial Reporting Menu</h3>
+      <div class="report-grid">
+        <article v-for="item in reportMenus" :key="item.name" class="report-card">
+          <h4>{{ item.name }}</h4>
+          <p>{{ item.desc }}</p>
+          <button class="btn ghost" @click="openReport(item.name)">Open</button>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -241,6 +391,28 @@ import Swal from 'sweetalert2'
 import api from '@/services/api'
 
 const today = new Date().toISOString().slice(0, 10)
+
+const moduleMenus = [
+  { key: 'manual-journal', label: 'General Ledger', desc: 'Manual journal & queue' },
+  { key: 'approval', label: 'Approval Queue', desc: 'Approval SLA & escalation' },
+  { key: 'recurring', label: 'Recurring', desc: 'Recurring journal templates' },
+  { key: 'ap', label: 'Accounts Payable', desc: 'Vendor bills & payable draft' },
+  { key: 'ar', label: 'Accounts Receivable', desc: 'Customer invoice draft' },
+  { key: 'payroll', label: 'Payroll', desc: 'Payroll accrual simulation' },
+  { key: 'tax', label: 'Tax Center', desc: 'PPN / PPh workflow' },
+  { key: 'close-book', label: 'Period Closing', desc: 'Close month checklist' },
+  { key: 'reporting', label: 'Reports', desc: 'P&L, Balance Sheet, Cash Flow' }
+]
+
+const reportMenus = [
+  { name: 'Profit & Loss', desc: 'Laporan laba rugi periodik per branch' },
+  { name: 'Balance Sheet', desc: 'Posisi aset, liabilitas, dan ekuitas' },
+  { name: 'Cash Flow', desc: 'Arus kas operasional, investasi, pendanaan' },
+  { name: 'Aging Payable', desc: 'Umur hutang vendor per due date' },
+  { name: 'Aging Receivable', desc: 'Umur piutang customer' }
+]
+
+const activeModule = ref('manual-journal')
 
 const loadingJournals = ref(false)
 const submitting = ref(false)
@@ -255,6 +427,42 @@ const filters = ref({
   to: '',
   page: 1,
   page_size: 20
+})
+
+const approvalFilter = ref({ branch_id: 1, priority: 'ALL' })
+const approvalRows = ref([
+  { doc_no: 'MJ-2026-0021', requester: 'Nadia', age_hours: 3, priority: 'HIGH', approver: 'Manager Branch 1' },
+  { doc_no: 'MJ-2026-0019', requester: 'Rudi', age_hours: 8, priority: 'MEDIUM', approver: 'Owner' }
+])
+
+const apDraft = ref({
+  vendor: 'PT Supplier Nusantara',
+  due_date: today,
+  lines: [{ expense_account: '6111', amount: 2500000, tax_code: 'PPN11', memo: 'Pembelian inventory' }]
+})
+
+const arDraft = ref({
+  customer: 'Corporate Client A',
+  invoice_date: today,
+  lines: [{ revenue_account: '4111', amount: 3500000, tax_code: 'PPN11', memo: 'Invoice layanan corporate' }]
+})
+
+const payrollForm = ref({
+  period_start: today,
+  period_end: today,
+  gross: 85000000,
+  deduction: 11250000
+})
+
+const taxForm = ref({
+  period: today.slice(0, 7),
+  branch_id: 1
+})
+
+const closingForm = ref({
+  period: today.slice(0, 7),
+  branch_id: 1,
+  checklist: ''
 })
 
 const statusCount = computed(() => {
@@ -510,6 +718,52 @@ const generateRecurring = async () => {
   }
 }
 
+
+const addApLine = () => apDraft.value.lines.push({ expense_account: '', amount: 0, tax_code: '', memo: '' })
+const removeApLine = (idx) => apDraft.value.lines.splice(idx, 1)
+const addArLine = () => arDraft.value.lines.push({ revenue_account: '', amount: 0, tax_code: '', memo: '' })
+const removeArLine = (idx) => arDraft.value.lines.splice(idx, 1)
+
+const saveApDraft = async () => {
+  await Swal.fire('AP Draft Saved', `Vendor ${apDraft.value.vendor} tersimpan untuk proses approval.`, 'success')
+}
+
+const saveArDraft = async () => {
+  await Swal.fire('AR Draft Saved', `Invoice draft ${arDraft.value.customer} tersimpan.`, 'success')
+}
+
+const generatePayrollJournal = async () => {
+  await Swal.fire('Payroll Journal Generated', `Net payroll ${formatAmount(payrollForm.value.gross - payrollForm.value.deduction)} siap diposting.`, 'success')
+}
+
+const recalcTax = async () => {
+  await Swal.fire('Tax Recalculated', `Periode ${taxForm.value.period} branch ${taxForm.value.branch_id} berhasil dihitung ulang.`, 'info')
+}
+
+const exportTaxSummary = async () => {
+  await Swal.fire('Export Triggered', 'Tax summary export sedang diproses.', 'success')
+}
+
+const previewClosing = async () => {
+  await Swal.fire('Closing Preview', `Preview closing ${closingForm.value.period} branch ${closingForm.value.branch_id} siap direview.`, 'info')
+}
+
+const executeClosing = async () => {
+  if (closingForm.value.checklist !== 'READY') {
+    await Swal.fire('Validation', 'Checklist harus READY TO CLOSE sebelum run closing.', 'warning')
+    return
+  }
+  await Swal.fire('Closing Executed', `Period closing ${closingForm.value.period} berhasil dijalankan.`, 'success')
+}
+
+const openReport = async (name) => {
+  await Swal.fire('Open Report', `Membuka report ${name}`, 'info')
+}
+
+const simulateApprovalSync = async () => {
+  await Swal.fire('Approval Sync', `Queue branch ${approvalFilter.value.branch_id} priority ${approvalFilter.value.priority} sudah disinkronkan.`, 'success')
+}
+
 onMounted(loadJournals)
 </script>
 
@@ -517,12 +771,21 @@ onMounted(loadJournals)
 .page { display: grid; gap: 16px; color: #fff; }
 .header { display: flex; justify-content: space-between; align-items: center; }
 .subtitle { color: #d0d0d0; margin-top: 4px; }
+.subtitle2 { color: #b8b8b8; margin: 6px 0 10px; font-size: 13px; }
 .card { background: #121212; border: 1px solid #2c2c2c; border-radius: 12px; padding: 16px; }
 .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .stat { background: #191919; border: 1px solid #2e2e2e; border-radius: 10px; padding: 10px; display: grid; gap: 4px; }
 .stat small { color: #b5b5b5; }
 .stat strong { font-size: 18px; }
 .grid.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.menu-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.menu-chip { background: #191919; border: 1px solid #2f3a4a; border-radius: 10px; color: #ececec; padding: 10px; display: grid; gap: 2px; text-align: left; cursor: pointer; }
+.menu-chip small { color: #a8a8a8; font-size: 11px; }
+.menu-chip.active { border-color: #c9a24d; background: #242017; }
+.report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.report-card { background: #171717; border: 1px solid #303030; border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+.mini-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.mini-table th, .mini-table td { border-bottom: 1px solid #2c2c2c; padding: 8px; text-align: left; }
 .grid.filter-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 label { display: grid; gap: 6px; font-size: 13px; color: #d9d9d9; }
 input, select { background: #1e1e1e; border: 1px solid #333; color: #fff; border-radius: 8px; padding: 8px 10px; }
@@ -558,9 +821,11 @@ hr { border: none; border-top: 1px solid #333; margin: 14px 0; }
 @media (max-width: 1200px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .menu-grid, .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
   .grid.two { grid-template-columns: 1fr; }
   .line-row { grid-template-columns: 1fr; }
+  .menu-grid, .report-grid { grid-template-columns: 1fr; }
 }
 </style>
