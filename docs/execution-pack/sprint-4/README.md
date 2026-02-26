@@ -72,3 +72,8 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Rollout lanjut ke Wave-1 menggunakan tracker eksekusi: `wave-rollout-tracker-2026-02-26.md`.
 - Sprint 4 ditutup **PASS** (Wave-2 selesai, H+3 stabilization final, handover BAU complete).
 - Referensi final: `h-plus-3-stabilization-report-2026-02-29.md`, `post-go-live-handover-2026-02-29.md`, `governance-readiness-scorecard-2026-02-29.md`.
+## Next Sprint
+
+- Sprint 5 kickoff docs tersedia di `../sprint-5/README.md`.
+- Fokus lanjutan: reliability hardening, recon automation, dan BAU optimization.
+
