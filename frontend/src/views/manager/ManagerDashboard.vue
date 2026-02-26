@@ -5,7 +5,6 @@
       <nav>
         <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
         <button class="nav-btn" :class="{active:tab==='profile'}" @click="tab='profile'"><User size="18" /> Profile</button>
-        <button class="nav-btn" :class="{active:tab==='users'}" @click="tab='users'"><UsersIcon size="18" /> Users</button>
         <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="tab='accounting-uat'"><ScrollText size="18" /> Accounting UAT</button>
         <button class="nav-btn" :class="{active:tab==='audit'}" @click="tab='audit'"><ShieldCheck size="18" /> Audit Logs</button>
         <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
@@ -131,7 +130,6 @@
         </section>
       </section>
 
-      <Users v-else-if="tab==='users'" />
       <Orders v-else-if="tab==='orders'" />
       <Timers v-else-if="tab==='timers'" />
       <Branches v-else-if="tab==='branches'" />
@@ -167,7 +165,7 @@ import AccountingUAT from "../superadmin/AccountingUAT.vue"
 import AuditLogs from "../superadmin/AuditLogs.vue"
 import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
 import { useAuthStore } from "../../store/auth.store"
-import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
+import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
 
 const tab = ref("accounting-uat")
 const branches = ref([])
