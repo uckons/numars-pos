@@ -5,8 +5,8 @@ const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 const manualJournalRoute = require("./manual-journal.route")
 
-router.get("/cash-flow", auth, rbac(["Owner","Manager"]), c.cashFlow)
-router.get("/profit-loss", auth, rbac(["Owner","Manager"]), c.profitLoss)
+router.get("/cash-flow", auth, rbac(["Owner","Manager","SuperAdmin"]), c.cashFlow)
+router.get("/profit-loss", auth, rbac(["Owner","Manager","SuperAdmin"]), c.profitLoss)
 
 router.use(manualJournalRoute)
 
