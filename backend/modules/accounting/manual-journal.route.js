@@ -1,8 +1,9 @@
 const router = require('express').Router()
 const auth = require('../../middlewares/auth.middleware')
+const rbac = require('../../middlewares/rbac.middleware')
 const c = require('./manual-journal.controller')
 
-router.use(auth)
+router.use(auth, rbac(['SuperAdmin','Owner','Manager']))
 
 router.post('/manual-journals', c.createManualJournal)
 router.get('/manual-journals', c.listManualJournals)
