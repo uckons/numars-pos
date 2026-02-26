@@ -1,5 +1,10 @@
 # Sprint 4 Task Board Harian (D1–D10)
 
+## Status Update Terbaru
+- Gate H+48/H+72: **GO** (2026-02-26, 10:00 WIB).
+- Evidence: `gate-decision-minutes-2026-02-26.md`, `pilot-control-sheet-2026-02-26.md`.
+- Next action aktif: jalankan Wave-1 checkpoint monitoring per 4 jam dan siapkan keputusan Wave-1 -> Wave-2.
+
 ## Immediate (Pasca Merge Terakhir)
 - Lock 1 pilot branch + approver Finance + approver Payroll.
 - Aktifkan feature flag AP/AR/payroll staff hanya untuk pilot branch.
