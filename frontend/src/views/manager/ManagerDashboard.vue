@@ -165,6 +165,7 @@ import AccountingUAT from "../superadmin/AccountingUAT.vue"
 import AuditLogs from "../superadmin/AuditLogs.vue"
 import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
 import { useAuthStore } from "../../store/auth.store"
+// Keep Users icon aliased to avoid SFC identifier collisions with local/component names.
 import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
 
 const tab = ref("accounting-uat")
