@@ -57,13 +57,13 @@ router.get("/timers", allowAdminManager, c.timers)
 
 router.get("/therapist-payroll", allowAdminManager, c.getTherapistPayrollSummary)
 router.post("/therapist-payroll/settle", allowAdminManager, audit("THERAPIST_PAYROLL_SETTLE"), c.settleTherapistPayroll)
-router.get("/audit-logs", allowSuperAdminOnly, c.auditLogs)
+router.get("/audit-logs", allowAdminManager, c.auditLogs)
 
 
-router.get("/printer-targets", allowSuperAdminOnly, c.getPrinterTargets)
+router.get("/printer-targets", allowAdminManager, c.getPrinterTargets)
 router.post(
   "/printer-targets",
-  allowSuperAdminOnly,
+  allowAdminManager,
   audit("UPSERT_PRINTER_TARGET"),
   c.upsertPrinterTarget
 )
