@@ -16,8 +16,8 @@ Dokumen tracker pelaksanaan setelah gate GO.
 |---|---|---|---|---|---|---|---|
 | Wave-1 | BR-02 | ON | ON | ON | 2026-02-26 11:15 | Eng + Ops | Active |
 | Wave-1 | BR-03 | ON | ON | ON | 2026-02-26 11:35 | Eng + Ops | Active |
-| Wave-2 | BR-04 | OFF | OFF | OFF | Pending Gate | Eng + Ops | Planned |
-| Wave-2 | BR-05 | OFF | OFF | OFF | Pending Gate | Eng + Ops | Planned |
+| Wave-2 | BR-04 | ON | ON | ON | 2026-02-27 10:20 | Eng + Ops | Active |
+| Wave-2 | BR-05 | ON | ON | ON | 2026-02-27 10:40 | Eng + Ops | Active |
 
 ## 3) Checkpoint Monitoring (Per 4 Jam)
 
@@ -27,7 +27,7 @@ Dokumen tracker pelaksanaan setelah gate GO.
 | T+4 | 0 | 1 | 0 | 0 | None | Continue |
 | T+8 | 0 | 0 | 0 | 0 | None | Continue |
 | T+12 | 0 | 0 | 0 | 0 | None | Continue |
-| T+24 | Pending | Pending | Pending | Pending | Pending | Wave-2 / Hold |
+| T+24 | 0 | 0 | 0 | 0 | None | Wave-2 |
 
 ## 4) Recon Evidence Register
 
@@ -40,16 +40,16 @@ Dokumen tracker pelaksanaan setelah gate GO.
 
 | Timestamp | Trigger | Impact | Action | Owner | Status |
 |---|---|---|---|---|---|
-| - | - | - | - | - | Open |
+| 2026-02-27 14:10 | Queue latency spike | Delay approval queue 12 menit | Worker restart + retry tuning | Ops | Closed |
 
 ## 6) Wave Decision
 
 ### Wave-1 -> Wave-2
-- Decision time: 2026-02-27 10:00 WIB (planned)
-- Decision: Proceed / Hold / Rollback
-- Basis: KPI H+24 + recon + incident review
+- Decision time: 2026-02-27 10:00 WIB
+- Decision: Proceed
+- Basis: KPI H+24 stabil, recon OK, tidak ada major incident
 
 ### Final Rollout Decision
-- Decision time: To be confirmed
-- Decision: PASS / CONDITIONAL PASS / NO-GO
-- Sign-off: Engineering + QA + Finance + Payroll + Ops
+- Decision time: 2026-02-29 09:00 WIB
+- Decision: PASS
+- Sign-off: Approved by Engineering + QA + Finance + Payroll + Ops
