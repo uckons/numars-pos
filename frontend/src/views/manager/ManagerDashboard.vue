@@ -5,7 +5,9 @@
       <nav>
         <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
         <button class="nav-btn" :class="{active:tab==='profile'}" @click="tab='profile'"><User size="18" /> Profile</button>
-        <button class="nav-btn" :class="{active:tab==='payroll'}" @click="openPayrollTab"><Wallet size="18" /> Payroll Terapis</button>
+        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="tab='accounting-uat'"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" :class="{active:tab==='audit'}" @click="tab='audit'"><ShieldCheck size="18" /> Audit Logs</button>
+        <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
         <button class="nav-btn" :class="{active:tab==='orders'}" @click="tab='orders'"><ReceiptText size="18" /> Orders</button>
         <button class="nav-btn" :class="{active:tab==='timers'}" @click="tab='timers'"><Timer size="18" /> Timers</button>
         <button class="nav-btn" :class="{active:tab==='branches'}" @click="tab='branches'"><Building2 size="18" /> Branches</button>
@@ -128,53 +130,6 @@
         </section>
       </section>
 
-      <section v-else-if="tab==='payroll'" class="page">
-        <section class="card hero">
-          <div>
-            <h2>Pembayaran Terapis</h2>
-            <p class="muted">Perhitungan jumlah kerja × komisi grade fix, lalu settlement agar tidak double hitung.</p>
-          </div>
-        </section>
-
-        <section class="card filters">
-          <div class="field"><label>Dari</label><input type="date" v-model="payrollFrom" /></div>
-          <div class="field"><label>Sampai</label><input type="date" v-model="payrollTo" /></div>
-          <button class="btn" @click="loadPayroll">Hitung Payroll</button>
-          <button class="btn" @click="settlePayroll">Settle Paid</button>
-          <button class="btn" @click="printPayroll">Print</button>
-          <button class="btn" @click="exportPayrollExcel">Export Excel</button>
-        </section>
-
-        <section class="card" v-if="payrollWarning">
-          <p class="bad">⚠️ {{ payrollWarning }}</p>
-        </section>
-
-        <section class="card" id="payroll-print-area">
-          <h4>Detail Payroll Terapis</h4>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Terapis</th><th>Grade</th><th>SPA</th><th>LC</th><th>Total Kerja</th><th>Komisi Fix</th><th>Gross</th><th>Sudah Paid</th><th>Unsettled</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!payrollRows.length"><td colspan="9" class="muted">Belum ada data payroll di range ini.</td></tr>
-              <tr v-for="row in payrollRows" :key="row.therapist_id">
-                <td>{{ row.therapist_name }}</td>
-                <td>{{ row.grade_name }}</td>
-                <td>{{ row.spa_work_count }}</td>
-                <td>{{ row.lc_work_count }}</td>
-                <td>{{ row.work_count }}</td>
-                <td class="num">Rp {{ formatCurrency(row.commission_amount) }}</td>
-                <td class="num">Rp {{ formatCurrency(row.gross_amount) }}</td>
-                <td class="num">Rp {{ formatCurrency(row.paid_amount) }}</td>
-                <td class="num">Rp {{ formatCurrency(row.unsettled_amount) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-      </section>
-
       <Orders v-else-if="tab==='orders'" />
       <Timers v-else-if="tab==='timers'" />
       <Branches v-else-if="tab==='branches'" />
@@ -183,6 +138,9 @@
       <Rooms v-else-if="tab==='rooms'" />
       <StockDashboard v-else-if="tab==='stock'" />
       <Grades v-else-if="tab==='grades'" />
+      <AccountingUAT v-else-if="tab==='accounting-uat'" />
+      <AuditLogs v-else-if="tab==='audit'" />
+      <PrinterAgentTools v-else-if="tab==='printer-agent'" />
     </main>
   </div>
 </template>
@@ -202,10 +160,13 @@ import Rooms from "../superadmin/Rooms.vue"
 import Grades from "../superadmin/Grades.vue"
 import StockDashboard from "../stock/StockDashboard.vue"
 import ProfilePasswordCard from "../../components/ProfilePasswordCard.vue"
+import AccountingUAT from "../superadmin/AccountingUAT.vue"
+import AuditLogs from "../superadmin/AuditLogs.vue"
+import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
 import { useAuthStore } from "../../store/auth.store"
-import { ChartNoAxesColumn, Wallet, ReceiptText, Timer, Building2, BellRing, Users, DoorOpen, Package, Trophy, LogOut, User } from "lucide-vue-next"
+import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
 
-const tab = ref("report")
+const tab = ref("accounting-uat")
 const branches = ref([])
 const orders = ref([])
 const loading = ref(false)
@@ -217,11 +178,6 @@ const fixedSalaryCost = ref(0)
 const manualExpenses = ref([])
 const ordersPage = ref(1)
 const ordersPageSize = ref(25)
-
-const payrollFrom = ref("")
-const payrollTo = ref("")
-const payrollRows = ref([])
-const payrollWarning = ref("")
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -251,162 +207,14 @@ const loadReport = async () => {
   }
 }
 
-const loadPayroll = async () => {
-  try {
-    payrollWarning.value = ""
-    const { data } = await api.get("/superadmin/therapist-payroll", {
-      params: {
-        branch_id: selectedBranch.value,
-        date_from: payrollFrom.value,
-        date_to: payrollTo.value
-      }
-    })
-    payrollRows.value = data.rows || []
-    if (data.has_settlement_in_range) {
-      payrollWarning.value = "Range salah: sudah ada pembayaran terapis pada rentang ini."
-      await Swal.fire({ icon: "warning", title: "Range sudah dibayar", text: payrollWarning.value })
-    }
-  } catch (err) {
-    payrollRows.value = []
-    await Swal.fire({ icon: "error", title: "Gagal hitung payroll", text: err?.response?.data?.message || "Gagal memuat payroll" })
-  }
-}
-
-const settlePayroll = async () => {
-  if (!payrollRows.value.length) {
-    await Swal.fire({ icon: "info", title: "Belum ada data", text: "Silakan hitung payroll dahulu." })
-    return
-  }
-
-  if (payrollWarning.value) {
-    await Swal.fire({ icon: "warning", title: "Range salah", text: payrollWarning.value })
-    return
-  }
-
-  const { isConfirmed } = await Swal.fire({
-    icon: "question",
-    title: "Konfirmasi Settlement",
-    text: "Payroll pada range ini akan ditandai paid dan masuk accounting settle.",
-    showCancelButton: true,
-    confirmButtonText: "Settle"
-  })
-
-  if (!isConfirmed) return
-
-  try {
-    const { data } = await api.post("/superadmin/therapist-payroll/settle", {
-      branch_id: selectedBranch.value,
-      date_from: payrollFrom.value,
-      date_to: payrollTo.value
-    })
-    await Swal.fire({ icon: "success", title: "Settlement berhasil", text: `Baris: ${data.settled_count}, total: Rp ${formatCurrency(data.settled_amount)}` })
-    await loadPayroll()
-  } catch (err) {
-    await Swal.fire({ icon: "error", title: "Settlement gagal", text: err?.response?.data?.message || "Gagal settle payroll" })
-  }
-}
-
-const openPayrollTab = async () => {
-  tab.value = "payroll"
-  await loadPayroll()
-}
-
-const getSelectedBranchLabel = () => {
-  if (selectedBranch.value === "ALL") return "Semua Outlet"
-  const found = branches.value.find((b) => String(b.id) === String(selectedBranch.value))
-  return found?.name || selectedBranch.value
-}
-
-const buildPayrollReportHtml = () => {
-  const rows = payrollRows.value.map((row) => `
-    <tr>
-      <td>${row.therapist_name || '-'}</td>
-      <td>${row.grade_name || '-'}</td>
-      <td>${row.spa_work_count || 0}</td>
-      <td>${row.lc_work_count || 0}</td>
-      <td>${row.work_count || 0}</td>
-      <td style="text-align:right">Rp ${formatCurrency(row.commission_amount)}</td>
-      <td style="text-align:right">Rp ${formatCurrency(row.gross_amount)}</td>
-      <td style="text-align:right">Rp ${formatCurrency(row.paid_amount)}</td>
-      <td style="text-align:right">Rp ${formatCurrency(row.unsettled_amount)}</td>
-    </tr>
-  `).join("")
-
-  return `
-    <html>
-      <head>
-        <title>Laporan Payroll Terapis</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 24px; color:#111; }
-          h1 { margin:0 0 6px; font-size:22px; }
-          .meta { margin-bottom: 16px; color:#444; }
-          table { width:100%; border-collapse: collapse; }
-          th, td { border:1px solid #d1d5db; padding:8px; font-size:12px; }
-          th { background:#f3f4f6; text-align:left; }
-        </style>
-      </head>
-      <body>
-        <h1>Laporan Payroll Terapis</h1>
-        <div class="meta">Periode: ${payrollFrom.value} s/d ${payrollTo.value} | Outlet: ${getSelectedBranchLabel()}</div>
-        <table>
-          <thead>
-            <tr><th>Terapis</th><th>Grade</th><th>SPA</th><th>LC</th><th>Total Kerja</th><th>Komisi Fix</th><th>Gross</th><th>Sudah Paid</th><th>Unsettled</th></tr>
-          </thead>
-          <tbody>${rows || '<tr><td colspan="9">Tidak ada data.</td></tr>'}</tbody>
-        </table>
-      </body>
-    </html>
-  `
-}
-
-const printPayroll = () => {
-  const w = window.open('', '_blank', 'width=1100,height=800')
-  if (!w) return
-  w.document.open()
-  w.document.write(buildPayrollReportHtml())
-  w.document.close()
-  w.focus()
-  w.print()
-}
-
-const exportPayrollExcel = () => {
-  const headers = ["Terapis","Grade","SPA","LC","Total Kerja","Komisi Fix","Gross","Sudah Paid","Unsettled"]
-  const rows = payrollRows.value.map((row) => ([
-    row.therapist_name || '-',
-    row.grade_name || '-',
-    row.spa_work_count || 0,
-    row.lc_work_count || 0,
-    row.work_count || 0,
-    row.commission_amount || 0,
-    row.gross_amount || 0,
-    row.paid_amount || 0,
-    row.unsettled_amount || 0
-  ]))
-
-  const csv = [headers, ...rows]
-    .map((line) => line.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','))
-    .join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `payroll-terapis-${payrollFrom.value}-sampai-${payrollTo.value}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
-}
 
 onMounted(() => {
   const today = new Date()
   const first = new Date(today.getFullYear(), today.getMonth(), 1)
   const firstISO = first.toISOString().slice(0, 10)
-  const todayISO = today.toISOString().slice(0, 10)
   dateFrom.value = firstISO
-  dateTo.value = todayISO
-  payrollFrom.value = firstISO
-  payrollTo.value = todayISO
+  dateTo.value = today.toISOString().slice(0, 10)
   loadReport()
-  loadPayroll()
 })
 
 watch([selectedBranch, dateFrom, dateTo, ordersPageSize], () => {
@@ -430,7 +238,7 @@ const pagedFilteredOrders = computed(() => {
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Number(o.total || 0), 0))
 const paidOrders = computed(() => paidOrdersList.value.length)
-const therapistSalaryCost = computed(() => payrollRows.value.reduce((a, r) => a + Number(r.gross_amount || 0), 0))
+const therapistSalaryCost = computed(() => 0)
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
 const totalExpense = computed(() => therapistSalaryCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
