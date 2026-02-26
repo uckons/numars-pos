@@ -29,6 +29,18 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - SQL reconciliation AP/AR/payroll (`sql-reconciliation-ap-ar-payroll.sql`).
 - Checklist operasional harian (`checklist-operasional-harian.md`).
 - Rollback runbook Sprint 4 (`rollback-runbook-v1.md`).
+- Next step 24–72 jam pasca merge (`next-step-24h.md`).
+- Pilot control sheet template (`pilot-control-sheet-template.md`).
+- Next phase plan (pilot -> wave rollout -> handover) (`phase-5-wave-rollout-plan.md`).
+- Post go-live handover checklist (`post-go-live-handover-checklist.md`).
+- Wave rollout tracker template (`wave-rollout-tracker-template.md`).
+- Gate decision minutes template (`gate-decision-minutes-template.md`).
+- H+3 stabilization report template (`h-plus-3-stabilization-report-template.md`).
+- Stakeholder communication template (`stakeholder-communication-template.md`).
+- Next phase 72h execution plan (`next-phase-72h-execution-plan.md`).
+- Governance readiness scorecard (`governance-readiness-scorecard.md`).
+- Contoh terisi hari pertama H+0..H+24 (`h0-h24-filled-example.md`).
+- UI gap assessment AP/AR/payroll (`ui-gap-assessment-ap-ar-payroll.md`).
 
 ## Dependency
 
@@ -52,3 +64,11 @@ Sprint 4 fokus ke penguatan transaksi finansial operasional setelah Sprint 3 clo
 - Payroll staff berhasil close 1 periode tanpa incident major.
 - Jurnal AP/AR/payroll selalu balance (debit = credit).
 - Approval trail untuk aksi kritikal terekam lengkap.
+
+## Status Eksekusi Saat Ini
+
+- Gate H+48/H+72: **GO** (lihat `gate-decision-minutes-2026-02-26.md`).
+- Pilot control sheet terisi: `pilot-control-sheet-2026-02-26.md`.
+- Rollout lanjut ke Wave-1 menggunakan tracker eksekusi: `wave-rollout-tracker-2026-02-26.md`.
+- Sprint 4 ditutup **PASS** (Wave-2 selesai, H+3 stabilization final, handover BAU complete).
+- Referensi final: `h-plus-3-stabilization-report-2026-02-29.md`, `post-go-live-handover-2026-02-29.md`, `governance-readiness-scorecard-2026-02-29.md`.
