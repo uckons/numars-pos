@@ -48,8 +48,15 @@
         <button class="danger" @click="removeLine(idx)" :disabled="draft.lines.length <= 2">x</button>
       </div>
 
+      <div class="totals">
+        <span>Total Debit: <strong>{{ formatAmount(draftTotalDebit) }}</strong></span>
+        <span>Total Credit: <strong>{{ formatAmount(draftTotalCredit) }}</strong></span>
+        <span :class="draftDiff === 0 ? 'ok' : 'warn'">Selisih: <strong>{{ formatAmount(Math.abs(draftDiff)) }}</strong></span>
+      </div>
+
       <div class="actions">
-        <button class="btn" @click="createDraft" :disabled="submitting">Create Draft</button>
+        <button class="btn" @click="createDraft" :disabled="submitting || draftDiff !== 0">Create Draft</button>
+        <button class="btn ghost" @click="resetDraft" :disabled="submitting">Reset Draft</button>
       </div>
     </section>
 
@@ -94,6 +101,8 @@
       <div class="actions compact">
         <button class="btn secondary" @click="applyFilters" :disabled="loadingJournals">Apply Filter</button>
         <button class="btn ghost" @click="resetFilters" :disabled="loadingJournals">Reset Filter</button>
+        <button class="btn ghost" @click="setDateRange(7)" :disabled="loadingJournals">Last 7 Days</button>
+        <button class="btn ghost" @click="setDateRange(30)" :disabled="loadingJournals">Last 30 Days</button>
       </div>
 
       <div class="table-wrap">
@@ -120,9 +129,9 @@
               <td>{{ j.id }}</td>
               <td>{{ formatDate(j.journal_date) }}</td>
               <td>{{ j.description || '-' }}</td>
-              <td><span class="badge">{{ j.status }}</span></td>
-              <td>{{ j.total_debit }}</td>
-              <td>{{ j.total_credit }}</td>
+              <td><span class="badge" :class="badgeClass(j.status)">{{ j.status }}</span></td>
+              <td>{{ formatAmount(j.total_debit) }}</td>
+              <td>{{ formatAmount(j.total_credit) }}</td>
               <td class="row-actions">
                 <button class="btn tiny secondary" @click="viewDetail(j.id)">Detail</button>
                 <button class="btn tiny" @click="submitJournal(j.id)" :disabled="j.status !== 'DRAFT' && j.status !== 'REJECTED'">Submit</button>
@@ -142,7 +151,27 @@
 
       <div v-if="selectedDetail" class="detail-box">
         <h4>Detail Journal #{{ selectedDetail.id }}</h4>
-        <pre>{{ selectedDetail }}</pre>
+        <p><strong>Date:</strong> {{ formatDate(selectedDetail.journal_date) }}</p>
+        <p><strong>Description:</strong> {{ selectedDetail.description || '-' }}</p>
+        <p><strong>Status:</strong> <span class="badge" :class="badgeClass(selectedDetail.status)">{{ selectedDetail.status || '-' }}</span></p>
+        <table class="detail-table" v-if="selectedDetail.lines?.length">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th>Memo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(line, idx) in selectedDetail.lines" :key="idx">
+              <td>{{ line.account_code || '-' }}</td>
+              <td>{{ formatAmount(line.debit) }}</td>
+              <td>{{ formatAmount(line.credit) }}</td>
+              <td>{{ line.memo || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -270,10 +299,37 @@ const dryRun = ref(true)
 
 const addLine = () => draft.value.lines.push({ account_code: '', debit: 0, credit: 0, memo: '' })
 const removeLine = (idx) => draft.value.lines.splice(idx, 1)
+const draftTotalDebit = computed(() => draft.value.lines.reduce((sum, line) => sum + Number(line.debit || 0), 0))
+const draftTotalCredit = computed(() => draft.value.lines.reduce((sum, line) => sum + Number(line.credit || 0), 0))
+const draftDiff = computed(() => Number((draftTotalDebit.value - draftTotalCredit.value).toFixed(2)))
+
+const defaultDraft = () => ({
+  branch_id: 1,
+  journal_date: today,
+  description: 'UAT Manual Journal',
+  lines: [
+    { account_code: '5111', debit: 100000, credit: 0, memo: 'beban test' },
+    { account_code: '1111', debit: 0, credit: 100000, memo: 'kas test' }
+  ]
+})
+
+const resetDraft = () => {
+  draft.value = defaultDraft()
+}
 
 const formatDate = (v) => {
   if (!v) return '-'
   return String(v).slice(0, 10)
+}
+
+const formatAmount = (value) => Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const badgeClass = (status) => {
+  const state = String(status || '').toUpperCase()
+  if (state === 'POSTED') return 'posted'
+  if (state === 'PENDING_APPROVAL') return 'pending'
+  if (state === 'REJECTED') return 'rejected'
+  return 'draft'
 }
 
 const buildFilterParams = () => ({
@@ -308,6 +364,15 @@ const resetFilters = async () => {
   await loadJournals()
 }
 
+const setDateRange = async (days) => {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(to.getDate() - days)
+  filters.value.from = from.toISOString().slice(0, 10)
+  filters.value.to = to.toISOString().slice(0, 10)
+  await applyFilters()
+}
+
 const prevPage = async () => {
   if (filters.value.page <= 1) return
   filters.value.page -= 1
@@ -332,6 +397,14 @@ const createDraft = async () => {
     return
   }
 
+  const totalDebit = cleanedLines.reduce((sum, line) => sum + Number(line.debit || 0), 0)
+  const totalCredit = cleanedLines.reduce((sum, line) => sum + Number(line.credit || 0), 0)
+
+  if (Number(totalDebit.toFixed(2)) !== Number(totalCredit.toFixed(2))) {
+    Swal.fire('Validation', 'Total debit dan credit harus balance.', 'warning')
+    return
+  }
+
   submitting.value = true
   try {
     const payload = {
@@ -351,7 +424,15 @@ const createDraft = async () => {
 
 const submitJournal = async (id) => {
   try {
-    await api.post(`/accounting/manual-journals/${id}/submit`, { note: 'Submit via UAT UI' })
+    const prompt = await Swal.fire({
+      title: 'Submit Journal',
+      text: 'Tambahkan note submit (opsional)',
+      input: 'text',
+      inputValue: 'Submit via UAT UI',
+      showCancelButton: true
+    })
+    if (!prompt.isConfirmed) return
+    await api.post(`/accounting/manual-journals/${id}/submit`, { note: prompt.value || 'Submit via UAT UI' })
     await loadJournals()
   } catch (err) {
     Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
@@ -360,7 +441,15 @@ const submitJournal = async (id) => {
 
 const approveJournal = async (id) => {
   try {
-    await api.post(`/accounting/manual-journals/${id}/approve`, { note: 'Approve via UAT UI' })
+    const prompt = await Swal.fire({
+      title: 'Approve Journal',
+      text: 'Tambahkan note approval (opsional)',
+      input: 'text',
+      inputValue: 'Approve via UAT UI',
+      showCancelButton: true
+    })
+    if (!prompt.isConfirmed) return
+    await api.post(`/accounting/manual-journals/${id}/approve`, { note: prompt.value || 'Approve via UAT UI' })
     await loadJournals()
   } catch (err) {
     Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
@@ -369,7 +458,16 @@ const approveJournal = async (id) => {
 
 const rejectJournal = async (id) => {
   try {
-    await api.post(`/accounting/manual-journals/${id}/reject`, { note: 'Reject via UAT UI' })
+    const prompt = await Swal.fire({
+      title: 'Reject Journal',
+      text: 'Tambahkan alasan reject',
+      input: 'text',
+      inputValue: 'Reject via UAT UI',
+      showCancelButton: true,
+      inputValidator: (value) => (!value ? 'Alasan reject wajib diisi.' : undefined)
+    })
+    if (!prompt.isConfirmed) return
+    await api.post(`/accounting/manual-journals/${id}/reject`, { note: prompt.value })
     await loadJournals()
   } catch (err) {
     Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
@@ -432,6 +530,9 @@ input, select { background: #1e1e1e; border: 1px solid #333; color: #fff; border
 .line-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.3fr auto; gap: 8px; margin-bottom: 8px; }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
 .actions.compact { margin-top: 8px; }
+.totals { margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; color: #d7d7d7; }
+.totals .ok { color: #66c57f; }
+.totals .warn { color: #f3b95a; }
 .btn { background: #c9a24d; color: #111; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: #2f3a4a; color: #fff; }
 .btn.ghost { background: transparent; color: #fff; border: 1px solid #3a3a3a; }
@@ -441,9 +542,15 @@ input, select { background: #1e1e1e; border: 1px solid #333; color: #fff; border
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { border-bottom: 1px solid #2c2c2c; padding: 8px; text-align: left; }
-.badge { background: #2f3a4a; color: #fff; border-radius: 999px; padding: 2px 8px; font-size: 11px; }
+.badge { background: #2f3a4a; color: #fff; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.badge.draft { background: #6c757d; }
+.badge.pending { background: #375a7f; }
+.badge.posted { background: #2b9348; }
+.badge.rejected { background: #9b2226; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .detail-box { margin-top: 12px; background: #0f0f0f; border: 1px solid #2c2c2c; border-radius: 8px; padding: 10px; }
+.detail-table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+.detail-table th, .detail-table td { border-bottom: 1px solid #2c2c2c; padding: 6px; font-size: 12px; }
 pre { white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow: auto; font-size: 11px; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; }
 .pager { margin-top: 10px; display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
