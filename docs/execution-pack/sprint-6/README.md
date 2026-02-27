@@ -28,6 +28,7 @@ Fokus Sprint 6 adalah scale-up operasional, observability production-grade, dan 
 - Alert dedup & routing policy v2 (`alert-policy-v2.md`).
 - Capacity tuning plan (`capacity-tuning-plan.md`).
 - Sprint 6 closure gate template (`closure-gate-template.md`).
+- Sprint 6 next-phase 72h execution plan (`next-phase-72h-execution-plan.md`).
 
 ## Entry Criteria
 
@@ -41,3 +42,8 @@ Fokus Sprint 6 adalah scale-up operasional, observability production-grade, dan 
 - Queue backlog peak stabil pada threshold yang disetujui.
 - Dashboard observability dan alert-policy v2 aktif di BAU.
 - Incident recurrence untuk top-3 issue turun signifikan.
+
+## Current Execution Status
+
+- Sprint 6 next-phase 72h execution: **In Progress**.
+- Evidence status: `next-phase-72h-status-2026-03-07.md`.

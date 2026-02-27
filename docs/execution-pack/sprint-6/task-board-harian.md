@@ -4,6 +4,7 @@
 - Sprint 6: **Started**.
 - Fokus aktif: scale readiness + observability product-grade.
 - Next checkpoint: H+72 next-phase decision.
+- Evidence status: `next-phase-72h-status-2026-03-07.md`.
 
 ## D1 — Kickoff Sprint 6
 - Lock scope dan owner matrix (Eng, Ops, QA, Finance).
