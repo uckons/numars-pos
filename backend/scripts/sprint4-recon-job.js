@@ -2,8 +2,8 @@
 
 const { Client } = require('pg')
 
-const parseArgs = () => {
-  const args = process.argv.slice(2)
+const parseArgs = (argv = process.argv.slice(2)) => {
+  const args = argv
   const opts = {
     date: new Date().toISOString().slice(0, 10),
     branchId: null,
@@ -118,7 +118,7 @@ const toStatus = (summary) => {
   }
 }
 
-const sendWebhook = async (url, payload) => {
+const sendWebhook = async (url, payload, fetchImpl = fetch) => {
   if (!url) return
   const message = [
     '📒 Sprint 4 Recon Automation',
@@ -132,15 +132,19 @@ const sendWebhook = async (url, payload) => {
   ].join('\n')
 
   const key = url.includes('discord.com/api/webhooks') || url.includes('discordapp.com/api/webhooks') ? 'content' : 'text'
-  await fetch(url, {
+  const res = await fetchImpl(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ [key]: message })
   })
+
+  if (!res.ok) {
+    throw new Error(`Webhook request failed with status ${res.status}`)
+  }
 }
 
-const main = async () => {
-  const opts = parseArgs()
+const main = async (argv = process.argv.slice(2)) => {
+  const opts = parseArgs(argv)
   const databaseUrl = process.env.DATABASE_URL
 
   if (opts.dryRun) {
@@ -163,13 +167,13 @@ const main = async () => {
     })
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(payload))
-    process.exit(0)
+    return 0
   }
 
   if (!databaseUrl) {
     // eslint-disable-next-line no-console
     console.error('DATABASE_URL is required')
-    process.exit(1)
+    return 1
   }
 
   const client = new Client({ connectionString: databaseUrl })
@@ -185,15 +189,32 @@ const main = async () => {
     }
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(payload))
-    await sendWebhook(opts.webhook, payload)
-    process.exit(payload.mismatch_total > 0 ? 2 : 0)
+    try {
+      await sendWebhook(opts.webhook, payload)
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[recon:webhook] ${err?.message || err}`)
+    }
+    return payload.mismatch_total > 0 ? 2 : 0
   } finally {
     await client.end()
   }
 }
 
-main().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(err?.message || err)
-  process.exit(1)
-})
+if (require.main === module) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error(err?.message || err)
+      process.exit(1)
+    })
+}
+
+module.exports = {
+  parseArgs,
+  runRecon,
+  toStatus,
+  sendWebhook,
+  main
+}
