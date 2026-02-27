@@ -16,7 +16,8 @@
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
         <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
-        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="tab='accounting-uat'"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" @click="openPayrollFlex()"><Calculator size="18" /> Payroll Flex Engine</button>
       </nav>
 
       <!-- LOGOUT -->
@@ -45,7 +46,7 @@
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/store/auth.store"
-import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut, Printer, ScrollText } from "lucide-vue-next"
+import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut, Printer, ScrollText, Calculator } from "lucide-vue-next"
 import AuditLogs from "./AuditLogs.vue"
 import StockDashboard from "@/views/stock/StockDashboard.vue"
 import Users from "./Users.vue"
@@ -63,6 +64,17 @@ import AccountingUAT from './AccountingUAT.vue'
 const tab = ref("users")
 const auth = useAuthStore()
 const router = useRouter()
+
+
+const openAccountingUAT = () => {
+  tab.value = 'accounting-uat'
+  localStorage.setItem('accountingUAT.activeModule', 'manual-journal')
+}
+
+const openPayrollFlex = () => {
+  tab.value = 'accounting-uat'
+  localStorage.setItem('accountingUAT.activeModule', 'payroll-flex')
+}
 
 const logout = () => {
   auth.logout()

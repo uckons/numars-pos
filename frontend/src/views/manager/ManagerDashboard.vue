@@ -5,7 +5,8 @@
       <nav>
         <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
         <button class="nav-btn" :class="{active:tab==='profile'}" @click="tab='profile'"><User size="18" /> Profile</button>
-        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="tab='accounting-uat'"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" @click="openPayrollFlex()"><Calculator size="18" /> Payroll Flex Engine</button>
         <button class="nav-btn" :class="{active:tab==='audit'}" @click="tab='audit'"><ShieldCheck size="18" /> Audit Logs</button>
         <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
         <button class="nav-btn" :class="{active:tab==='orders'}" @click="tab='orders'"><ReceiptText size="18" /> Orders</button>
@@ -166,7 +167,7 @@ import AuditLogs from "../superadmin/AuditLogs.vue"
 import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
 import { useAuthStore } from "../../store/auth.store"
 // Keep Users icon aliased to avoid SFC identifier collisions with local/component names.
-import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
+import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer, Calculator } from "lucide-vue-next"
 
 const tab = ref("accounting-uat")
 const branches = ref([])
@@ -183,6 +184,17 @@ const ordersPageSize = ref(25)
 
 const auth = useAuthStore()
 const router = useRouter()
+
+
+const openAccountingUAT = () => {
+  tab.value = 'accounting-uat'
+  localStorage.setItem('accountingUAT.activeModule', 'manual-journal')
+}
+
+const openPayrollFlex = () => {
+  tab.value = 'accounting-uat'
+  localStorage.setItem('accountingUAT.activeModule', 'payroll-flex')
+}
 
 const logout = () => {
   auth.logout()

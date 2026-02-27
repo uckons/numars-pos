@@ -27,7 +27,7 @@
           :key="menu.key"
           class="menu-chip"
           :class="{ active: activeModule === menu.key }"
-          @click="activeModule = menu.key"
+          @click="activeModule = menu.key; persistActiveModule()"
         >
           <strong>{{ menu.label }}</strong>
           <small>{{ menu.desc }}</small>
@@ -455,7 +455,13 @@ const reportMenus = [
   { name: 'Aging Receivable', desc: 'Umur piutang customer' }
 ]
 
-const activeModule = ref('manual-journal')
+const defaultModule = localStorage.getItem('accountingUAT.activeModule') || 'manual-journal'
+const activeModule = ref(defaultModule)
+
+
+const persistActiveModule = () => {
+  localStorage.setItem('accountingUAT.activeModule', activeModule.value)
+}
 
 const loadingJournals = ref(false)
 const submitting = ref(false)
@@ -893,6 +899,10 @@ const simulateApprovalSync = async () => {
 }
 
 onMounted(async () => {
+  if (!moduleMenus.some((menu) => menu.key === activeModule.value)) {
+    activeModule.value = 'manual-journal'
+  }
+  persistActiveModule()
   await loadJournals()
   await reloadPayrollModels()
 })
