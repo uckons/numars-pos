@@ -17,8 +17,7 @@
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
         <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
         <button class="nav-btn" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT (Full Page)</button>
-        <button class="nav-btn" @click="openPayrollFlex()"><Calculator size="18" /> Payroll Flex Engine</button>
-      </nav>
+              </nav>
 
       <!-- LOGOUT -->
       <button class="logout nav-btn" @click="logout"><LogOut size="18" /> Logout</button>
@@ -69,10 +68,6 @@ const openAccountingUAT = () => {
   router.push('/superadmin/accounting-uat?module=manual-journal')
 }
 
-const openPayrollFlex = () => {
-  localStorage.setItem('accountingUAT.activeModule', 'payroll-flex')
-  router.push('/superadmin/accounting-uat?module=payroll-flex')
-}
 
 const logout = () => {
   auth.logout()
