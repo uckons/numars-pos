@@ -151,6 +151,7 @@ import { useRouter } from "vue-router"
 import Swal from "sweetalert2"
 import api from "../../services/api"
 import ApexChart from "../../components/ApexChart.vue"
+import Users from "../superadmin/Users.vue"
 import Orders from "../superadmin/Orders.vue"
 import Timers from "../superadmin/Timers.vue"
 import Branches from "../superadmin/Branches.vue"
@@ -166,7 +167,7 @@ import { useAuthStore } from "../../store/auth.store"
 // Keep Users icon aliased to avoid SFC identifier collisions with local/component names.
 import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer, Calculator } from "lucide-vue-next"
 
-const tab = ref("report")
+const tab = ref("accounting-uat")
 const branches = ref([])
 const orders = ref([])
 const loading = ref(false)
