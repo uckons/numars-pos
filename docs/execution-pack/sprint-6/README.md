@@ -30,6 +30,7 @@ Fokus Sprint 6 adalah scale-up operasional, observability production-grade, dan 
 - Sprint 6 closure gate template (`closure-gate-template.md`).
 - Sprint 6 closure gate minutes (`closure-gate-minutes-2026-03-12.md`).
 - Sprint 6 next-phase 72h execution plan (`next-phase-72h-execution-plan.md`).
+- Multi-outlet enterprise active criteria checklist (`multi-outlet-active-criteria-checklist.md`).
 
 ## Entry Criteria
 
