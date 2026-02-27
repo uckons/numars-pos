@@ -5,9 +5,12 @@
         <h2>Accounting Sprint 3 — UAT Console</h2>
         <p class="subtitle">Manual Journal, Approval Queue, Recurring Generator, dan filter reporting untuk UAT user.</p>
       </div>
-      <button class="btn" @click="loadJournals" :disabled="loadingJournals">
-        {{ loadingJournals ? 'Refreshing...' : 'Refresh Data' }}
-      </button>
+      <div class="header-actions">
+        <button class="btn ghost" @click="goBackToDashboard">Kembali ke Dashboard</button>
+        <button class="btn" @click="loadJournals" :disabled="loadingJournals">
+          {{ loadingJournals ? 'Refreshing...' : 'Refresh Data' }}
+        </button>
+      </div>
     </header>
 
     <section class="card stats">
@@ -438,11 +441,12 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 import api from '@/services/api'
 
 const route = useRoute()
+const router = useRouter()
 const today = new Date().toISOString().slice(0, 10)
 
 const moduleMenus = [
@@ -469,6 +473,19 @@ const reportMenus = [
 const defaultModule = localStorage.getItem('accountingUAT.activeModule') || 'manual-journal'
 const activeModule = ref(defaultModule)
 
+
+
+const goBackToDashboard = () => {
+  if (route.path.startsWith('/manager')) {
+    router.push('/manager')
+    return
+  }
+  if (route.path.startsWith('/superadmin')) {
+    router.push('/superadmin')
+    return
+  }
+  router.back()
+}
 
 const persistActiveModule = () => {
   localStorage.setItem('accountingUAT.activeModule', activeModule.value)
@@ -930,7 +947,8 @@ onMounted(async () => {
 
 <style scoped>
 .page { display: grid; gap: 16px; color: #fff; }
-.header { display: flex; justify-content: space-between; align-items: center; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
 .subtitle { color: #d0d0d0; margin-top: 4px; }
 .subtitle2 { color: #b8b8b8; margin: 6px 0 10px; font-size: 13px; }
 .card { background: #121212; border: 1px solid #2c2c2c; border-radius: 12px; padding: 16px; }
