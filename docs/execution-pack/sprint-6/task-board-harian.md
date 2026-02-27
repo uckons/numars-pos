@@ -1,10 +1,10 @@
 # Sprint 6 Task Board Harian (D1–D10)
 
 ## Status Update Terbaru
-- Sprint 6: **Next phase H+72 completed (GO)**.
-- Fokus aktif: scale readiness + observability product-grade.
-- Next step: lanjut batch-2 + finalisasi observability v1.
-- Evidence status: `next-phase-72h-status-2026-03-07.md`, `next-phase-h72-decision-2026-03-10.md`.
+- Sprint 6: **Completed (PASS) — Ready for Go-Live**.
+- Fokus final: closure evidence lock + BAU handover.
+- Next step: eksekusi go-live window + hypercare 72 jam.
+- Evidence status: `next-phase-72h-status-2026-03-07.md`, `next-phase-h72-decision-2026-03-10.md`, `closure-gate-minutes-2026-03-12.md`.
 
 ## D1 — Kickoff Sprint 6
 - Lock scope dan owner matrix (Eng, Ops, QA, Finance).
