@@ -20,7 +20,7 @@
 
     <section class="card">
       <h3>Accounting Full Menu</h3>
-      <p class="subtitle2">Aktifkan menu UAT sesuai scope build: GL, AP, AR, Payroll, Tax, Closing, dan Financial Report.</p>
+      <p class="subtitle2">Aktifkan menu UAT sesuai scope build: GL, AP, AR, Payroll, Payroll Flexible Engine, Tax, Closing, dan Financial Report.</p>
       <div class="menu-grid">
         <button
           v-for="menu in moduleMenus"
@@ -341,6 +341,48 @@
       </div>
     </section>
 
+    <section class="card" v-if="activeModule === 'payroll-flex'">
+      <h3>Payroll Flexible Engine (Sprint 5 M9–M10)</h3>
+      <p class="subtitle2">4 model therapist + 4 model agent. Formula dapat diedit tanpa coding lalu dipreview.</p>
+
+      <div class="grid two">
+        <label>Model
+          <select v-model="selectedPayrollModel" @change="onSelectPayrollModel">
+            <option v-for="model in payrollModels" :key="model.key" :value="model.key">
+              {{ model.label }}
+            </option>
+          </select>
+        </label>
+        <label>Domain
+          <input :value="selectedPayrollDomain" type="text" disabled />
+        </label>
+      </div>
+
+      <label>Formula Expression
+        <textarea v-model="payrollExpression" rows="3" placeholder="Contoh: (commission_base * commission_rate) + bonus_amount"></textarea>
+      </label>
+
+      <div class="actions">
+        <button class="btn secondary" @click="reloadPayrollModels">Reload Formula</button>
+        <button class="btn" @click="savePayrollFormula">Save Formula</button>
+      </div>
+
+      <h4>Preview Inputs</h4>
+      <div class="grid two">
+        <label v-for="field in payrollPreviewFields" :key="field.key">
+          {{ field.label }}
+          <input v-model.number="payrollInputs[field.key]" type="number" step="0.01" />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" @click="runPayrollPreview">Run Preview</button>
+      </div>
+      <div class="totals" v-if="payrollPreviewResult">
+        <span>Result Amount: <strong>{{ formatAmount(payrollPreviewResult.amount) }}</strong></span>
+        <span>Variables: <strong>{{ (payrollPreviewResult.variables || []).join(', ') || '-' }}</strong></span>
+      </div>
+    </section>
+
     <section class="card" v-if="activeModule === 'tax'">
       <h3>Tax Center (PPN / PPh)</h3>
       <div class="grid two">
@@ -399,6 +441,7 @@ const moduleMenus = [
   { key: 'ap', label: 'Accounts Payable', desc: 'Vendor bills & payable draft' },
   { key: 'ar', label: 'Accounts Receivable', desc: 'Customer invoice draft' },
   { key: 'payroll', label: 'Payroll', desc: 'Payroll accrual simulation' },
+  { key: 'payroll-flex', label: 'Payroll Flexible Engine', desc: '4 model therapist + 4 model agent' },
   { key: 'tax', label: 'Tax Center', desc: 'PPN / PPh workflow' },
   { key: 'close-book', label: 'Period Closing', desc: 'Close month checklist' },
   { key: 'reporting', label: 'Reports', desc: 'P&L, Balance Sheet, Cash Flow' }
@@ -452,6 +495,42 @@ const payrollForm = ref({
   period_end: today,
   gross: 85000000,
   deduction: 11250000
+})
+
+const payrollModels = ref([])
+const selectedPayrollModel = ref('therapist_commission_percent')
+const selectedPayrollDomain = ref('PAYROLL_THERAPIST')
+const payrollExpression = ref('')
+const payrollPreviewResult = ref(null)
+const payrollPreviewFields = [
+  { key: 'work_count', label: 'Work Count' },
+  { key: 'commission_base', label: 'Commission Base' },
+  { key: 'commission_rate', label: 'Commission Rate (0-1)' },
+  { key: 'total_revenue', label: 'Total Revenue' },
+  { key: 'revenue_share_rate', label: 'Revenue Share Rate (0-1)' },
+  { key: 'flat_rate', label: 'Flat Rate' },
+  { key: 'flat_fee', label: 'Flat Fee' },
+  { key: 'therapist_count', label: 'Therapist Count' },
+  { key: 'therapist_commission_total', label: 'Therapist Commission Total' },
+  { key: 'agent_share_rate', label: 'Agent Share Rate (0-1)' },
+  { key: 'bonus_amount', label: 'Bonus Amount' },
+  { key: 'deduction_total', label: 'Deduction Total' },
+  { key: 'penalty_amount', label: 'Penalty Amount' }
+]
+const payrollInputs = ref({
+  work_count: 10,
+  commission_base: 1000000,
+  commission_rate: 0.3,
+  total_revenue: 10000000,
+  revenue_share_rate: 0.05,
+  flat_rate: 75000,
+  flat_fee: 200000,
+  therapist_count: 5,
+  therapist_commission_total: 3000000,
+  agent_share_rate: 0.1,
+  bonus_amount: 0,
+  deduction_total: 0,
+  penalty_amount: 0
 })
 
 const taxForm = ref({
@@ -736,6 +815,55 @@ const generatePayrollJournal = async () => {
   await Swal.fire('Payroll Journal Generated', `Net payroll ${formatAmount(payrollForm.value.gross - payrollForm.value.deduction)} siap diposting.`, 'success')
 }
 
+const syncSelectedPayrollModel = () => {
+  const selected = payrollModels.value.find((m) => m.key === selectedPayrollModel.value)
+  if (!selected) return
+  selectedPayrollDomain.value = selected.domain
+  payrollExpression.value = selected.expression
+}
+
+const reloadPayrollModels = async () => {
+  try {
+    const res = await api.get('/accounting/payroll-flex/models')
+    payrollModels.value = res.data?.data || []
+    if (!payrollModels.value.length) return
+    if (!payrollModels.value.some((m) => m.key === selectedPayrollModel.value)) {
+      selectedPayrollModel.value = payrollModels.value[0].key
+    }
+    syncSelectedPayrollModel()
+  } catch (err) {
+    Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
+  }
+}
+
+const onSelectPayrollModel = () => {
+  syncSelectedPayrollModel()
+}
+
+const savePayrollFormula = async () => {
+  try {
+    await api.put(`/accounting/payroll-flex/formulas/${selectedPayrollModel.value}`, {
+      expression: payrollExpression.value
+    })
+    await Swal.fire('Success', 'Formula payroll berhasil disimpan', 'success')
+    await reloadPayrollModels()
+  } catch (err) {
+    Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
+  }
+}
+
+const runPayrollPreview = async () => {
+  try {
+    const res = await api.post('/accounting/payroll-flex/preview', {
+      model_key: selectedPayrollModel.value,
+      inputs: payrollInputs.value
+    })
+    payrollPreviewResult.value = res.data?.data || null
+  } catch (err) {
+    Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
+  }
+}
+
 const recalcTax = async () => {
   await Swal.fire('Tax Recalculated', `Periode ${taxForm.value.period} branch ${taxForm.value.branch_id} berhasil dihitung ulang.`, 'info')
 }
@@ -764,7 +892,10 @@ const simulateApprovalSync = async () => {
   await Swal.fire('Approval Sync', `Queue branch ${approvalFilter.value.branch_id} priority ${approvalFilter.value.priority} sudah disinkronkan.`, 'success')
 }
 
-onMounted(loadJournals)
+onMounted(async () => {
+  await loadJournals()
+  await reloadPayrollModels()
+})
 </script>
 
 <style scoped>
