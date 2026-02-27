@@ -16,6 +16,7 @@ import Therapists from "@/views/superadmin/Therapists.vue"
 import AuditLogs from "../views/superadmin/AuditLogs.vue"
 import Services from "@/views/superadmin/Services.vue"
 import Branches from "@/views/superadmin/Branches.vue"
+import AccountingUAT from "@/views/superadmin/AccountingUAT.vue"
 import PosCashier from "@/views/pos/PosCashier.vue"
 import KasirBarInbox from "@/views/kasir/KasirBarInbox.vue"
 const routes = [
@@ -39,6 +40,18 @@ const routes = [
   { path: "/manager",
     component: ManagerDashboard,
     meta: { auth: true, roles: ["Manager"] }
+  },
+
+  {
+    path: '/manager/accounting-uat',
+    component: AccountingUAT,
+    meta: { auth: true, roles: ['Manager'] }
+  },
+
+  {
+    path: '/superadmin/accounting-uat',
+    component: AccountingUAT,
+    meta: { auth: true, roles: ['SuperAdmin'] }
   },
 
   // SUPERVISOR
