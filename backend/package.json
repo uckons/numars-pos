@@ -14,7 +14,9 @@
     "recon:parse-output": "node scripts/recon-output-parser.js",
     "recon:cron-alert": "bash scripts/cron-recon-alert.sh",
     "journal:repair:missing-pos-payment": "node scripts/repair-missing-pos-payment-journals.js",
-    "migrate:010": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f ../database/migrations/010_sprint4_ap_ar_payroll_staff.sql"
+    "migrate:010": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f ../database/migrations/010_sprint4_ap_ar_payroll_staff.sql",
+    "recon:sprint4": "node scripts/sprint4-recon-job.js",
+    "test:sprint4-recon": "node --test tests/sprint4-recon-job.test.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
