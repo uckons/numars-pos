@@ -344,23 +344,32 @@
     <section class="card" v-if="activeModule === 'payroll-flex'">
       <h3>Payroll Flexible Engine (Sprint 5 M9–M10)</h3>
       <p class="subtitle2">4 model therapist + 4 model agent. Formula dapat diedit tanpa coding lalu dipreview.</p>
+      <p class="subtitle2"><strong>Catatan domain:</strong> Agent menggunakan domain <code>PAYROLL_AGENT</code>, bukan domain payroll therapist.</p>
 
       <div class="grid two">
         <label>Model
           <select v-model="selectedPayrollModel" @change="onSelectPayrollModel">
-            <option v-for="model in payrollModels" :key="model.key" :value="model.key">
-              {{ model.label }}
-            </option>
+            <optgroup label="Payroll Terapis">
+              <option v-for="model in therapistModels" :key="model.key" :value="model.key">
+                {{ model.label }}
+              </option>
+            </optgroup>
+            <optgroup label="Payroll Agent">
+              <option v-for="model in agentModels" :key="model.key" :value="model.key">
+                {{ model.label }}
+              </option>
+            </optgroup>
           </select>
         </label>
         <label>Domain
-          <input :value="selectedPayrollDomain" type="text" disabled />
+          <input :value="selectedPayrollDomainLabel" type="text" disabled />
         </label>
       </div>
 
       <label>Formula Expression
         <textarea v-model="payrollExpression" rows="3" placeholder="Contoh: (commission_base * commission_rate) + bonus_amount"></textarea>
       </label>
+      <p class="subtitle2">Tip: gunakan variabel seperti <code>total_revenue</code>, <code>work_count</code>, <code>agent_share_rate</code>, lalu klik <em>Run Preview</em>.</p>
 
       <div class="actions">
         <button class="btn secondary" @click="reloadPayrollModels">Reload Formula</button>
@@ -429,9 +438,11 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import Swal from 'sweetalert2'
 import api from '@/services/api'
 
+const route = useRoute()
 const today = new Date().toISOString().slice(0, 10)
 
 const moduleMenus = [
@@ -508,6 +519,11 @@ const selectedPayrollModel = ref('therapist_commission_percent')
 const selectedPayrollDomain = ref('PAYROLL_THERAPIST')
 const payrollExpression = ref('')
 const payrollPreviewResult = ref(null)
+
+const therapistModels = computed(() => payrollModels.value.filter((m) => m.domain === 'PAYROLL_THERAPIST'))
+const agentModels = computed(() => payrollModels.value.filter((m) => m.domain === 'PAYROLL_AGENT'))
+const selectedPayrollDomainLabel = computed(() => selectedPayrollDomain.value === 'PAYROLL_AGENT' ? 'Payroll Agent (PAYROLL_AGENT)' : 'Payroll Terapis (PAYROLL_THERAPIST)')
+
 const payrollPreviewFields = [
   { key: 'work_count', label: 'Work Count' },
   { key: 'commission_base', label: 'Commission Base' },
@@ -899,6 +915,10 @@ const simulateApprovalSync = async () => {
 }
 
 onMounted(async () => {
+  const queryModule = String(route.query.module || '')
+  if (moduleMenus.some((menu) => menu.key === queryModule)) {
+    activeModule.value = queryModule
+  }
   if (!moduleMenus.some((menu) => menu.key === activeModule.value)) {
     activeModule.value = 'manual-journal'
   }

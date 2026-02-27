@@ -16,7 +16,7 @@
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
         <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
-        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT (Full Page)</button>
         <button class="nav-btn" @click="openPayrollFlex()"><Calculator size="18" /> Payroll Flex Engine</button>
       </nav>
 
@@ -37,7 +37,6 @@
       <StockDashboard v-if="tab==='stock'" />
       <Grades v-if="tab==='grades'" />
       <PrinterAgentTools v-if="tab==='printer-agent'" />
-      <AccountingUAT v-if="tab==='accounting-uat'" />
     </main>
   </div>
 </template>
@@ -58,7 +57,6 @@ import Therapists from './Therapists.vue'
 import Rooms from './Rooms.vue'
 import Grades from './Grades.vue'
 import PrinterAgentTools from './PrinterAgentTools.vue'
-import AccountingUAT from './AccountingUAT.vue'
 
 
 const tab = ref("users")
@@ -67,13 +65,13 @@ const router = useRouter()
 
 
 const openAccountingUAT = () => {
-  tab.value = 'accounting-uat'
   localStorage.setItem('accountingUAT.activeModule', 'manual-journal')
+  router.push('/superadmin/accounting-uat?module=manual-journal')
 }
 
 const openPayrollFlex = () => {
-  tab.value = 'accounting-uat'
   localStorage.setItem('accountingUAT.activeModule', 'payroll-flex')
+  router.push('/superadmin/accounting-uat?module=payroll-flex')
 }
 
 const logout = () => {

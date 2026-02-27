@@ -5,7 +5,7 @@
       <nav>
         <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
         <button class="nav-btn" :class="{active:tab==='profile'}" @click="tab='profile'"><User size="18" /> Profile</button>
-        <button class="nav-btn" :class="{active:tab==='accounting-uat'}" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT</button>
+        <button class="nav-btn" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT (Full Page)</button>
         <button class="nav-btn" @click="openPayrollFlex()"><Calculator size="18" /> Payroll Flex Engine</button>
         <button class="nav-btn" :class="{active:tab==='audit'}" @click="tab='audit'"><ShieldCheck size="18" /> Audit Logs</button>
         <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
@@ -139,7 +139,6 @@
       <Rooms v-else-if="tab==='rooms'" />
       <StockDashboard v-else-if="tab==='stock'" />
       <Grades v-else-if="tab==='grades'" />
-      <AccountingUAT v-else-if="tab==='accounting-uat'" />
       <AuditLogs v-else-if="tab==='audit'" />
       <PrinterAgentTools v-else-if="tab==='printer-agent'" />
     </main>
@@ -162,7 +161,6 @@ import Rooms from "../superadmin/Rooms.vue"
 import Grades from "../superadmin/Grades.vue"
 import StockDashboard from "../stock/StockDashboard.vue"
 import ProfilePasswordCard from "../../components/ProfilePasswordCard.vue"
-import AccountingUAT from "../superadmin/AccountingUAT.vue"
 import AuditLogs from "../superadmin/AuditLogs.vue"
 import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
 import { useAuthStore } from "../../store/auth.store"
@@ -187,13 +185,13 @@ const router = useRouter()
 
 
 const openAccountingUAT = () => {
-  tab.value = 'accounting-uat'
   localStorage.setItem('accountingUAT.activeModule', 'manual-journal')
+  router.push('/manager/accounting-uat?module=manual-journal')
 }
 
 const openPayrollFlex = () => {
-  tab.value = 'accounting-uat'
   localStorage.setItem('accountingUAT.activeModule', 'payroll-flex')
+  router.push('/manager/accounting-uat?module=payroll-flex')
 }
 
 const logout = () => {
