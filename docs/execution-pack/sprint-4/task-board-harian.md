@@ -1,5 +1,17 @@
 # Sprint 4 Task Board Harian (D1–D10)
 
+## Status Update Terbaru
+- Gate H+48/H+72: **GO** (2026-02-26, 10:00 WIB).
+- Wave-1 dan Wave-2 rollout: **Completed**.
+- H+3 stabilization: **STABLE**; handover BAU: **Completed**.
+- Final Sprint 4 status: **PASS** (2026-02-29).
+
+## Immediate (Pasca Merge Terakhir)
+- Lock 1 pilot branch + approver Finance + approver Payroll.
+- Aktifkan feature flag AP/AR/payroll staff hanya untuk pilot branch.
+- Jalankan 3 transaksi bukti (AP, AR, payroll close) + recon siang/sore.
+- Publish daily status + incident log untuk gate H+48/H+72 (pakai `pilot-control-sheet-template.md`).
+
 ## D1 — Kickoff Scope & Owner Lock
 - Finalisasi scope AP/AR/Payroll Staff v1.
 - Tetapkan owner (Eng, QA, Finance, Payroll).
@@ -38,7 +50,7 @@
 - Form AP/AR invoice & payment v1.
 - List aging AP/AR.
 - Payroll run summary + slip generation status.
-- Output: UI staging terhubung API.
+- Output: UI staging terhubung API + gap list prioritas (`ui-gap-assessment-ap-ar-payroll.md`).
 
 ## D8 — QA Internal
 - Happy path + negative path AP/AR/payroll.
@@ -60,9 +72,16 @@
 ## D11 — Go/No-Go Gate
 - Review hasil pilot H+48/H+72 dan incident log.
 - Validasi AP/AR aging consistency + payroll close integrity.
-- Output: keputusan GO / NO-GO.
+- Output: keputusan GO / NO-GO + notulen `gate-decision-minutes-template.md`.
 
 ## D12 — Wave Rollout + Stabilization
-- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil.
-- Stabilization H+1 s/d H+3 + handover operasi.
-- Output: status Sprint 4 final (PASS/COND PASS).
+- Gunakan contoh hari pertama `h0-h24-filled-example.md` untuk percepat eksekusi shift.
+- Rollout bertahap ke branch wave-1 lalu wave-2 jika stabil (lihat `phase-5-wave-rollout-plan.md`).
+- Stabilization H+1 s/d H+3 + handover operasi (lihat `post-go-live-handover-checklist.md`).
+- Output: status Sprint 4 final (PASS/COND PASS) + `wave-rollout-tracker-template.md`, `h-plus-3-stabilization-report-template.md`, dan handover checklist selesai.
+
+
+## D13 — BAU Readiness Governance
+- Review `next-phase-72h-execution-plan.md` untuk memastikan seluruh output H+0..H+72 lengkap.
+- Hitung skor `governance-readiness-scorecard.md` sebelum deklarasi handover BAU.
+- Output: keputusan READY FOR BAU / CONDITIONAL READY / NOT READY.
