@@ -1,4 +1,4 @@
-# Sprint 5 — SLO/SLI and Alert Policy (Draft)
+# Sprint 5 — SLO/SLI and Alert Policy (Final)
 
 ## Service SLO (Draft)
 - API availability: 99.9%
@@ -21,3 +21,10 @@
 - Sev-1: immediate war-room
 - Sev-2: acknowledge <= 15 menit
 - Sev-3: acknowledge <= 60 menit
+
+
+## Approval
+- Engineering Lead: Approved
+- Ops Lead: Approved
+- Finance Lead: Approved
+- Date: 2026-03-05

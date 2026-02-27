@@ -1,10 +1,10 @@
 # Sprint 5 Task Board Harian (D1–D10)
 
 ## Status Update Terbaru
-- Next phase 72h: **Completed (GO)**.
+- Next phase 72h: **Completed (GO)**, batch-2 selesai.
 - Fokus aktif: P0 hardening + recon automation + alert governance.
 - Evidence status: `next-phase-72h-status-2026-03-01.md`, `next-phase-h72-decision-2026-03-03.md`.
-- Next step: lanjut hardening batch-2 + lock SLO/SLI final.
+- Closure gate: **PASS** (2026-03-05), siap lanjut Sprint 6.
 
 ## D1 — Sprint 5 Kickoff & Scope Lock
 - Finalisasi objective Sprint 5 (reliability, hardening, BAU optimization).
@@ -55,3 +55,7 @@
 - Review KPI improvement vs baseline Sprint 4.
 - Putuskan PASS / CONDITIONAL PASS / EXTEND.
 - Output: closure minutes + next-sprint carry-over.
+
+## Closure Result
+- Sprint 5 final status: **PASS**.
+- Evidence: `closure-gate-minutes-2026-03-05.md`.
