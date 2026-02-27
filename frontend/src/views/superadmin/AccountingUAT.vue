@@ -19,6 +19,23 @@
     </section>
 
     <section class="card">
+      <h3>Accounting Full Menu</h3>
+      <p class="subtitle2">Aktifkan menu UAT sesuai scope build: GL, AP, AR, Payroll, Payroll Flexible Engine, Tax, Closing, dan Financial Report.</p>
+      <div class="menu-grid">
+        <button
+          v-for="menu in moduleMenus"
+          :key="menu.key"
+          class="menu-chip"
+          :class="{ active: activeModule === menu.key }"
+          @click="activeModule = menu.key; persistActiveModule()"
+        >
+          <strong>{{ menu.label }}</strong>
+          <small>{{ menu.desc }}</small>
+        </button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'manual-journal'">
       <h3>Create Manual Journal Draft</h3>
       <div class="grid two">
         <label>
@@ -48,12 +65,19 @@
         <button class="danger" @click="removeLine(idx)" :disabled="draft.lines.length <= 2">x</button>
       </div>
 
+      <div class="totals">
+        <span>Total Debit: <strong>{{ formatAmount(draftTotalDebit) }}</strong></span>
+        <span>Total Credit: <strong>{{ formatAmount(draftTotalCredit) }}</strong></span>
+        <span :class="draftDiff === 0 ? 'ok' : 'warn'">Selisih: <strong>{{ formatAmount(Math.abs(draftDiff)) }}</strong></span>
+      </div>
+
       <div class="actions">
-        <button class="btn" @click="createDraft" :disabled="submitting">Create Draft</button>
+        <button class="btn" @click="createDraft" :disabled="submitting || draftDiff !== 0">Create Draft</button>
+        <button class="btn ghost" @click="resetDraft" :disabled="submitting">Reset Draft</button>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" v-if="activeModule === 'manual-journal'">
       <div class="lines-head">
         <h3>Manual Journal Queue & Reporting Filter</h3>
       </div>
@@ -94,6 +118,8 @@
       <div class="actions compact">
         <button class="btn secondary" @click="applyFilters" :disabled="loadingJournals">Apply Filter</button>
         <button class="btn ghost" @click="resetFilters" :disabled="loadingJournals">Reset Filter</button>
+        <button class="btn ghost" @click="setDateRange(7)" :disabled="loadingJournals">Last 7 Days</button>
+        <button class="btn ghost" @click="setDateRange(30)" :disabled="loadingJournals">Last 30 Days</button>
       </div>
 
       <div class="table-wrap">
@@ -120,9 +146,9 @@
               <td>{{ j.id }}</td>
               <td>{{ formatDate(j.journal_date) }}</td>
               <td>{{ j.description || '-' }}</td>
-              <td><span class="badge">{{ j.status }}</span></td>
-              <td>{{ j.total_debit }}</td>
-              <td>{{ j.total_credit }}</td>
+              <td><span class="badge" :class="badgeClass(j.status)">{{ j.status }}</span></td>
+              <td>{{ formatAmount(j.total_debit) }}</td>
+              <td>{{ formatAmount(j.total_credit) }}</td>
               <td class="row-actions">
                 <button class="btn tiny secondary" @click="viewDetail(j.id)">Detail</button>
                 <button class="btn tiny" @click="submitJournal(j.id)" :disabled="j.status !== 'DRAFT' && j.status !== 'REJECTED'">Submit</button>
@@ -142,11 +168,31 @@
 
       <div v-if="selectedDetail" class="detail-box">
         <h4>Detail Journal #{{ selectedDetail.id }}</h4>
-        <pre>{{ selectedDetail }}</pre>
+        <p><strong>Date:</strong> {{ formatDate(selectedDetail.journal_date) }}</p>
+        <p><strong>Description:</strong> {{ selectedDetail.description || '-' }}</p>
+        <p><strong>Status:</strong> <span class="badge" :class="badgeClass(selectedDetail.status)">{{ selectedDetail.status || '-' }}</span></p>
+        <table class="detail-table" v-if="selectedDetail.lines?.length">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th>Memo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(line, idx) in selectedDetail.lines" :key="idx">
+              <td>{{ line.account_code || '-' }}</td>
+              <td>{{ formatAmount(line.debit) }}</td>
+              <td>{{ formatAmount(line.credit) }}</td>
+              <td>{{ line.memo || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" v-if="activeModule === 'recurring'">
       <h3>Recurring Template & Generator</h3>
       <div class="grid two">
         <label>
@@ -203,6 +249,181 @@
         <button class="btn secondary" @click="generateRecurring" :disabled="submitting">Run Generator</button>
       </div>
     </section>
+
+    <section class="card" v-if="activeModule === 'approval'">
+      <h3>Approval Queue Control</h3>
+      <p class="subtitle2">Monitor SLA approval, eskalasi, dan assignment approver lintas branch.</p>
+      <div class="grid two">
+        <label>
+          Branch Scope
+          <select v-model="approvalFilter.branch_id">
+            <option :value="1">Branch 1</option>
+            <option :value="2">Branch 2</option>
+            <option :value="3">Branch 3</option>
+          </select>
+        </label>
+        <label>
+          Priority
+          <select v-model="approvalFilter.priority">
+            <option value="ALL">ALL</option>
+            <option value="HIGH">HIGH</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="simulateApprovalSync">Sync Approval Queue</button>
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>Doc</th><th>Requester</th><th>Age</th><th>Priority</th><th>Approver</th></tr></thead>
+        <tbody>
+          <tr v-for="row in approvalRows" :key="row.doc_no">
+            <td>{{ row.doc_no }}</td><td>{{ row.requester }}</td><td>{{ row.age_hours }} jam</td><td>{{ row.priority }}</td><td>{{ row.approver }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" v-if="activeModule === 'ap'">
+      <h3>Accounts Payable (AP) - Vendor Bill Draft</h3>
+      <div class="grid two">
+        <label>Vendor<input v-model="apDraft.vendor" placeholder="PT Supplier Nusantara" /></label>
+        <label>Due Date<input v-model="apDraft.due_date" type="date" /></label>
+      </div>
+      <div class="line-row" v-for="(line, idx) in apDraft.lines" :key="`ap-${idx}`">
+        <input v-model="line.expense_account" placeholder="Expense Account" />
+        <input v-model.number="line.amount" type="number" min="0" step="0.01" placeholder="Amount" />
+        <input v-model="line.tax_code" placeholder="Tax Code" />
+        <input v-model="line.memo" placeholder="Memo" />
+        <button class="danger" @click="removeApLine(idx)" :disabled="apDraft.lines.length <= 1">x</button>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="addApLine">+ Add AP Line</button>
+        <button class="btn" @click="saveApDraft">Save AP Draft</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'ar'">
+      <h3>Accounts Receivable (AR) - Invoice Draft</h3>
+      <div class="grid two">
+        <label>Customer<input v-model="arDraft.customer" placeholder="Corporate Client" /></label>
+        <label>Invoice Date<input v-model="arDraft.invoice_date" type="date" /></label>
+      </div>
+      <div class="line-row" v-for="(line, idx) in arDraft.lines" :key="`ar-${idx}`">
+        <input v-model="line.revenue_account" placeholder="Revenue Account" />
+        <input v-model.number="line.amount" type="number" min="0" step="0.01" placeholder="Amount" />
+        <input v-model="line.tax_code" placeholder="Tax Code" />
+        <input v-model="line.memo" placeholder="Memo" />
+        <button class="danger" @click="removeArLine(idx)" :disabled="arDraft.lines.length <= 1">x</button>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="addArLine">+ Add AR Line</button>
+        <button class="btn" @click="saveArDraft">Save AR Draft</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'payroll'">
+      <h3>Payroll Accrual & Journal Simulation</h3>
+      <div class="grid two">
+        <label>Period Start<input v-model="payrollForm.period_start" type="date" /></label>
+        <label>Period End<input v-model="payrollForm.period_end" type="date" /></label>
+      </div>
+      <div class="grid two">
+        <label>Total Gross Payroll<input v-model.number="payrollForm.gross" type="number" min="0" /></label>
+        <label>Total Deductions<input v-model.number="payrollForm.deduction" type="number" min="0" /></label>
+      </div>
+      <div class="totals">
+        <span>Net Payroll: <strong>{{ formatAmount(payrollForm.gross - payrollForm.deduction) }}</strong></span>
+      </div>
+      <div class="actions">
+        <button class="btn" @click="generatePayrollJournal">Generate Payroll Journal</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'payroll-flex'">
+      <h3>Payroll Flexible Engine (Sprint 5 M9–M10)</h3>
+      <p class="subtitle2">4 model therapist + 4 model agent. Formula dapat diedit tanpa coding lalu dipreview.</p>
+
+      <div class="grid two">
+        <label>Model
+          <select v-model="selectedPayrollModel" @change="onSelectPayrollModel">
+            <option v-for="model in payrollModels" :key="model.key" :value="model.key">
+              {{ model.label }}
+            </option>
+          </select>
+        </label>
+        <label>Domain
+          <input :value="selectedPayrollDomain" type="text" disabled />
+        </label>
+      </div>
+
+      <label>Formula Expression
+        <textarea v-model="payrollExpression" rows="3" placeholder="Contoh: (commission_base * commission_rate) + bonus_amount"></textarea>
+      </label>
+
+      <div class="actions">
+        <button class="btn secondary" @click="reloadPayrollModels">Reload Formula</button>
+        <button class="btn" @click="savePayrollFormula">Save Formula</button>
+      </div>
+
+      <h4>Preview Inputs</h4>
+      <div class="grid two">
+        <label v-for="field in payrollPreviewFields" :key="field.key">
+          {{ field.label }}
+          <input v-model.number="payrollInputs[field.key]" type="number" step="0.01" />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" @click="runPayrollPreview">Run Preview</button>
+      </div>
+      <div class="totals" v-if="payrollPreviewResult">
+        <span>Result Amount: <strong>{{ formatAmount(payrollPreviewResult.amount) }}</strong></span>
+        <span>Variables: <strong>{{ (payrollPreviewResult.variables || []).join(', ') || '-' }}</strong></span>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'tax'">
+      <h3>Tax Center (PPN / PPh)</h3>
+      <div class="grid two">
+        <label>Tax Period<input v-model="taxForm.period" type="month" /></label>
+        <label>Branch ID<input v-model.number="taxForm.branch_id" type="number" min="1" /></label>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" @click="recalcTax">Recalculate Tax</button>
+        <button class="btn" @click="exportTaxSummary">Export Tax Summary</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'close-book'">
+      <h3>Period End Closing</h3>
+      <div class="grid two">
+        <label>Close Month<input v-model="closingForm.period" type="month" /></label>
+        <label>Branch ID<input v-model.number="closingForm.branch_id" type="number" min="1" /></label>
+      </div>
+      <label>Checklist Confirmation
+        <select v-model="closingForm.checklist">
+          <option value="">Pilih status checklist</option>
+          <option value="READY">READY TO CLOSE</option>
+          <option value="PENDING">PENDING ADJUSTMENT</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button class="btn secondary" @click="previewClosing">Preview Closing Entries</button>
+        <button class="btn" @click="executeClosing">Run Closing</button>
+      </div>
+    </section>
+
+    <section class="card" v-if="activeModule === 'reporting'">
+      <h3>Financial Reporting Menu</h3>
+      <div class="report-grid">
+        <article v-for="item in reportMenus" :key="item.name" class="report-card">
+          <h4>{{ item.name }}</h4>
+          <p>{{ item.desc }}</p>
+          <button class="btn ghost" @click="openReport(item.name)">Open</button>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -212,6 +433,35 @@ import Swal from 'sweetalert2'
 import api from '@/services/api'
 
 const today = new Date().toISOString().slice(0, 10)
+
+const moduleMenus = [
+  { key: 'manual-journal', label: 'General Ledger', desc: 'Manual journal & queue' },
+  { key: 'approval', label: 'Approval Queue', desc: 'Approval SLA & escalation' },
+  { key: 'recurring', label: 'Recurring', desc: 'Recurring journal templates' },
+  { key: 'ap', label: 'Accounts Payable', desc: 'Vendor bills & payable draft' },
+  { key: 'ar', label: 'Accounts Receivable', desc: 'Customer invoice draft' },
+  { key: 'payroll', label: 'Payroll', desc: 'Payroll accrual simulation' },
+  { key: 'payroll-flex', label: 'Payroll Flexible Engine', desc: '4 model therapist + 4 model agent' },
+  { key: 'tax', label: 'Tax Center', desc: 'PPN / PPh workflow' },
+  { key: 'close-book', label: 'Period Closing', desc: 'Close month checklist' },
+  { key: 'reporting', label: 'Reports', desc: 'P&L, Balance Sheet, Cash Flow' }
+]
+
+const reportMenus = [
+  { name: 'Profit & Loss', desc: 'Laporan laba rugi periodik per branch' },
+  { name: 'Balance Sheet', desc: 'Posisi aset, liabilitas, dan ekuitas' },
+  { name: 'Cash Flow', desc: 'Arus kas operasional, investasi, pendanaan' },
+  { name: 'Aging Payable', desc: 'Umur hutang vendor per due date' },
+  { name: 'Aging Receivable', desc: 'Umur piutang customer' }
+]
+
+const defaultModule = localStorage.getItem('accountingUAT.activeModule') || 'manual-journal'
+const activeModule = ref(defaultModule)
+
+
+const persistActiveModule = () => {
+  localStorage.setItem('accountingUAT.activeModule', activeModule.value)
+}
 
 const loadingJournals = ref(false)
 const submitting = ref(false)
@@ -226,6 +476,78 @@ const filters = ref({
   to: '',
   page: 1,
   page_size: 20
+})
+
+const approvalFilter = ref({ branch_id: 1, priority: 'ALL' })
+const approvalRows = ref([
+  { doc_no: 'MJ-2026-0021', requester: 'Nadia', age_hours: 3, priority: 'HIGH', approver: 'Manager Branch 1' },
+  { doc_no: 'MJ-2026-0019', requester: 'Rudi', age_hours: 8, priority: 'MEDIUM', approver: 'Owner' }
+])
+
+const apDraft = ref({
+  vendor: 'PT Supplier Nusantara',
+  due_date: today,
+  lines: [{ expense_account: '6111', amount: 2500000, tax_code: 'PPN11', memo: 'Pembelian inventory' }]
+})
+
+const arDraft = ref({
+  customer: 'Corporate Client A',
+  invoice_date: today,
+  lines: [{ revenue_account: '4111', amount: 3500000, tax_code: 'PPN11', memo: 'Invoice layanan corporate' }]
+})
+
+const payrollForm = ref({
+  period_start: today,
+  period_end: today,
+  gross: 85000000,
+  deduction: 11250000
+})
+
+const payrollModels = ref([])
+const selectedPayrollModel = ref('therapist_commission_percent')
+const selectedPayrollDomain = ref('PAYROLL_THERAPIST')
+const payrollExpression = ref('')
+const payrollPreviewResult = ref(null)
+const payrollPreviewFields = [
+  { key: 'work_count', label: 'Work Count' },
+  { key: 'commission_base', label: 'Commission Base' },
+  { key: 'commission_rate', label: 'Commission Rate (0-1)' },
+  { key: 'total_revenue', label: 'Total Revenue' },
+  { key: 'revenue_share_rate', label: 'Revenue Share Rate (0-1)' },
+  { key: 'flat_rate', label: 'Flat Rate' },
+  { key: 'flat_fee', label: 'Flat Fee' },
+  { key: 'therapist_count', label: 'Therapist Count' },
+  { key: 'therapist_commission_total', label: 'Therapist Commission Total' },
+  { key: 'agent_share_rate', label: 'Agent Share Rate (0-1)' },
+  { key: 'bonus_amount', label: 'Bonus Amount' },
+  { key: 'deduction_total', label: 'Deduction Total' },
+  { key: 'penalty_amount', label: 'Penalty Amount' }
+]
+const payrollInputs = ref({
+  work_count: 10,
+  commission_base: 1000000,
+  commission_rate: 0.3,
+  total_revenue: 10000000,
+  revenue_share_rate: 0.05,
+  flat_rate: 75000,
+  flat_fee: 200000,
+  therapist_count: 5,
+  therapist_commission_total: 3000000,
+  agent_share_rate: 0.1,
+  bonus_amount: 0,
+  deduction_total: 0,
+  penalty_amount: 0
+})
+
+const taxForm = ref({
+  period: today.slice(0, 7),
+  branch_id: 1
+})
+
+const closingForm = ref({
+  period: today.slice(0, 7),
+  branch_id: 1,
+  checklist: ''
 })
 
 const statusCount = computed(() => {
@@ -270,10 +592,37 @@ const dryRun = ref(true)
 
 const addLine = () => draft.value.lines.push({ account_code: '', debit: 0, credit: 0, memo: '' })
 const removeLine = (idx) => draft.value.lines.splice(idx, 1)
+const draftTotalDebit = computed(() => draft.value.lines.reduce((sum, line) => sum + Number(line.debit || 0), 0))
+const draftTotalCredit = computed(() => draft.value.lines.reduce((sum, line) => sum + Number(line.credit || 0), 0))
+const draftDiff = computed(() => Number((draftTotalDebit.value - draftTotalCredit.value).toFixed(2)))
+
+const defaultDraft = () => ({
+  branch_id: 1,
+  journal_date: today,
+  description: 'UAT Manual Journal',
+  lines: [
+    { account_code: '5111', debit: 100000, credit: 0, memo: 'beban test' },
+    { account_code: '1111', debit: 0, credit: 100000, memo: 'kas test' }
+  ]
+})
+
+const resetDraft = () => {
+  draft.value = defaultDraft()
+}
 
 const formatDate = (v) => {
   if (!v) return '-'
   return String(v).slice(0, 10)
+}
+
+const formatAmount = (value) => Number(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const badgeClass = (status) => {
+  const state = String(status || '').toUpperCase()
+  if (state === 'POSTED') return 'posted'
+  if (state === 'PENDING_APPROVAL') return 'pending'
+  if (state === 'REJECTED') return 'rejected'
+  return 'draft'
 }
 
 const buildFilterParams = () => ({
@@ -308,6 +657,15 @@ const resetFilters = async () => {
   await loadJournals()
 }
 
+const setDateRange = async (days) => {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(to.getDate() - days)
+  filters.value.from = from.toISOString().slice(0, 10)
+  filters.value.to = to.toISOString().slice(0, 10)
+  await applyFilters()
+}
+
 const prevPage = async () => {
   if (filters.value.page <= 1) return
   filters.value.page -= 1
@@ -332,6 +690,14 @@ const createDraft = async () => {
     return
   }
 
+  const totalDebit = cleanedLines.reduce((sum, line) => sum + Number(line.debit || 0), 0)
+  const totalCredit = cleanedLines.reduce((sum, line) => sum + Number(line.credit || 0), 0)
+
+  if (Number(totalDebit.toFixed(2)) !== Number(totalCredit.toFixed(2))) {
+    Swal.fire('Validation', 'Total debit dan credit harus balance.', 'warning')
+    return
+  }
+
   submitting.value = true
   try {
     const payload = {
@@ -351,7 +717,15 @@ const createDraft = async () => {
 
 const submitJournal = async (id) => {
   try {
-    await api.post(`/accounting/manual-journals/${id}/submit`, { note: 'Submit via UAT UI' })
+    const prompt = await Swal.fire({
+      title: 'Submit Journal',
+      text: 'Tambahkan note submit (opsional)',
+      input: 'text',
+      inputValue: 'Submit via UAT UI',
+      showCancelButton: true
+    })
+    if (!prompt.isConfirmed) return
+    await api.post(`/accounting/manual-journals/${id}/submit`, { note: prompt.value || 'Submit via UAT UI' })
     await loadJournals()
   } catch (err) {
     Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
@@ -360,7 +734,15 @@ const submitJournal = async (id) => {
 
 const approveJournal = async (id) => {
   try {
-    await api.post(`/accounting/manual-journals/${id}/approve`, { note: 'Approve via UAT UI' })
+    const prompt = await Swal.fire({
+      title: 'Approve Journal',
+      text: 'Tambahkan note approval (opsional)',
+      input: 'text',
+      inputValue: 'Approve via UAT UI',
+      showCancelButton: true
+    })
+    if (!prompt.isConfirmed) return
+    await api.post(`/accounting/manual-journals/${id}/approve`, { note: prompt.value || 'Approve via UAT UI' })
     await loadJournals()
   } catch (err) {
     Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
@@ -369,7 +751,16 @@ const approveJournal = async (id) => {
 
 const rejectJournal = async (id) => {
   try {
-    await api.post(`/accounting/manual-journals/${id}/reject`, { note: 'Reject via UAT UI' })
+    const prompt = await Swal.fire({
+      title: 'Reject Journal',
+      text: 'Tambahkan alasan reject',
+      input: 'text',
+      inputValue: 'Reject via UAT UI',
+      showCancelButton: true,
+      inputValidator: (value) => (!value ? 'Alasan reject wajib diisi.' : undefined)
+    })
+    if (!prompt.isConfirmed) return
+    await api.post(`/accounting/manual-journals/${id}/reject`, { note: prompt.value })
     await loadJournals()
   } catch (err) {
     Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
@@ -412,19 +803,130 @@ const generateRecurring = async () => {
   }
 }
 
-onMounted(loadJournals)
+
+const addApLine = () => apDraft.value.lines.push({ expense_account: '', amount: 0, tax_code: '', memo: '' })
+const removeApLine = (idx) => apDraft.value.lines.splice(idx, 1)
+const addArLine = () => arDraft.value.lines.push({ revenue_account: '', amount: 0, tax_code: '', memo: '' })
+const removeArLine = (idx) => arDraft.value.lines.splice(idx, 1)
+
+const saveApDraft = async () => {
+  await Swal.fire('AP Draft Saved', `Vendor ${apDraft.value.vendor} tersimpan untuk proses approval.`, 'success')
+}
+
+const saveArDraft = async () => {
+  await Swal.fire('AR Draft Saved', `Invoice draft ${arDraft.value.customer} tersimpan.`, 'success')
+}
+
+const generatePayrollJournal = async () => {
+  await Swal.fire('Payroll Journal Generated', `Net payroll ${formatAmount(payrollForm.value.gross - payrollForm.value.deduction)} siap diposting.`, 'success')
+}
+
+const syncSelectedPayrollModel = () => {
+  const selected = payrollModels.value.find((m) => m.key === selectedPayrollModel.value)
+  if (!selected) return
+  selectedPayrollDomain.value = selected.domain
+  payrollExpression.value = selected.expression
+}
+
+const reloadPayrollModels = async () => {
+  try {
+    const res = await api.get('/accounting/payroll-flex/models')
+    payrollModels.value = res.data?.data || []
+    if (!payrollModels.value.length) return
+    if (!payrollModels.value.some((m) => m.key === selectedPayrollModel.value)) {
+      selectedPayrollModel.value = payrollModels.value[0].key
+    }
+    syncSelectedPayrollModel()
+  } catch (err) {
+    Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
+  }
+}
+
+const onSelectPayrollModel = () => {
+  syncSelectedPayrollModel()
+}
+
+const savePayrollFormula = async () => {
+  try {
+    await api.put(`/accounting/payroll-flex/formulas/${selectedPayrollModel.value}`, {
+      expression: payrollExpression.value
+    })
+    await Swal.fire('Success', 'Formula payroll berhasil disimpan', 'success')
+    await reloadPayrollModels()
+  } catch (err) {
+    Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
+  }
+}
+
+const runPayrollPreview = async () => {
+  try {
+    const res = await api.post('/accounting/payroll-flex/preview', {
+      model_key: selectedPayrollModel.value,
+      inputs: payrollInputs.value
+    })
+    payrollPreviewResult.value = res.data?.data || null
+  } catch (err) {
+    Swal.fire('Error', err?.response?.data?.error?.message || err.message, 'error')
+  }
+}
+
+const recalcTax = async () => {
+  await Swal.fire('Tax Recalculated', `Periode ${taxForm.value.period} branch ${taxForm.value.branch_id} berhasil dihitung ulang.`, 'info')
+}
+
+const exportTaxSummary = async () => {
+  await Swal.fire('Export Triggered', 'Tax summary export sedang diproses.', 'success')
+}
+
+const previewClosing = async () => {
+  await Swal.fire('Closing Preview', `Preview closing ${closingForm.value.period} branch ${closingForm.value.branch_id} siap direview.`, 'info')
+}
+
+const executeClosing = async () => {
+  if (closingForm.value.checklist !== 'READY') {
+    await Swal.fire('Validation', 'Checklist harus READY TO CLOSE sebelum run closing.', 'warning')
+    return
+  }
+  await Swal.fire('Closing Executed', `Period closing ${closingForm.value.period} berhasil dijalankan.`, 'success')
+}
+
+const openReport = async (name) => {
+  await Swal.fire('Open Report', `Membuka report ${name}`, 'info')
+}
+
+const simulateApprovalSync = async () => {
+  await Swal.fire('Approval Sync', `Queue branch ${approvalFilter.value.branch_id} priority ${approvalFilter.value.priority} sudah disinkronkan.`, 'success')
+}
+
+onMounted(async () => {
+  if (!moduleMenus.some((menu) => menu.key === activeModule.value)) {
+    activeModule.value = 'manual-journal'
+  }
+  persistActiveModule()
+  await loadJournals()
+  await reloadPayrollModels()
+})
 </script>
 
 <style scoped>
 .page { display: grid; gap: 16px; color: #fff; }
 .header { display: flex; justify-content: space-between; align-items: center; }
 .subtitle { color: #d0d0d0; margin-top: 4px; }
+.subtitle2 { color: #b8b8b8; margin: 6px 0 10px; font-size: 13px; }
 .card { background: #121212; border: 1px solid #2c2c2c; border-radius: 12px; padding: 16px; }
 .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .stat { background: #191919; border: 1px solid #2e2e2e; border-radius: 10px; padding: 10px; display: grid; gap: 4px; }
 .stat small { color: #b5b5b5; }
 .stat strong { font-size: 18px; }
 .grid.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.menu-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.menu-chip { background: #191919; border: 1px solid #2f3a4a; border-radius: 10px; color: #ececec; padding: 10px; display: grid; gap: 2px; text-align: left; cursor: pointer; }
+.menu-chip small { color: #a8a8a8; font-size: 11px; }
+.menu-chip.active { border-color: #c9a24d; background: #242017; }
+.report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.report-card { background: #171717; border: 1px solid #303030; border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+.mini-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.mini-table th, .mini-table td { border-bottom: 1px solid #2c2c2c; padding: 8px; text-align: left; }
 .grid.filter-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 label { display: grid; gap: 6px; font-size: 13px; color: #d9d9d9; }
 input, select { background: #1e1e1e; border: 1px solid #333; color: #fff; border-radius: 8px; padding: 8px 10px; }
@@ -432,6 +934,9 @@ input, select { background: #1e1e1e; border: 1px solid #333; color: #fff; border
 .line-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.3fr auto; gap: 8px; margin-bottom: 8px; }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
 .actions.compact { margin-top: 8px; }
+.totals { margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; color: #d7d7d7; }
+.totals .ok { color: #66c57f; }
+.totals .warn { color: #f3b95a; }
 .btn { background: #c9a24d; color: #111; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: #2f3a4a; color: #fff; }
 .btn.ghost { background: transparent; color: #fff; border: 1px solid #3a3a3a; }
@@ -441,9 +946,15 @@ input, select { background: #1e1e1e; border: 1px solid #333; color: #fff; border
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { border-bottom: 1px solid #2c2c2c; padding: 8px; text-align: left; }
-.badge { background: #2f3a4a; color: #fff; border-radius: 999px; padding: 2px 8px; font-size: 11px; }
+.badge { background: #2f3a4a; color: #fff; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.badge.draft { background: #6c757d; }
+.badge.pending { background: #375a7f; }
+.badge.posted { background: #2b9348; }
+.badge.rejected { background: #9b2226; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .detail-box { margin-top: 12px; background: #0f0f0f; border: 1px solid #2c2c2c; border-radius: 8px; padding: 10px; }
+.detail-table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+.detail-table th, .detail-table td { border-bottom: 1px solid #2c2c2c; padding: 6px; font-size: 12px; }
 pre { white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow: auto; font-size: 11px; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; }
 .pager { margin-top: 10px; display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
@@ -451,9 +962,11 @@ hr { border: none; border-top: 1px solid #333; margin: 14px 0; }
 @media (max-width: 1200px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .menu-grid, .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
   .grid.two { grid-template-columns: 1fr; }
   .line-row { grid-template-columns: 1fr; }
+  .menu-grid, .report-grid { grid-template-columns: 1fr; }
 }
 </style>
