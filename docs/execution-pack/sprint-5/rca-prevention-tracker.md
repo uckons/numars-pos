@@ -2,4 +2,4 @@
 
 | Incident/Issue | Root Cause | Preventive Action | Owner | ETA | Status |
 |---|---|---|---|---|---|
-|  |  |  |  |  | Open |
+| Queue latency spike (handover S4) | Retry burst saat reconnect Redis | Tambah exponential backoff + retry cap | Eng | 2026-03-02 | In Progress |
