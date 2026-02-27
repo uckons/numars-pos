@@ -946,7 +946,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page { display: grid; gap: 16px; color: #fff; }
+.page { display: grid; gap: 16px; color: #fff; padding: 18px 20px 24px; box-sizing: border-box; }
 .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
 .subtitle { color: #d0d0d0; margin-top: 4px; }
@@ -997,6 +997,10 @@ pre { white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow
 .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; }
 .pager { margin-top: 10px; display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
 hr { border: none; border-top: 1px solid #333; margin: 14px 0; }
+
+@media (max-width: 640px) {
+  .page { padding: 12px; }
+}
 @media (max-width: 1200px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
