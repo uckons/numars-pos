@@ -3,7 +3,7 @@
     <aside class="sidebar">
       <h2>MANAGER</h2>
       <nav>
-        <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
+        <button class="nav-btn" :class="{active:tab==='report'}" @click="openFinanceReport()"><ChartNoAxesColumn size="18" /> Finance Report</button>
         <button class="nav-btn" :class="{active:tab==='profile'}" @click="tab='profile'"><User size="18" /> Profile</button>
         <button class="nav-btn" @click="openAccountingUAT()"><ScrollText size="18" /> Accounting UAT (Full Page)</button>
         <button class="nav-btn" @click="openPayrollFlex()"><Calculator size="18" /> Payroll Flex Engine</button>
@@ -184,6 +184,12 @@ const auth = useAuthStore()
 const router = useRouter()
 
 
+
+const openFinanceReport = async () => {
+  tab.value = 'report'
+  await loadReport()
+}
+
 const openAccountingUAT = () => {
   localStorage.setItem('accountingUAT.activeModule', 'manual-journal')
   router.push('/manager/accounting-uat?module=manual-journal')
@@ -220,17 +226,24 @@ const loadReport = async () => {
 }
 
 
-onMounted(() => {
+onMounted(async () => {
   const today = new Date()
   const first = new Date(today.getFullYear(), today.getMonth(), 1)
   const firstISO = first.toISOString().slice(0, 10)
   dateFrom.value = firstISO
   dateTo.value = today.toISOString().slice(0, 10)
-  loadReport()
+  tab.value = 'report'
+  await loadReport()
 })
 
 watch([selectedBranch, dateFrom, dateTo, ordersPageSize], () => {
   ordersPage.value = 1
+})
+
+watch(tab, async (value) => {
+  if (value !== 'report') return
+  if (loading.value) return
+  await loadReport()
 })
 
 const filteredOrders = computed(() => orders.value.filter((o) => {
