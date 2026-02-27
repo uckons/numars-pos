@@ -29,6 +29,7 @@ Fokus Sprint 5 adalah memperkuat reliability operasional, observability, dan gov
 - Reconciliation automation plan (`recon-automation-plan.md`).
 - Cutover guardrails change policy (`change-guardrails.md`).
 - Exit criteria & BAU+ acceptance (`exit-criteria.md`).
+- Next-phase 72h execution plan (`next-phase-72h-execution-plan.md`).
 
 ## Entry Criteria
 
@@ -44,3 +45,9 @@ Fokus Sprint 5 adalah memperkuat reliability operasional, observability, dan gov
 - Runbook insiden dan rollback tervalidasi melalui drill.
 - SLO/SLI dan alert policy disetujui Engineering + Ops + Finance.
 - Backlog hardening prioritas tinggi selesai sesuai komitmen sprint.
+
+## Current Execution Status
+
+- Sprint 5 masuk fase next-phase execution (72h).
+- Prioritas aktif: P0 hardening, recon automation run, dan lock SLO/SLI sementara.
+- Referensi eksekusi: `next-phase-72h-execution-plan.md`.

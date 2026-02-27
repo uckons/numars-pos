@@ -1,5 +1,10 @@
 # Sprint 5 Task Board Harian (D1–D10)
 
+## Status Update Terbaru
+- Next phase 72h: **Started**.
+- Fokus aktif: P0 hardening + recon automation + alert governance.
+- Checkpoint berikutnya: H+72 GO/HOLD decision.
+
 ## D1 — Sprint 5 Kickoff & Scope Lock
 - Finalisasi objective Sprint 5 (reliability, hardening, BAU optimization).
 - Lock owner matrix lintas fungsi (Eng, Ops, QA, Finance).
