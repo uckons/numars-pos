@@ -55,3 +55,8 @@ Fokus Sprint 5 adalah memperkuat reliability operasional, observability, dan gov
 - Keputusan H+72: `next-phase-h72-decision-2026-03-03.md`.
 - Closure evidence: `closure-gate-minutes-2026-03-05.md`.
 - Sprint 6 readiness: **READY**.
+
+## Next Sprint
+
+- Sprint 6 kickoff docs tersedia di `../sprint-6/README.md`.
+- Fokus lanjutan: scale readiness, observability product-grade, dan governance maturity.
