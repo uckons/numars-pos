@@ -662,6 +662,22 @@ const loadRooms = async () => {
   }
 }
 
+const getUndeliveredFnbItems = (order) => {
+  const items = Array.isArray(order?.items) ? order.items : []
+  return items.filter((item) => Boolean(item?.is_fnb) && Number(item?.qty || 0) > 0 && !Boolean(item?.is_delivered))
+}
+
+const showFnbDeliveryGuardAlert = async () => {
+  await Swal.fire({
+    icon: 'error',
+    title: 'Pembayaran Gagal',
+    text: 'Pembayaran Gagal, masih ada item FNB yang belum dideliver oleh BAR, Check ke BAR terlebih dahulu untuk deliver Item!',
+    confirmButtonColor: '#c9a24d',
+    background: '#111',
+    color: '#fff'
+  })
+}
+
 // 🔄 WATCH FILTERS - RESET PAGE
 watch(filters, () => {
   pagination.value.page = 1
@@ -670,6 +686,11 @@ watch(filters, () => {
 
 // 💳 CONFIRM PAY
 const confirmPay = async (order) => {
+  if (getUndeliveredFnbItems(order).length > 0) {
+    await showFnbDeliveryGuardAlert()
+    return
+  }
+
   const res = await Swal.fire({
     title: "Checkout Order?",
     text: `Order #${order.id} akan dibayar`,
@@ -731,6 +752,16 @@ const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount, paymentMethod
 
 const paySelectedOrders = async () => {
   if (selectedOrderIds.value.length === 0) return
+
+  const selectedDraftOrders = orders.value.filter((order) =>
+    order.status === 'DRAFT' && selectedOrderIds.value.includes(Number(order.id))
+  )
+  const hasUndeliveredFnb = selectedDraftOrders.some((order) => getUndeliveredFnbItems(order).length > 0)
+
+  if (hasUndeliveredFnb) {
+    await showFnbDeliveryGuardAlert()
+    return
+  }
 
   const confirm = await Swal.fire({
     title: 'Bayar gabungan?',

@@ -358,31 +358,80 @@ const deliver = async (id, fromModal = false) => {
 }
 
 const cancel = async (id, fromModal = false) => {
+  const targetOrder = selectedInboxOrder.value?.id === id
+    ? selectedInboxOrder.value
+    : barInbox.value.find((item) => Number(item.id) === Number(id))
+  const snapshotItems = Array.isArray(targetOrder?.items_snapshot) ? targetOrder.items_snapshot : []
+
+  if (!snapshotItems.length) {
+    await Swal.fire({ icon: 'warning', title: 'Item inbox kosong' })
+    return
+  }
+
+  const html = `
+    <div style="text-align:left;display:grid;gap:10px;max-height:260px;overflow:auto;">
+      ${snapshotItems.map((item, index) => `
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <input id="cancel-check-${index}" type="checkbox" style="margin-top:6px;transform:scale(1.2);" />
+          <div>
+            <strong>${item.service_name}</strong><br/>
+            <small>Qty kirim: ${Number(item.qty || 0)}</small>
+          </div>
+        </label>
+      `).join('')}
+    </div>
+    <textarea id="cancel-note" class="swal2-textarea" placeholder="Alasan cancel (wajib), contoh: stok habis / item tidak tersedia" style="margin-top:12px;"></textarea>
+    <small style="color:#999;display:block;line-height:1.45;margin-top:6px;">Item yang tidak dicancel akan tetap dikirim (delivered) otomatis.</small>
+  `
+
   const confirm = await Swal.fire({
-    icon: "warning",
-    title: "Batalkan item tambahan?",
-    input: "textarea",
-    inputLabel: "Alasan cancel",
-    inputPlaceholder: "Contoh: stok habis / item tidak tersedia",
-    inputValue: "",
-    inputAttributes: { maxlength: 300 },
-    text: "Yang dibatalkan hanya item tambahan dari inbox ini.",
+    icon: 'warning',
+    title: 'Pilih item yang dicancel',
+    html,
+    focusConfirm: false,
     showCancelButton: true,
-    confirmButtonText: "Ya, batalkan",
-    cancelButtonText: "Kembali",
-    inputValidator: (value) => {
-      if (!String(value || "").trim()) return "Alasan cancel wajib diisi"
-      return null
+    confirmButtonText: 'Proses cancel',
+    cancelButtonText: 'Kembali',
+    preConfirm: () => {
+      const note = String(document.getElementById('cancel-note')?.value || '').trim()
+      if (!note) {
+        Swal.showValidationMessage('Alasan cancel wajib diisi')
+        return false
+      }
+
+      const cancelledItems = snapshotItems
+        .filter((_, index) => Boolean(document.getElementById(`cancel-check-${index}`)?.checked))
+        .map((item) => ({
+          service_id: Number(item.service_id || 0),
+          qty: Math.max(0, Number(item.qty || 0))
+        }))
+        .filter((item) => item.service_id > 0 && item.qty > 0)
+
+      if (!cancelledItems.length) {
+        Swal.showValidationMessage('Checklist minimal 1 item untuk dicancel')
+        return false
+      }
+
+      return { note, cancelled_items: cancelledItems }
     }
   })
+
   if (!confirm.isConfirmed) return
 
-  const note = String(confirm.value || "").trim()
-  await api.post(`/orders/bar/${id}/cancel`, { note })
-  await loadAll({ silent: true })
-  await Swal.fire({ icon: "success", title: "Item tambahan dibatalkan" })
+  const payload = confirm.value || {}
+  try {
+    await api.post(`/orders/bar/${id}/cancel`, payload)
+    await loadAll({ silent: true })
+    await Swal.fire({ icon: 'success', title: 'Cancel diproses', text: 'Item yang tidak dicancel tetap delivered.' })
 
-  if (fromModal) closeInboxDetail()
+    if (fromModal) closeInboxDetail()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Cancel gagal',
+      text: err.response?.data?.message || err.message || 'Gagal memproses cancel item'
+    })
+  }
 }
 
 
