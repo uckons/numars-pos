@@ -27,6 +27,45 @@ const ensureGradeCommissionStorage = async (db) => {
   `)
 }
 
+
+const ensureTherapistAttendanceTable = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS therapist_attendance (
+      id SERIAL PRIMARY KEY,
+      therapist_id INT NOT NULL REFERENCES therapists(id) ON DELETE CASCADE,
+      branch_id INT NOT NULL,
+      business_date DATE NOT NULL,
+      status VARCHAR(20) NOT NULL,
+      pin_input VARCHAR(50),
+      updated_by INT,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (therapist_id, business_date)
+    )
+  `)
+}
+
+const getBusinessDateForBranch = async (db, branchId) => {
+  const { rows } = await db.query(
+    `WITH cfg AS (
+       SELECT
+         COALESCE(open_time, '10:00:00'::time) AS open_time,
+         COALESCE(close_time, '03:00:00'::time) AS close_time,
+         timezone('Asia/Jakarta', NOW()) AS now_jkt
+       FROM branches
+       WHERE id = $1
+     )
+     SELECT
+       CASE
+         WHEN cfg.close_time <= cfg.open_time AND cfg.now_jkt::time < cfg.close_time THEN (cfg.now_jkt::date - INTERVAL '1 day')::date
+         ELSE cfg.now_jkt::date
+       END AS business_date
+     FROM cfg`,
+    [branchId]
+  )
+
+  return rows[0]?.business_date || null
+}
+
 const resolveGradeCommissionExpression = async (db) => {
   const { rows } = await db.query(`
     SELECT EXISTS (
@@ -179,6 +218,91 @@ exports.getTherapist = async (req, res) => {
     res.json(rows[0])
   } catch (err) {
     console.error("GET THERAPIST ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.getTherapistAttendance = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureTherapistAttendanceTable(db)
+
+    const branchId = req.user?.branch_id
+    const businessDate = await getBusinessDateForBranch(db, branchId)
+
+    const { rows } = await db.query(
+      `SELECT
+         t.id,
+         t.name,
+         t.active,
+         COALESCE(ta.status, 'OFF') AS attendance_status,
+         ta.updated_at
+       FROM therapists t
+       LEFT JOIN therapist_attendance ta
+         ON ta.therapist_id = t.id
+        AND ta.business_date = $2::date
+       WHERE t.branch_id = $1
+         AND t.active = true
+       ORDER BY t.name ASC`,
+      [branchId, businessDate]
+    )
+
+    res.json({
+      business_date: businessDate,
+      data: rows
+    })
+  } catch (err) {
+    console.error('GET THERAPIST ATTENDANCE ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.setTherapistAttendance = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureTherapistAttendanceTable(db)
+
+    const therapistId = Number(req.params.id)
+    const status = String(req.body?.status || '').trim().toUpperCase()
+    const pinInput = String(req.body?.pin || '').trim()
+
+    if (!Number.isInteger(therapistId) || therapistId <= 0) {
+      return res.status(400).json({ message: 'Therapist tidak valid' })
+    }
+    if (!['MASUK', 'OFF', 'CLOSE'].includes(status)) {
+      return res.status(400).json({ message: 'Status absensi tidak valid' })
+    }
+    if ((status === 'MASUK' || status === 'CLOSE') && !pinInput) {
+      return res.status(400).json({ message: 'PIN wajib diisi untuk status MASUK/CLOSE' })
+    }
+
+    const branchId = req.user?.branch_id
+    const businessDate = await getBusinessDateForBranch(db, branchId)
+
+    const therapistRes = await db.query(
+      `SELECT id FROM therapists WHERE id = $1 AND branch_id = $2 AND active = true`,
+      [therapistId, branchId]
+    )
+    if (!therapistRes.rows.length) {
+      return res.status(404).json({ message: 'Terapis tidak ditemukan' })
+    }
+
+    const { rows } = await db.query(
+      `INSERT INTO therapist_attendance (therapist_id, branch_id, business_date, status, pin_input, updated_by, updated_at)
+       VALUES ($1, $2, $3::date, $4, $5, $6, NOW())
+       ON CONFLICT (therapist_id, business_date)
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         pin_input = EXCLUDED.pin_input,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()
+       RETURNING therapist_id, business_date, status, updated_at`,
+      [therapistId, branchId, businessDate, status, pinInput || null, req.user?.id || null]
+    )
+
+    res.json({ success: true, attendance: rows[0] })
+  } catch (err) {
+    console.error('SET THERAPIST ATTENDANCE ERROR:', err)
     res.status(500).json({ message: err.message })
   }
 }
