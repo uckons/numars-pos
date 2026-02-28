@@ -563,6 +563,89 @@ const askPaymentDetails = async () => {
   return res.value
 }
 
+
+const showFnbDeliveryGuardAlert = async () => {
+  await SwalTheme.fire({
+    icon: 'error',
+    title: 'Pembayaran Gagal',
+    text: 'Pembayaran Gagal, masih ada item FNB yang belum dideliver oleh BAR, Check ke BAR terlebih dahulu untuk deliver Item!',
+    confirmButtonText: 'OK'
+  })
+}
+
+
+const showSaveDraftFirstAlert = async () => {
+  await SwalTheme.fire({
+    icon: 'warning',
+    title: 'Verifikasi Order',
+    text: 'masukan ke draft dulu untuk verifikasi order',
+    confirmButtonText: 'OK'
+  })
+}
+
+const getResolvedCartServiceId = (item) => Number(item?.variant_service_id || item?.id || 0)
+const getResolvedOrderServiceId = (item) => Number(item?.resolved_service_id || item?.variant_service_id || item?.service_id || 0)
+
+const mapQtyByResolvedService = (rows = [], resolver = () => 0) => {
+  const qtyMap = new Map()
+  for (const row of rows) {
+    const resolvedId = Number(resolver(row) || 0)
+    if (!(resolvedId > 0)) continue
+    const qty = Number(row?.qty || 0)
+    qtyMap.set(resolvedId, (qtyMap.get(resolvedId) || 0) + qty)
+  }
+  return qtyMap
+}
+
+const hasUnsyncedCartChanges = (orderItems = []) => {
+  const orderQtyMap = mapQtyByResolvedService(Array.isArray(orderItems) ? orderItems : [], getResolvedOrderServiceId)
+  const cartQtyMap = mapQtyByResolvedService(items.value || [], getResolvedCartServiceId)
+
+  if (orderQtyMap.size !== cartQtyMap.size) return true
+  for (const [serviceId, qty] of cartQtyMap.entries()) {
+    if (Number(orderQtyMap.get(serviceId) || 0) !== Number(qty || 0)) return true
+  }
+
+  return false
+}
+
+const guardCheckoutByBarDelivery = async () => {
+  if (!pos.currentOrderId) {
+    if ((items.value || []).length > 0) {
+      await showSaveDraftFirstAlert()
+      return false
+    }
+    return true
+  }
+
+  try {
+    const { data } = await api.get(`/orders/${pos.currentOrderId}`)
+    const orderItems = Array.isArray(data?.items) ? data.items : []
+
+    if (hasUnsyncedCartChanges(orderItems)) {
+      await showSaveDraftFirstAlert()
+      return false
+    }
+
+    const hasUndeliveredFnb = orderItems.some((item) => Boolean(item?.is_fnb) && !Boolean(item?.is_delivered))
+
+    if (hasUndeliveredFnb) {
+      await showFnbDeliveryGuardAlert()
+      return false
+    }
+
+    return true
+  } catch (err) {
+    await SwalTheme.fire({
+      icon: 'error',
+      title: 'Gagal',
+      text: err.response?.data?.message || err.message || 'Gagal validasi status delivery BAR',
+      confirmButtonText: 'OK'
+    })
+    return false
+  }
+}
+
 const buildDraftReceiptPreview = (payment) => {
   const subtotal = Math.round(Number(grandTotal.value || 0))
   const discount = Math.max(0, Math.round(Number(payment?.discount_amount || 0)))
@@ -625,6 +708,9 @@ const checkout = async () => {
     })
     return
   }
+
+  const canCheckout = await guardCheckoutByBarDelivery()
+  if (!canCheckout) return
 
   const payment = await askPaymentDetails()
   if (!payment) return
