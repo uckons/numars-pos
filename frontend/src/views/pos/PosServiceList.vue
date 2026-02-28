@@ -322,7 +322,12 @@ const chooseTherapistForService = async (service) => {
     return undefined
   }
 
-  const options = therapists.map((t) => `<option value="${t.id}">${t.name}${t.grade_name ? ` (${t.grade_name})` : ''}</option>`).join('')
+  const options = therapists.map((t) => {
+  const attendance = String(t.attendance_status || '').toUpperCase()
+  const disabled = attendance === 'CLOSE'
+  const suffix = [t.grade_name ? ` (${t.grade_name})` : '', attendance ? ` - ${attendance}` : ''].join('')
+  return `<option value="${t.id}" ${disabled ? 'disabled' : ''}>${t.name}${suffix}</option>`
+}).join('')
   const pick = await Swal.fire({
     title: `Pilih Terapis - ${service.name}`,
     html: `<select id="service-therapist-select" class="swal2-select"><option value="">-- Pilih Terapis --</option>${options}</select>`,
@@ -340,6 +345,10 @@ const chooseTherapistForService = async (service) => {
       const selected = therapists.find((t) => Number(t.id) === id)
       if (!selected) {
         Swal.showValidationMessage('Terapis tidak valid')
+        return false
+      }
+      if (String(selected.attendance_status || '').toUpperCase() === 'CLOSE') {
+        Swal.showValidationMessage('Terapis status CLOSE tidak bisa dipilih')
         return false
       }
       return { id: Number(selected.id), name: selected.name }

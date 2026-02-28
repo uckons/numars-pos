@@ -968,6 +968,45 @@ exports.createFromOrder = async (req, res) => {
 
 // NEW ENDPOINTS FOR TIMER MODAL
 
+
+const ensureTherapistAttendanceTable = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS therapist_attendance (
+      id SERIAL PRIMARY KEY,
+      therapist_id INT NOT NULL REFERENCES therapists(id) ON DELETE CASCADE,
+      branch_id INT NOT NULL,
+      business_date DATE NOT NULL,
+      status VARCHAR(20) NOT NULL,
+      pin_input VARCHAR(50),
+      updated_by INT,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (therapist_id, business_date)
+    )
+  `)
+}
+
+const getBusinessDateForBranch = async (db, branchId) => {
+  const { rows } = await db.query(
+    `WITH cfg AS (
+       SELECT
+         COALESCE(open_time, '10:00:00'::time) AS open_time,
+         COALESCE(close_time, '03:00:00'::time) AS close_time,
+         timezone('Asia/Jakarta', NOW()) AS now_jkt
+       FROM branches
+       WHERE id = $1
+     )
+     SELECT
+       CASE
+         WHEN cfg.close_time <= cfg.open_time AND cfg.now_jkt::time < cfg.close_time THEN (cfg.now_jkt::date - INTERVAL '1 day')::date
+         ELSE cfg.now_jkt::date
+       END AS business_date
+     FROM cfg`,
+    [branchId]
+  )
+
+  return rows[0]?.business_date || null
+}
+
 /**
  * GET /api/timers/therapists?branch_id=X&service_type=SPA
  * Fetch active therapists from database
@@ -975,13 +1014,18 @@ exports.createFromOrder = async (req, res) => {
 exports.getTherapists = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureTherapistAttendanceTable(db)
+
     const branch_id = req.query.branch_id || req.user.branch_id
-    let query = `
+    const businessDate = await getBusinessDateForBranch(db, branch_id)
+
+    const query = `
       SELECT 
         t.id,
         t.name,
         t.grade_id,
         tg.name AS grade_name,
+        COALESCE(ta.status, 'OFF') AS attendance_status,
         CASE
           WHEN EXISTS (
             SELECT 1
@@ -993,12 +1037,16 @@ exports.getTherapists = async (req, res) => {
         END AS is_occupied
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+      LEFT JOIN therapist_attendance ta
+        ON ta.therapist_id = t.id
+       AND ta.business_date = $2::date
       WHERE t.active = true
         AND t.branch_id = $1
+        AND COALESCE(ta.status, 'OFF') <> 'OFF'
       ORDER BY t.name ASC
     `
 
-    const { rows } = await db.query(query, [branch_id])
+    const { rows } = await db.query(query, [branch_id, businessDate])
     res.json(rows)
   } catch (err) {
     console.error("GET THERAPISTS ERROR:", err)

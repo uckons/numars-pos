@@ -64,17 +64,18 @@
             <th>Komisi</th>
             <th>Cabang</th>
             <th>Status</th>
+            <th>PIN Absensi</th>
             <th>Aksi</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="7" class="loading">
+            <td colspan="8" class="loading">
               Loading...
             </td>
           </tr>
           <tr v-else-if="therapists.length === 0">
-            <td colspan="7" class="empty">
+            <td colspan="8" class="empty">
               Tidak ada data terapis
             </td>
           </tr>
@@ -91,6 +92,11 @@
             <td>
               <span class="status" :class="therapist.active ? 'status-active' : 'status-inactive'">
                 {{ therapist.active ? 'Aktif' : 'Tidak Aktif' }}
+              </span>
+            </td>
+            <td>
+              <span class="status" :class="therapist.has_attendance_pin ? 'status-active' : 'status-inactive'">
+                {{ therapist.has_attendance_pin ? 'Sudah Diset' : 'Belum Diset' }}
               </span>
             </td>
             <td class="actions">
@@ -151,6 +157,16 @@
               placeholder="Nama lengkap terapis"
               required
             />
+          </div>
+
+          <div class="form-group">
+            <label>PIN Absensi</label>
+            <input
+              type="password"
+              v-model="form.attendance_pin"
+              placeholder="Minimal 4 karakter (kosongkan untuk reset)"
+            />
+            <small class="help-text">Digunakan saat status MASUK/CLOSE di dashboard kasir.</small>
           </div>
 
           <div class="form-group">
@@ -229,7 +245,8 @@ const form = ref({
   name: '',
   grade_id: '',
   branch_id: '',
-  active: true
+  active: true,
+  attendance_pin: ''
 })
 
 let searchTimeout = null
@@ -342,7 +359,8 @@ const openAddModal = () => {
     name: '',
     grade_id: '',
     branch_id: '',
-    active: true
+    active: true,
+    attendance_pin: ''
   }
   showModal.value = true
 }
@@ -355,7 +373,8 @@ const openEditModal = (therapist) => {
     name: therapist.name,
     grade_id: therapist.grade_id,
     branch_id: therapist.branch_id,
-    active: therapist.active
+    active: therapist.active,
+    attendance_pin: ''
   }
   showModal.value = true
 }
@@ -367,7 +386,8 @@ const closeModal = () => {
     name: '',
     grade_id: '',
     branch_id: '',
-    active: true
+    active: true,
+    attendance_pin: ''
   }
 }
 
@@ -378,6 +398,7 @@ const submitForm = async () => {
 
     if (isEdit.value) {
       await api.put(`/therapists/${form.value.id}`, form.value)
+      closeModal()
       await SwalTheme.fire({
         icon: 'success',
         title: 'Berhasil',
@@ -387,6 +408,7 @@ const submitForm = async () => {
       })
     } else {
       await api.post('/therapists', form.value)
+      closeModal()
       await SwalTheme.fire({
         icon: 'success',
         title: 'Berhasil',
@@ -396,7 +418,6 @@ const submitForm = async () => {
       })
     }
 
-    closeModal()
     fetchTherapists()
   } catch (err) {
     console.error('Submit form error:', err)
@@ -570,6 +591,11 @@ onMounted(() => {
   color: #fff;
   font-size: 14px;
   min-width: 150px;
+}
+
+.help-text {
+  color: #888;
+  font-size: 12px;
 }
 
 .filter-group select:focus,
@@ -870,6 +896,11 @@ onMounted(() => {
 
 .modal-actions .btn {
   flex: 1;
+}
+
+/* keep alerts above edit modal overlay */
+:deep(.swal2-container) {
+  z-index: 20000 !important;
 }
 
 /* ===== SWEETALERT DARK THEME ===== */
