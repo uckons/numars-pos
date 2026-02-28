@@ -191,38 +191,17 @@ exports.kasirAnalytics = async (user, query = {}) => {
     close_time: schedule.close_time
   })
 
-  const scopedOrderCte = `WITH branch_schedule AS (
-      SELECT
-        COALESCE(open_time, '10:00:00'::time) AS open_time,
-        COALESCE(close_time, '03:00:00'::time) AS close_time
-      FROM branches
-      WHERE id = $1
-    ),
-    business_windows AS (
-      SELECT
-        day::date AS business_date,
-        (day::timestamp + bs.open_time) AS window_start,
-        CASE
-          WHEN bs.close_time <= bs.open_time THEN (day::timestamp + INTERVAL '1 day' + bs.close_time)
-          ELSE (day::timestamp + bs.close_time)
-        END AS window_end
-      FROM branch_schedule bs
-      CROSS JOIN LATERAL generate_series(($2::date - INTERVAL '1 day')::timestamp, $3::date::timestamp, INTERVAL '1 day') AS day
-    ),
-    orders_scoped AS (
+  const scopedOrderCte = `WITH orders_scoped AS (
       SELECT
         o.id,
         o.total,
         o.created_at,
-        bw.business_date
+        timezone('Asia/Jakarta', o.created_at)::date AS business_date
       FROM orders o
-      JOIN business_windows bw
-        ON o.created_at >= bw.window_start
-       AND o.created_at < bw.window_end
       WHERE o.status = 'PAID'
         AND o.branch_id = $1
-        AND bw.business_date >= $2::date
-        AND bw.business_date < $3::date
+        AND timezone('Asia/Jakarta', o.created_at)::date >= $2::date
+        AND timezone('Asia/Jakarta', o.created_at)::date < $3::date
     )`
 
   const summaryRes = await db.query(
