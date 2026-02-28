@@ -51,7 +51,38 @@
         📨 Inbox Bar
         <span v-if="unreadBarCount" class="notif-dot">{{ unreadBarCount }}</span>
       </router-link>
+
+      <button class="action attendance-action" type="button" @click="showAttendanceModal = true">
+        👥 Absensi Terapis
+      </button>
     </section>
+
+    <div v-if="showAttendanceModal" class="attendance-modal-backdrop" @click.self="showAttendanceModal = false">
+      <section class="attendance-modal card-panel">
+        <div class="attendance-head">
+          <div>
+            <h3>Absensi Terapis</h3>
+            <small v-if="attendanceBusinessDate">Tanggal bisnis: {{ attendanceBusinessDate }}</small>
+          </div>
+          <button class="btn-close-modal" @click="showAttendanceModal = false">✕</button>
+        </div>
+        <div v-if="!therapistAttendance.length" class="empty">Belum ada data terapis.</div>
+        <div v-else class="attendance-list">
+          <div v-for="t in therapistAttendance" :key="t.id" class="attendance-row">
+            <div class="attendance-name">
+              <strong>{{ t.name }}</strong>
+              <span class="badge" :class="`badge-${String(t.attendance_status || 'OFF').toLowerCase()}`">{{ t.attendance_status || 'OFF' }}</span>
+              <small v-if="!t.has_attendance_pin" class="pin-warning">PIN belum diset</small>
+            </div>
+            <div class="attendance-actions">
+              <button class="btn-state masuk" :disabled="isAttendanceButtonDisabled(t, 'MASUK')" @click="setTherapistAttendance(t, 'MASUK')">MASUK</button>
+              <button class="btn-state off" :disabled="isAttendanceButtonDisabled(t, 'OFF')" @click="setTherapistAttendance(t, 'OFF')">OFF</button>
+              <button class="btn-state close" :disabled="isAttendanceButtonDisabled(t, 'CLOSE')" @click="setTherapistAttendance(t, 'CLOSE')">CLOSE</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
 
  
     <!-- TIMER GRID (AMAN) -->
@@ -101,6 +132,11 @@ const stats = ref({
   todayRevenue: 0,
   activeTherapists: 0
 })
+
+const therapistAttendance = ref([])
+const attendanceBusinessDate = ref('')
+const showAttendanceModal = ref(false)
+let attendanceInterval = null
 
 const barMessages = ref([])
 const unreadBarCount = computed(() => barMessages.value.filter(m => !m.is_read).length)
@@ -373,6 +409,80 @@ const showUnreadBarRepopup = async () => {
   }
 }
 
+const loadTherapistAttendance = async () => {
+  try {
+    const { data } = await api.get('/therapists/attendance')
+    therapistAttendance.value = Array.isArray(data?.data) ? data.data : []
+    attendanceBusinessDate.value = data?.business_date || ''
+  } catch (err) {
+    console.error('Gagal load absensi terapis', err)
+    therapistAttendance.value = []
+  }
+}
+
+const isAttendanceButtonDisabled = (therapist, targetStatus) => {
+  const current = String(therapist?.attendance_status || 'OFF').toUpperCase()
+  const target = String(targetStatus || '').toUpperCase()
+
+  if (current === 'MASUK') {
+    if (target === 'MASUK' || target === 'OFF') return true
+    return false
+  }
+  if (current === 'OFF') {
+    if (target === 'OFF' || target === 'CLOSE') return true
+    return false
+  }
+  if (current === 'CLOSE') {
+    if (target === 'CLOSE') return true
+    return false
+  }
+  return !(target === 'MASUK' || target === 'OFF')
+}
+
+const setTherapistAttendance = async (therapist, targetStatus) => {
+  const status = String(targetStatus || '').toUpperCase()
+  let pin = ''
+
+  if ((status === 'MASUK' || status === 'CLOSE') && !therapist?.has_attendance_pin) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'PIN belum diset',
+      text: 'PIN absensi terapis diset di menu Master Terapis.'
+    })
+    return
+  }
+
+  if (status === 'MASUK' || status === 'CLOSE') {
+    const pinAsk = await Swal.fire({
+      title: `PIN ${status} - ${therapist?.name || 'Terapis'}`,
+      input: 'password',
+      inputLabel: 'Masukkan PIN',
+      inputPlaceholder: 'PIN',
+      showCancelButton: true,
+      confirmButtonText: 'Simpan',
+      cancelButtonText: 'Batal',
+      inputValidator: (value) => {
+        if (!String(value || '').trim()) return 'PIN wajib diisi'
+        return null
+      }
+    })
+
+    if (!pinAsk.isConfirmed) return
+    pin = String(pinAsk.value || '').trim()
+  }
+
+  try {
+    await api.post(`/therapists/attendance/${therapist.id}`, { status, pin: pin || undefined })
+    await loadTherapistAttendance()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal update absensi',
+      text: err.response?.data?.message || err.message || 'Terjadi kesalahan'
+    })
+  }
+}
+
 const formatMessageDate = (v) => new Date(v).toLocaleString('id-ID')
 
 onMounted(async () => {
@@ -396,6 +506,7 @@ Alasan: ${payload.note}` : (payload.message || "Update dari staff bar")
   await loadDashboard()
   await syncTimers()
   await loadBarMessages()
+  await loadTherapistAttendance()
   await showUnreadBarRepopup()
   
   // Start countdown interval (every 1 second)
@@ -407,6 +518,14 @@ Alasan: ${payload.note}` : (payload.message || "Update dari staff bar")
     await loadBarMessages()
     await showUnreadBarRepopup()
   }, BAR_MESSAGE_REFRESH_INTERVAL)
+
+  attendanceInterval = setInterval(async () => {
+    const prevBusinessDate = attendanceBusinessDate.value
+    await loadTherapistAttendance()
+    if (prevBusinessDate && attendanceBusinessDate.value && prevBusinessDate !== attendanceBusinessDate.value) {
+      await Swal.fire({ icon: 'info', title: 'Shift absensi terapis diperbarui', text: 'Tanggal bisnis baru dimulai sesuai jam tutup outlet.' })
+    }
+  }, 60000)
 })
 
 onUnmounted(() => {
@@ -414,6 +533,7 @@ onUnmounted(() => {
   if (countdownInterval) clearInterval(countdownInterval)
   if (apiRefreshInterval) clearInterval(apiRefreshInterval)
   if (barMessageInterval) clearInterval(barMessageInterval)
+  if (attendanceInterval) clearInterval(attendanceInterval)
 })
 
 </script>
@@ -575,6 +695,64 @@ onUnmounted(() => {
   justify-content: center;
   padding: 0 6px;
 }
+
+.attendance-action {
+  border: 1px solid #2d3640;
+}
+
+.attendance-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 64px 18px 18px;
+}
+
+.attendance-modal {
+  width: min(980px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+.btn-close-modal {
+  border: 1px solid #333;
+  background: #161616;
+  color: #eee;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+
+.card-panel {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 18px;
+}
+.attendance-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.attendance-head h3 { margin:0; font-size:16px; }
+.attendance-head small { color:#999; }
+.attendance-list { display:grid; gap:10px; }
+.attendance-row { display:flex; justify-content:space-between; align-items:center; border:1px solid #242424; border-radius:10px; padding:10px; }
+.attendance-name { display:flex; align-items:center; gap:8px; }
+.pin-warning { color:#f39c12; font-size:11px; font-weight:700; }
+.attendance-actions { display:flex; gap:8px; }
+.btn-state { border:none; border-radius:8px; padding:6px 10px; font-weight:700; cursor:pointer; }
+.btn-state.masuk { background:#1f8f4f; color:#fff; }
+.btn-state.off { background:#9a7d0a; color:#111; }
+.btn-state.close { background:#4d4d4d; color:#fff; }
+.btn-state:disabled { opacity:.45; cursor:not-allowed; }
+.badge { padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+.badge-masuk { background:#1f8f4f; color:#fff; }
+.badge-off { background:#9a7d0a; color:#111; }
+.badge-close { background:#4d4d4d; color:#fff; }
 
 /* ======================
    TIMERS
