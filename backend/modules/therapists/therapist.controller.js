@@ -44,6 +44,13 @@ const ensureTherapistAttendanceTable = async (db) => {
   `)
 }
 
+const ensureTherapistPinColumn = async (db) => {
+  await db.query(`
+    ALTER TABLE therapists
+    ADD COLUMN IF NOT EXISTS attendance_pin VARCHAR(50)
+  `)
+}
+
 const getBusinessDateForBranch = async (db, branchId) => {
   const { rows } = await db.query(
     `WITH cfg AS (
@@ -85,6 +92,7 @@ const resolveGradeCommissionExpression = async (db) => {
 exports.getTherapists = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureTherapistPinColumn(db)
     const { 
       page = 1, 
       limit = 25, 
@@ -157,6 +165,7 @@ exports.getTherapists = async (req, res) => {
         t.branch_id,
         t.grade_id,
         t.active,
+        (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
         tg.name AS grade_name,
         ${gradeCommissionExpr} AS commission_amount,
         ${gradeCommissionExpr} AS commission_percent,
@@ -191,6 +200,7 @@ exports.getTherapists = async (req, res) => {
 exports.getTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureTherapistPinColumn(db)
     const { id } = req.params
     const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
 
@@ -201,6 +211,7 @@ exports.getTherapist = async (req, res) => {
         t.branch_id,
         t.grade_id,
         t.active,
+        (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
         tg.name AS grade_name,
         ${gradeCommissionExpr} AS commission_amount,
         ${gradeCommissionExpr} AS commission_percent,
@@ -226,6 +237,7 @@ exports.getTherapistAttendance = async (req, res) => {
   try {
     const db = req.app.get("db")
     await ensureTherapistAttendanceTable(db)
+    await ensureTherapistPinColumn(db)
 
     const branchId = req.user?.branch_id
     const businessDate = await getBusinessDateForBranch(db, branchId)
@@ -235,6 +247,7 @@ exports.getTherapistAttendance = async (req, res) => {
          t.id,
          t.name,
          t.active,
+         (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
          COALESCE(ta.status, 'OFF') AS attendance_status,
          ta.updated_at
        FROM therapists t
@@ -261,6 +274,7 @@ exports.setTherapistAttendance = async (req, res) => {
   try {
     const db = req.app.get("db")
     await ensureTherapistAttendanceTable(db)
+    await ensureTherapistPinColumn(db)
 
     const therapistId = Number(req.params.id)
     const status = String(req.body?.status || '').trim().toUpperCase()
@@ -280,11 +294,21 @@ exports.setTherapistAttendance = async (req, res) => {
     const businessDate = await getBusinessDateForBranch(db, branchId)
 
     const therapistRes = await db.query(
-      `SELECT id FROM therapists WHERE id = $1 AND branch_id = $2 AND active = true`,
+      `SELECT id, COALESCE(attendance_pin, '') AS attendance_pin
+       FROM therapists
+       WHERE id = $1 AND branch_id = $2 AND active = true`,
       [therapistId, branchId]
     )
     if (!therapistRes.rows.length) {
       return res.status(404).json({ message: 'Terapis tidak ditemukan' })
+    }
+
+    const therapistPin = String(therapistRes.rows[0].attendance_pin || '').trim()
+    if ((status === 'MASUK' || status === 'CLOSE') && !therapistPin) {
+      return res.status(400).json({ message: 'PIN absensi terapis belum diset. Atur PIN di menu Master Terapis.' })
+    }
+    if ((status === 'MASUK' || status === 'CLOSE') && therapistPin !== pinInput) {
+      return res.status(400).json({ message: 'PIN absensi tidak sesuai' })
     }
 
     const { rows } = await db.query(
@@ -311,7 +335,8 @@ exports.setTherapistAttendance = async (req, res) => {
 exports.createTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { name, grade_id, branch_id } = req.body
+    await ensureTherapistPinColumn(db)
+    const { name, grade_id, branch_id, attendance_pin } = req.body
 
     // Validation
     if (!name || !grade_id) {
@@ -321,11 +346,17 @@ exports.createTherapist = async (req, res) => {
     // Use user's branch if not provided
     const finalBranchId = branch_id || req.user.branch_id
 
+    const normalizedPin = String(attendance_pin || '').trim()
+    if (normalizedPin && normalizedPin.length < 4) {
+      return res.status(400).json({ message: 'PIN absensi minimal 4 karakter' })
+    }
+
     const { rows } = await db.query(`
-      INSERT INTO therapists (name, grade_id, branch_id, active)
-      VALUES ($1, $2, $3, true)
-      RETURNING id, name, grade_id, branch_id, active
-    `, [name, grade_id, finalBranchId])
+      INSERT INTO therapists (name, grade_id, branch_id, active, attendance_pin)
+      VALUES ($1, $2, $3, true, $4)
+      RETURNING id, name, grade_id, branch_id, active,
+        (attendance_pin IS NOT NULL AND attendance_pin <> '') AS has_attendance_pin
+    `, [name, grade_id, finalBranchId, normalizedPin || null])
 
     res.status(201).json(rows[0])
   } catch (err) {
@@ -338,8 +369,9 @@ exports.createTherapist = async (req, res) => {
 exports.updateTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureTherapistPinColumn(db)
     const { id } = req.params
-    const { name, grade_id, branch_id, active } = req.body
+    const { name, grade_id, branch_id, active, attendance_pin, service_addon_amount } = req.body
 
     // Build update fields
     let updateFields = []
@@ -381,6 +413,16 @@ exports.updateTherapist = async (req, res) => {
       paramIndex++
     }
 
+    if (attendance_pin !== undefined) {
+      const normalizedPin = String(attendance_pin || '').trim()
+      if (normalizedPin && normalizedPin.length < 4) {
+        return res.status(400).json({ message: 'PIN absensi minimal 4 karakter' })
+      }
+      updateFields.push(`attendance_pin = $${paramIndex}`)
+      params.push(normalizedPin || null)
+      paramIndex++
+    }
+
     if (updateFields.length === 0) {
       return res.status(400).json({ message: "No fields to update" })
     }
@@ -391,7 +433,8 @@ exports.updateTherapist = async (req, res) => {
       UPDATE therapists
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, name, grade_id, branch_id, active
+      RETURNING id, name, grade_id, branch_id, active,
+        (attendance_pin IS NOT NULL AND attendance_pin <> '') AS has_attendance_pin
     `, params)
 
     if (rows.length === 0) {
@@ -608,6 +651,16 @@ exports.updateGrade = async (req, res) => {
       }
       updateFields.push(`service_addon_amount = $${paramIndex}`)
       params.push(normalizedAddon)
+      paramIndex++
+    }
+
+    if (attendance_pin !== undefined) {
+      const normalizedPin = String(attendance_pin || '').trim()
+      if (normalizedPin && normalizedPin.length < 4) {
+        return res.status(400).json({ message: 'PIN absensi minimal 4 karakter' })
+      }
+      updateFields.push(`attendance_pin = $${paramIndex}`)
+      params.push(normalizedPin || null)
       paramIndex++
     }
 
