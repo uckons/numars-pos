@@ -214,7 +214,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
         o.id,
         o.total,
         o.created_at,
-        bw.business_date
+        timezone('Asia/Jakarta', o.created_at)::date AS business_date
       FROM orders o
       JOIN business_windows bw
         ON timezone('Asia/Jakarta', o.created_at) >= bw.window_start
