@@ -174,6 +174,166 @@ const buildIncrementalFnbSnapshot = async (db, orderId, previousRows = []) => {
     .filter(item => Number(item.qty || 0) > 0)
 }
 
+
+const FNB_DELIVERY_GUARD_MESSAGE = 'Pembayaran Gagal, masih ada item FNB yang belum dideliver oleh BAR, Check ke BAR terlebih dahulu untuk deliver Item!'
+const FNB_SAVE_DRAFT_FIRST_MESSAGE = 'masukan ke draft dulu untuk verifikasi order'
+
+
+const payloadContainsFnbItems = async (dbClient, items = []) => {
+  const resolvedIds = [...new Set(
+    (Array.isArray(items) ? items : [])
+      .map((item) => Number(item?.variant_service_id || item?.id || 0))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )]
+
+  if (!resolvedIds.length) return false
+
+  const { rows } = await dbClient.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM services
+       WHERE id = ANY($1::int[])
+         AND type = 'FNB'
+     ) AS has_fnb`,
+    [resolvedIds]
+  )
+
+  return Boolean(rows[0]?.has_fnb)
+}
+
+const hasUndeliveredFnbItems = async (dbClient, orderId) => {
+  const { rows } = await dbClient.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM order_items oi
+       JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
+       WHERE oi.order_id = $1
+         AND oi.qty > 0
+         AND s.type = 'FNB'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM bar_orders bo
+           WHERE bo.order_id = oi.order_id
+             AND bo.status = 'DELIVERED'
+             AND bo.items_snapshot @> jsonb_build_array(
+               jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
+             )
+         )
+     ) AS blocked`,
+    [orderId]
+  )
+
+  return Boolean(rows[0]?.blocked)
+}
+
+
+const normalizeBarSnapshotItems = (items = []) => {
+  const map = new Map()
+  for (const row of (Array.isArray(items) ? items : [])) {
+    const serviceId = Number(row?.service_id || 0)
+    if (!(serviceId > 0)) continue
+    const current = map.get(serviceId) || {
+      service_id: serviceId,
+      fnb_item_id: Number(row?.fnb_item_id || 0) || null,
+      service_name: String(row?.service_name || '').trim() || 'Unknown',
+      qty: 0
+    }
+    current.qty += Math.max(0, Number(row?.qty || 0))
+    if (!current.fnb_item_id && Number(row?.fnb_item_id || 0) > 0) {
+      current.fnb_item_id = Number(row.fnb_item_id)
+    }
+    map.set(serviceId, current)
+  }
+  return Array.from(map.values()).filter((item) => Number(item.qty || 0) > 0)
+}
+
+const parseCancelledItemsSelection = (rawSelection = [], snapshotItems = []) => {
+  const snapshotMap = new Map(snapshotItems.map((item) => [Number(item.service_id), Number(item.qty || 0)]))
+  const requested = new Map()
+
+  for (const row of (Array.isArray(rawSelection) ? rawSelection : [])) {
+    const serviceId = Number(row?.service_id || 0)
+    const snapshotQty = Number(snapshotMap.get(serviceId) || 0)
+    const hasExplicitQty = row?.qty !== undefined && row?.qty !== null && String(row?.qty).trim() !== ''
+    const requestedQty = hasExplicitQty ? Number(row?.qty || 0) : snapshotQty
+    const qty = Math.max(0, requestedQty)
+    if (!(serviceId > 0) || !(qty > 0) || !snapshotMap.has(serviceId)) continue
+    requested.set(serviceId, (requested.get(serviceId) || 0) + qty)
+  }
+
+  return Array.from(requested.entries())
+    .map(([serviceId, qty]) => ({
+      service_id: serviceId,
+      qty: Math.min(qty, Number(snapshotMap.get(serviceId) || 0))
+    }))
+    .filter((item) => Number(item.qty || 0) > 0)
+}
+
+const applyBarCancelledItemsToOrder = async (db, orderId, cancelledItems = [], note = '') => {
+  const trimmedNote = String(note || '').trim()
+
+  for (const cancelled of cancelledItems) {
+    let remainingQty = Math.max(0, Number(cancelled?.qty || 0))
+    if (!(remainingQty > 0)) continue
+
+    const { rows: orderItemRows } = await db.query(
+      `SELECT id, qty, price, subtotal, service_name
+       FROM order_items
+       WHERE order_id = $1
+         AND COALESCE(variant_service_id, service_id) = $2
+         AND qty > 0
+       ORDER BY id ASC
+       FOR UPDATE`,
+      [orderId, Number(cancelled.service_id)]
+    )
+
+    for (const row of orderItemRows) {
+      if (!(remainingQty > 0)) break
+
+      const rowQty = Math.max(0, Number(row.qty || 0))
+      if (!(rowQty > 0)) continue
+
+      const reduceQty = Math.min(rowQty, remainingQty)
+      const nextQty = rowQty - reduceQty
+      const unitPrice = Number(row.price || 0) || (rowQty > 0 ? Number(row.subtotal || 0) / rowQty : 0)
+      const nextSubtotal = Math.max(0, Math.round(unitPrice * nextQty))
+      const markedName = String(row.service_name || '').includes('(X)')
+        ? row.service_name
+        : `${String(row.service_name || '').trim()} (X)`
+
+      await db.query(
+        `UPDATE order_items
+         SET qty = $2,
+             subtotal = $3,
+             service_name = CASE WHEN $2 <= 0 THEN $4 ELSE service_name END,
+             therapist_name = CASE WHEN $2 <= 0 THEN NULL ELSE therapist_name END
+         WHERE id = $1`,
+        [row.id, nextQty, nextSubtotal, markedName]
+      )
+
+      remainingQty -= reduceQty
+    }
+  }
+
+  const { rows: totalRows } = await db.query(
+    `SELECT COALESCE(SUM(subtotal), 0) AS total
+     FROM order_items
+     WHERE order_id = $1`,
+    [orderId]
+  )
+
+  const updatedTotal = Math.max(0, Math.round(Number(totalRows[0]?.total || 0)))
+  await db.query(
+    `UPDATE orders
+     SET total = $2,
+         total_amount = $2
+     WHERE id = $1`,
+    [orderId, updatedTotal]
+  )
+
+  return updatedTotal
+}
+
 const emitBarOrderNew = (req, payload) => {
   const io = req.app.get("io")
   if (!io) return
@@ -422,6 +582,10 @@ exports.close = async (req, res) => {
     } else {
       paymentAmount = total
       changeAmount = 0
+    }
+
+    if (await hasUndeliveredFnbItems(db, orderId)) {
+      return res.status(400).json({ message: FNB_DELIVERY_GUARD_MESSAGE })
     }
 
     // Update order dengan payment & status PAID
@@ -834,6 +998,10 @@ exports.createFromPos = async (req, res) => {
       return res.status(400).json({ message: "Item kosong" })
     }
 
+    if (await payloadContainsFnbItems(db, items)) {
+      return res.status(400).json({ message: FNB_SAVE_DRAFT_FIRST_MESSAGE })
+    }
+
     // 3️⃣ create order (PAID)
     const orderRes = await db.query(
       `
@@ -998,6 +1166,12 @@ exports.payBulk = async (req, res) => {
     if (notDraft.length) {
       const invalidIds = notDraft.map((row) => row.id).join(", ")
       throw new Error(`Hanya order DRAFT yang bisa dibayar gabungan. Invalid: #${invalidIds}`)
+    }
+
+    for (const order of rows) {
+      if (await hasUndeliveredFnbItems(client, Number(order.id))) {
+        throw new Error(FNB_DELIVERY_GUARD_MESSAGE)
+      }
     }
 
     await client.query(
@@ -1358,6 +1532,8 @@ exports.getKasirOrders = async (req, res) => {
         json_agg(
           DISTINCT jsonb_build_object(
             'service_id', oi.service_id,
+            'variant_service_id', oi.variant_service_id,
+            'resolved_service_id', COALESCE(oi.variant_service_id, oi.service_id),
             'service_name', oi.service_name,
             'qty', oi.qty,
             'subtotal', oi.subtotal,
@@ -1379,6 +1555,7 @@ exports.getKasirOrders = async (req, res) => {
                 AND therapist_name.name <> ''
             ),
             'room_name', oi.room_name,
+            'type', s.type,
             'is_fnb', (s.type = 'FNB'),
             'is_delivered', (
               s.type = 'FNB' AND EXISTS (
@@ -1387,7 +1564,7 @@ exports.getKasirOrders = async (req, res) => {
                 WHERE bo.order_id = o.id
                   AND bo.status = 'DELIVERED'
                   AND bo.items_snapshot @> jsonb_build_array(
-                    jsonb_build_object('service_id', oi.service_id)
+                    jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
                   )
               )
             )
@@ -1396,7 +1573,7 @@ exports.getKasirOrders = async (req, res) => {
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN services s ON s.id = oi.service_id
+      LEFT JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN LATERAL (
         SELECT COALESCE(
@@ -1449,6 +1626,8 @@ exports.getById = async (req, res) => {
         json_agg(
           json_build_object(
             'service_id', oi.service_id,
+            'variant_service_id', oi.variant_service_id,
+            'resolved_service_id', COALESCE(oi.variant_service_id, oi.service_id),
             'service_name', oi.service_name,
             'qty', oi.qty,
             'price', oi.price,
@@ -1456,12 +1635,25 @@ exports.getById = async (req, res) => {
             'therapist_name', oi.therapist_name,
             'room_name', oi.room_name,
             'price_label', oi.price_label,
-            'is_package', oi.is_package_snapshot
+            'is_package', oi.is_package_snapshot,
+            'type', s.type,
+            'is_fnb', (s.type = 'FNB'),
+            'is_delivered', (
+              s.type = 'FNB' AND EXISTS (
+                SELECT 1
+                FROM bar_orders bo
+                WHERE bo.order_id = o.id
+                  AND bo.status = 'DELIVERED'
+                  AND bo.items_snapshot @> jsonb_build_array(
+                    jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
+                  )
+              )
+            )
           ) ORDER BY oi.id
         ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN services s ON s.id = oi.service_id
+      LEFT JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
       WHERE o.id = $1
       GROUP BY o.id
       `,
@@ -1725,23 +1917,75 @@ exports.cancelBarOrder = async (req, res) => {
     }
 
     const note = String(req.body?.note || "cancelled by SB").trim() || "cancelled by SB"
-    const items = Array.isArray(bo.items_snapshot) ? bo.items_snapshot : []
+    const snapshotItems = normalizeBarSnapshotItems(Array.isArray(bo.items_snapshot) ? bo.items_snapshot : [])
+    if (!snapshotItems.length) {
+      await db.query("ROLLBACK")
+      return res.status(400).json({ message: 'Item inbox kosong' })
+    }
+
+    const selectedCancelledItems = parseCancelledItemsSelection(req.body?.cancelled_items, snapshotItems)
+    const cancelledItems = selectedCancelledItems.length
+      ? snapshotItems
+          .map((item) => {
+            const selected = selectedCancelledItems.find((picked) => Number(picked.service_id) === Number(item.service_id))
+            return selected ? { ...item, qty: Number(selected.qty || 0) } : null
+          })
+          .filter((item) => item && Number(item.qty || 0) > 0)
+      : snapshotItems
+
+    const cancelledQtyByService = new Map(cancelledItems.map((item) => [Number(item.service_id), Number(item.qty || 0)]))
+    const deliveredItems = snapshotItems
+      .map((item) => {
+        const cancelledQty = Number(cancelledQtyByService.get(Number(item.service_id)) || 0)
+        const deliveredQty = Math.max(0, Number(item.qty || 0) - cancelledQty)
+        return {
+          ...item,
+          qty: deliveredQty
+        }
+      })
+      .filter((item) => Number(item.qty || 0) > 0)
+
+    if (!cancelledItems.length) {
+      await db.query("ROLLBACK")
+      return res.status(400).json({ message: 'Pilih minimal 1 item untuk dibatalkan' })
+    }
+
+    const nextStatus = deliveredItems.length ? 'DELIVERED' : 'CANCELLED'
+
+    if (deliveredItems.length) {
+      for (const item of deliveredItems) {
+        if (Number(item.fnb_item_id || 0) > 0) {
+          await stockService.reduceFnbStock(db, Number(item.fnb_item_id), Number(item.qty || 0))
+        }
+      }
+    }
+
+    const updatedTotal = await applyBarCancelledItemsToOrder(db, bo.order_id, cancelledItems, note)
 
     await db.query(
       `UPDATE bar_orders
-       SET status='CANCELLED', note=$1, cancelled_by=$2, cancelled_at=NOW(), updated_at=NOW()
-       WHERE id=$3`,
-      [note, req.user.id, barOrderId]
+       SET status=$1,
+           items_snapshot=$2,
+           note=$3,
+           cancelled_by=$4,
+           cancelled_at=CASE WHEN $1='CANCELLED' THEN NOW() ELSE cancelled_at END,
+           delivered_by=CASE WHEN $1='DELIVERED' THEN $4 ELSE delivered_by END,
+           delivered_at=CASE WHEN $1='DELIVERED' THEN NOW() ELSE delivered_at END,
+           updated_at=NOW()
+       WHERE id=$5`,
+      [nextStatus, deliveredItems, note, req.user.id, barOrderId]
     )
 
     const kasirMessage = await createKasirBarMessage(db, {
       branch_id: bo.branch_id,
       order_id: bo.order_id,
       bar_order_id: barOrderId,
-      type: "CANCELLED",
-      title: `Item tambahan order #${bo.order_id} dibatalkan`,
+      type: cancelledItems.length && deliveredItems.length ? "PARTIAL_CANCELLED" : (nextStatus === 'DELIVERED' ? 'DELIVERED' : 'CANCELLED'),
+      title: cancelledItems.length && deliveredItems.length
+        ? `Order #${bo.order_id} partial cancel (sebagian delivered)`
+        : `Item tambahan order #${bo.order_id} dibatalkan`,
       message: `Alasan: ${note}`,
-      payload: { items, note }
+      payload: { cancelled_items: cancelledItems, delivered_items: deliveredItems, note, updated_total: updatedTotal }
     })
 
     await db.query("COMMIT")
@@ -1749,14 +1993,25 @@ exports.cancelBarOrder = async (req, res) => {
     emitKasirOrderUpdate(req, {
       order_id: bo.order_id,
       branch_id: bo.branch_id,
-      status: "CANCELLED",
-      items,
-      message: `Item tambahan order #${bo.order_id} dibatalkan oleh SB`,
+      status: nextStatus,
+      items: deliveredItems,
+      cancelled_items: cancelledItems,
+      message: cancelledItems.length && deliveredItems.length
+        ? `Order #${bo.order_id} partial cancel: sebagian item dibatalkan, sisa item delivered`
+        : `Item tambahan order #${bo.order_id} dibatalkan oleh SB`,
       note,
       message_id: kasirMessage.id
     })
 
-    res.json({ success: true, order_id: bo.order_id, note, message_id: kasirMessage.id })
+    res.json({
+      success: true,
+      order_id: bo.order_id,
+      note,
+      message_id: kasirMessage.id,
+      cancelled_items: cancelledItems,
+      delivered_items: deliveredItems,
+      updated_total: updatedTotal
+    })
   } catch (err) {
     try { await db.query("ROLLBACK") } catch (_) {}
     res.status(500).json({ message: err.message })

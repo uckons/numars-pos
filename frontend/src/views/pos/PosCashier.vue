@@ -56,10 +56,13 @@ const loadOrder = async (orderId) => {
 
         const cartItem = {
           id: item.service_id,
+          variant_service_id: item.variant_service_id || null,
           name: item.service_name,
           base_price: normalizedBasePrice,
           price_label: item.price_label || null,
           is_package: Boolean(item.is_package),
+          is_fnb: Boolean(item.is_fnb),
+          type: item.type || null,
           locked_package: Boolean(item.is_package),
           locked_main: Boolean(isKtvMainService),
           therapist_name: item.therapist_name || null,
