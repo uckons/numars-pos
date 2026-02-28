@@ -563,6 +563,41 @@ const askPaymentDetails = async () => {
   return res.value
 }
 
+
+const showFnbDeliveryGuardAlert = async () => {
+  await SwalTheme.fire({
+    icon: 'error',
+    title: 'Pembayaran Gagal',
+    text: 'Pembayaran Gagal, masih ada item FNB yang belum dideliver oleh BAR, Check ke BAR terlebih dahulu untuk deliver Item!',
+    confirmButtonText: 'OK'
+  })
+}
+
+const guardCheckoutByBarDelivery = async () => {
+  if (!pos.currentOrderId) return true
+
+  try {
+    const { data } = await api.get(`/orders/${pos.currentOrderId}`)
+    const orderItems = Array.isArray(data?.items) ? data.items : []
+    const hasUndeliveredFnb = orderItems.some((item) => Boolean(item?.is_fnb) && !Boolean(item?.is_delivered))
+
+    if (hasUndeliveredFnb) {
+      await showFnbDeliveryGuardAlert()
+      return false
+    }
+
+    return true
+  } catch (err) {
+    await SwalTheme.fire({
+      icon: 'error',
+      title: 'Gagal',
+      text: err.response?.data?.message || err.message || 'Gagal validasi status delivery BAR',
+      confirmButtonText: 'OK'
+    })
+    return false
+  }
+}
+
 const buildDraftReceiptPreview = (payment) => {
   const subtotal = Math.round(Number(grandTotal.value || 0))
   const discount = Math.max(0, Math.round(Number(payment?.discount_amount || 0)))
@@ -625,6 +660,9 @@ const checkout = async () => {
     })
     return
   }
+
+  const canCheckout = await guardCheckoutByBarDelivery()
+  if (!canCheckout) return
 
   const payment = await askPaymentDetails()
   if (!payment) return
