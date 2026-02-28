@@ -66,7 +66,7 @@
             :value="t.id"
             :disabled="isTherapistDisabled(t.id, idx - 1)"
           >
-            {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
+            {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span> • {{ t.attendance_status || 'OFF' }}
           </option>
         </select>
       </div>
@@ -130,7 +130,7 @@
         <select v-for="idx in karaokeTherapistPopupCount" :key="`popup-ther-${idx}`" v-model="popupTherapistIds[idx - 1]">
           <option value="">-- Pilih Terapis #{{ idx }} --</option>
           <option v-for="t in therapists" :key="`popup-ther-opt-${idx}-${t.id}`" :value="t.id" :disabled="popupTherapistDisabled(t.id, idx - 1)">
-            {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
+            {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span> • {{ t.attendance_status || 'OFF' }}
           </option>
         </select>
       </div>
@@ -419,6 +419,12 @@ const onTherapistSelectionChange = (idx, value) => {
     return
   }
 
+  if (!therapistIsSelectable(therapistId)) {
+    selectedTherapistIds.value[idx] = ''
+    errorMessage.value = 'Terapis dengan status CLOSE/OFF tidak bisa dipilih'
+    return
+  }
+
   if (selectedTherapistIds.value.some((id, currentIdx) => currentIdx !== idx && Number(id) === therapistId)) {
     selectedTherapistIds.value[idx] = ''
     errorMessage.value = 'Terapis harus berbeda'
@@ -429,9 +435,24 @@ const onTherapistSelectionChange = (idx, value) => {
   selectedTherapistIds.value[idx] = String(therapistId)
 }
 
+const therapistIsSelectable = (therapistId) => {
+  const normalizedId = Number(therapistId)
+  if (!Number.isInteger(normalizedId) || normalizedId <= 0) return false
+
+  const therapist = therapists.value.find(t => Number(t.id) === normalizedId)
+  if (!therapist) return false
+
+  const attendanceStatus = String(therapist.attendance_status || 'OFF').toUpperCase()
+  return attendanceStatus === 'MASUK'
+}
+
 const isTherapistDisabled = (therapistId, currentIndex) => {
   const normalizedId = Number(therapistId)
   if (!Number.isInteger(normalizedId) || normalizedId <= 0) return false
+
+  if (!therapistIsSelectable(normalizedId)) {
+    return true
+  }
 
   if (therapists.value.find(t => Number(t.id) === normalizedId)?.is_occupied) {
     return true
@@ -658,6 +679,7 @@ const karaokeTherapistPopupCount = computed(() => requiredTherapistQty.value)
 const popupTherapistDisabled = (therapistId, currentIndex) => {
   const normalizedId = Number(therapistId)
   if (!Number.isInteger(normalizedId) || normalizedId <= 0) return false
+  if (!therapistIsSelectable(normalizedId)) return true
   if (therapists.value.find(t => Number(t.id) === normalizedId)?.is_occupied) return true
   return popupTherapistIds.value.some((selectedId, idx) => idx !== currentIndex && Number(selectedId) === normalizedId)
 }
@@ -695,6 +717,11 @@ const confirmKaraokePopup = () => {
   }
   if (new Set(normalizedPopupTherapists).size !== normalizedPopupTherapists.length) {
     errorMessage.value = 'Terapis harus berbeda'
+    return
+  }
+
+  if (normalizedPopupTherapists.some((id) => !therapistIsSelectable(id))) {
+    errorMessage.value = 'Terapis CLOSE/OFF tidak bisa dipilih'
     return
   }
 
@@ -748,6 +775,11 @@ const submit = async () => {
   if (!['LOUNGE', 'KARAOKE'].includes(selectedType)) {
     if (normalizedTherapistIds.length !== therapistSelectionCount.value) {
       errorMessage.value = "Pilih terapis sesuai ketentuan service"
+      return
+    }
+
+    if (normalizedTherapistIds.some((id) => !therapistIsSelectable(id))) {
+      errorMessage.value = "Terapis CLOSE/OFF tidak bisa dipilih"
       return
     }
 

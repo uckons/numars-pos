@@ -288,6 +288,9 @@ exports.startTimer = async (req, res) => {
       return res.status(400).json({ message: "User belum terikat ke branch" })
     }
 
+    await ensureTherapistAttendanceTable(db)
+    const businessDate = await getBusinessDateForBranch(db, branchId)
+
     await db.query(`
       ALTER TABLE services
       ADD COLUMN IF NOT EXISTS therapist_qty_required INT NOT NULL DEFAULT 1
@@ -582,17 +585,31 @@ exports.startTimer = async (req, res) => {
       let therapistRows = []
       if (requiresTherapist) {
         const therapistRes = await db.query(
-          `SELECT t.id, t.name, tg.name AS grade_name, COALESCE(tg.service_addon_amount, 0) AS service_addon_amount
+          `SELECT
+             t.id,
+             t.name,
+             tg.name AS grade_name,
+             COALESCE(tg.service_addon_amount, 0) AS service_addon_amount,
+             COALESCE(ta.status, 'OFF') AS attendance_status
            FROM therapists t
            LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+           LEFT JOIN therapist_attendance ta
+             ON ta.therapist_id = t.id
+            AND ta.business_date = $2::date
            WHERE t.id = ANY($1::int[])`,
-          [therapistIds]
+          [therapistIds, businessDate]
         )
         therapistRows = therapistRes.rows
         therapistNameById = new Map(therapistRows.map(t => [Number(t.id), t.name]))
 
         if (therapistNameById.size !== therapistIds.length) {
           throw new Error('Terapis tidak ditemukan')
+        }
+
+        const unavailableTherapists = therapistRows.filter((t) => String(t.attendance_status || 'OFF').toUpperCase() !== 'MASUK')
+        if (unavailableTherapists.length) {
+          const names = unavailableTherapists.map((t) => t.name).join(', ')
+          throw new Error(`Terapis status CLOSE/OFF tidak bisa dipilih: ${names}`)
         }
 
         const therapistById = new Map(therapistRows.map(t => [Number(t.id), t]))
