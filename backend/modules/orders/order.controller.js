@@ -1387,7 +1387,7 @@ exports.getKasirOrders = async (req, res) => {
                 WHERE bo.order_id = o.id
                   AND bo.status = 'DELIVERED'
                   AND bo.items_snapshot @> jsonb_build_array(
-                    jsonb_build_object('service_id', oi.service_id)
+                    jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
                   )
               )
             )
@@ -1396,7 +1396,7 @@ exports.getKasirOrders = async (req, res) => {
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN services s ON s.id = oi.service_id
+      LEFT JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN LATERAL (
         SELECT COALESCE(
