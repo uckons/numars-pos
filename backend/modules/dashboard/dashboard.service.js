@@ -207,7 +207,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
           ELSE (day::timestamp + bs.close_time)
         END AS window_end
       FROM branch_schedule bs
-      CROSS JOIN LATERAL generate_series(($2::date - INTERVAL '1 day')::timestamp, $3::date::timestamp, INTERVAL '1 day') AS day
+      CROSS JOIN LATERAL generate_series($2::date::timestamp, ($3::date - INTERVAL '1 day')::timestamp, INTERVAL '1 day') AS day
     ),
     orders_scoped AS (
       SELECT
@@ -217,12 +217,10 @@ exports.kasirAnalytics = async (user, query = {}) => {
         bw.business_date
       FROM orders o
       JOIN business_windows bw
-        ON o.created_at >= bw.window_start
-       AND o.created_at < bw.window_end
+        ON timezone('Asia/Jakarta', o.created_at) >= bw.window_start
+       AND timezone('Asia/Jakarta', o.created_at) < bw.window_end
       WHERE o.status = 'PAID'
         AND o.branch_id = $1
-        AND bw.business_date >= $2::date
-        AND bw.business_date < $3::date
     )`
 
   const summaryRes = await db.query(
