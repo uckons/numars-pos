@@ -252,7 +252,10 @@ const parseCancelledItemsSelection = (rawSelection = [], snapshotItems = []) => 
 
   for (const row of (Array.isArray(rawSelection) ? rawSelection : [])) {
     const serviceId = Number(row?.service_id || 0)
-    const qty = Math.max(0, Number(row?.qty || 0))
+    const snapshotQty = Number(snapshotMap.get(serviceId) || 0)
+    const hasExplicitQty = row?.qty !== undefined && row?.qty !== null && String(row?.qty).trim() !== ''
+    const requestedQty = hasExplicitQty ? Number(row?.qty || 0) : snapshotQty
+    const qty = Math.max(0, requestedQty)
     if (!(serviceId > 0) || !(qty > 0) || !snapshotMap.has(serviceId)) continue
     requested.set(serviceId, (requested.get(serviceId) || 0) + qty)
   }

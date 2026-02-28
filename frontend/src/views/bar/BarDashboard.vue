@@ -371,26 +371,17 @@ const cancel = async (id, fromModal = false) => {
   const html = `
     <div style="text-align:left;display:grid;gap:10px;max-height:260px;overflow:auto;">
       ${snapshotItems.map((item, index) => `
-        <div style="display:grid;grid-template-columns:1fr 94px;align-items:center;gap:10px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <input id="cancel-check-${index}" type="checkbox" style="margin-top:6px;transform:scale(1.2);" />
           <div>
             <strong>${item.service_name}</strong><br/>
             <small>Qty kirim: ${Number(item.qty || 0)}</small>
           </div>
-          <input
-            id="cancel-qty-${index}"
-            class="swal2-input"
-            type="number"
-            min="0"
-            max="${Math.max(0, Number(item.qty || 0))}"
-            step="1"
-            value="0"
-            style="height:36px;margin:0;"
-          />
-        </div>
+        </label>
       `).join('')}
     </div>
     <textarea id="cancel-note" class="swal2-textarea" placeholder="Alasan cancel (wajib), contoh: stok habis / item tidak tersedia" style="margin-top:12px;"></textarea>
-    <small style="color:#999">Qty yang tidak dicancel akan tetap dikirim (delivered) otomatis.</small>
+    <small style="color:#999">Item yang tidak dicancel akan tetap dikirim (delivered) otomatis.</small>
   `
 
   const confirm = await Swal.fire({
@@ -409,24 +400,15 @@ const cancel = async (id, fromModal = false) => {
       }
 
       const cancelledItems = snapshotItems
-        .map((item, index) => ({
+        .filter((_, index) => Boolean(document.getElementById(`cancel-check-${index}`)?.checked))
+        .map((item) => ({
           service_id: Number(item.service_id || 0),
-          qty: Math.max(0, Number(document.getElementById(`cancel-qty-${index}`)?.value || 0))
+          qty: Math.max(0, Number(item.qty || 0))
         }))
         .filter((item) => item.service_id > 0 && item.qty > 0)
 
       if (!cancelledItems.length) {
-        Swal.showValidationMessage('Pilih minimal 1 qty item untuk dicancel')
-        return false
-      }
-
-      const overQty = cancelledItems.find((picked) => {
-        const row = snapshotItems.find((item) => Number(item.service_id) === Number(picked.service_id))
-        return Number(picked.qty || 0) > Number(row?.qty || 0)
-      })
-
-      if (overQty) {
-        Swal.showValidationMessage('Qty cancel tidak boleh lebih besar dari qty kirim')
+        Swal.showValidationMessage('Checklist minimal 1 item untuk dicancel')
         return false
       }
 
