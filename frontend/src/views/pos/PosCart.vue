@@ -590,8 +590,8 @@ const mapQtyByResolvedService = (rows = [], resolver = () => 0) => {
   const qtyMap = new Map()
   for (const row of rows) {
     const resolvedId = Number(resolver(row) || 0)
-    if (!(resolvedId > 0)) continue
     const qty = Number(row?.qty || 0)
+    if (!(resolvedId > 0) || !(qty > 0)) continue
     qtyMap.set(resolvedId, (qtyMap.get(resolvedId) || 0) + qty)
   }
   return qtyMap
