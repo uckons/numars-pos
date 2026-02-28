@@ -7,6 +7,10 @@ const auth = require("../../middlewares/auth.middleware")
 // 📋 GET ALL THERAPISTS
 router.get("/", auth, controller.getTherapists)
 
+// 🕒 THERAPIST ATTENDANCE (Kasir)
+router.get("/attendance", auth, controller.getTherapistAttendance)
+router.post("/attendance/:id", auth, controller.setTherapistAttendance)
+
 // 📋 GET SINGLE THERAPIST
 router.get("/:id", auth, controller.getTherapist)
 
