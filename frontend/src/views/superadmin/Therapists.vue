@@ -398,6 +398,7 @@ const submitForm = async () => {
 
     if (isEdit.value) {
       await api.put(`/therapists/${form.value.id}`, form.value)
+      closeModal()
       await SwalTheme.fire({
         icon: 'success',
         title: 'Berhasil',
@@ -407,6 +408,7 @@ const submitForm = async () => {
       })
     } else {
       await api.post('/therapists', form.value)
+      closeModal()
       await SwalTheme.fire({
         icon: 'success',
         title: 'Berhasil',
@@ -416,7 +418,6 @@ const submitForm = async () => {
       })
     }
 
-    closeModal()
     fetchTherapists()
   } catch (err) {
     console.error('Submit form error:', err)
@@ -895,6 +896,11 @@ onMounted(() => {
 
 .modal-actions .btn {
   flex: 1;
+}
+
+/* keep alerts above edit modal overlay */
+:deep(.swal2-container) {
+  z-index: 20000 !important;
 }
 
 /* ===== SWEETALERT DARK THEME ===== */
