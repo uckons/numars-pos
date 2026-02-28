@@ -585,9 +585,8 @@ const showSaveDraftFirstAlert = async () => {
 
 const getResolvedCartServiceId = (item) => Number(item?.variant_service_id || item?.id || 0)
 const getResolvedOrderServiceId = (item) => Number(item?.resolved_service_id || item?.variant_service_id || item?.service_id || 0)
-const isFnbCartItem = (item) => String(item?.type || '').toUpperCase() === 'FNB' || Boolean(item?.is_fnb)
 
-const mapFnbQtyByResolvedService = (rows = [], resolver = () => 0) => {
+const mapQtyByResolvedService = (rows = [], resolver = () => 0) => {
   const qtyMap = new Map()
   for (const row of rows) {
     const resolvedId = Number(resolver(row) || 0)
@@ -598,12 +597,9 @@ const mapFnbQtyByResolvedService = (rows = [], resolver = () => 0) => {
   return qtyMap
 }
 
-const hasUnsyncedFnbCartChanges = (orderItems = []) => {
-  const orderFnbItems = (Array.isArray(orderItems) ? orderItems : []).filter((item) => Boolean(item?.is_fnb))
-  const cartFnbItems = (items.value || []).filter((item) => isFnbCartItem(item))
-
-  const orderQtyMap = mapFnbQtyByResolvedService(orderFnbItems, getResolvedOrderServiceId)
-  const cartQtyMap = mapFnbQtyByResolvedService(cartFnbItems, getResolvedCartServiceId)
+const hasUnsyncedCartChanges = (orderItems = []) => {
+  const orderQtyMap = mapQtyByResolvedService(Array.isArray(orderItems) ? orderItems : [], getResolvedOrderServiceId)
+  const cartQtyMap = mapQtyByResolvedService(items.value || [], getResolvedCartServiceId)
 
   if (orderQtyMap.size !== cartQtyMap.size) return true
   for (const [serviceId, qty] of cartQtyMap.entries()) {
@@ -614,9 +610,8 @@ const hasUnsyncedFnbCartChanges = (orderItems = []) => {
 }
 
 const guardCheckoutByBarDelivery = async () => {
-  const cartHasFnb = (items.value || []).some((item) => isFnbCartItem(item))
   if (!pos.currentOrderId) {
-    if (cartHasFnb) {
+    if ((items.value || []).length > 0) {
       await showSaveDraftFirstAlert()
       return false
     }
@@ -627,7 +622,7 @@ const guardCheckoutByBarDelivery = async () => {
     const { data } = await api.get(`/orders/${pos.currentOrderId}`)
     const orderItems = Array.isArray(data?.items) ? data.items : []
 
-    if (hasUnsyncedFnbCartChanges(orderItems)) {
+    if (hasUnsyncedCartChanges(orderItems)) {
       await showSaveDraftFirstAlert()
       return false
     }
