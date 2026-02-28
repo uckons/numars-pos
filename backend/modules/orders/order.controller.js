@@ -1964,16 +1964,16 @@ exports.cancelBarOrder = async (req, res) => {
 
     await db.query(
       `UPDATE bar_orders
-       SET status=$1,
-           items_snapshot=$2,
+       SET status=$1::varchar,
+           items_snapshot=$2::jsonb,
            note=$3,
-           cancelled_by=$4,
-           cancelled_at=CASE WHEN $1='CANCELLED' THEN NOW() ELSE cancelled_at END,
-           delivered_by=CASE WHEN $1='DELIVERED' THEN $4 ELSE delivered_by END,
-           delivered_at=CASE WHEN $1='DELIVERED' THEN NOW() ELSE delivered_at END,
+           cancelled_by=$4::int,
+           cancelled_at=CASE WHEN $6::varchar='CANCELLED' THEN NOW() ELSE cancelled_at END,
+           delivered_by=CASE WHEN $6::varchar='DELIVERED' THEN $4::int ELSE delivered_by END,
+           delivered_at=CASE WHEN $6::varchar='DELIVERED' THEN NOW() ELSE delivered_at END,
            updated_at=NOW()
-       WHERE id=$5`,
-      [nextStatus, deliveredItems, note, req.user.id, barOrderId]
+       WHERE id=$5::int`,
+      [nextStatus, JSON.stringify(deliveredItems), note, Number(req.user.id), Number(barOrderId), nextStatus]
     )
 
     const kasirMessage = await createKasirBarMessage(db, {
