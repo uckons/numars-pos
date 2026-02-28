@@ -326,8 +326,7 @@ const applyBarCancelledItemsToOrder = async (db, orderId, cancelledItems = [], n
   await db.query(
     `UPDATE orders
      SET total = $2,
-         total_amount = $2,
-         updated_at = NOW()
+         total_amount = $2
      WHERE id = $1`,
     [orderId, updatedTotal]
   )
