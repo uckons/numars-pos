@@ -208,6 +208,7 @@ const hasUndeliveredFnbItems = async (dbClient, orderId) => {
        FROM order_items oi
        JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
        WHERE oi.order_id = $1
+         AND oi.qty > 0
          AND s.type = 'FNB'
          AND NOT EXISTS (
            SELECT 1

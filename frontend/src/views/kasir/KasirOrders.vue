@@ -664,7 +664,7 @@ const loadRooms = async () => {
 
 const getUndeliveredFnbItems = (order) => {
   const items = Array.isArray(order?.items) ? order.items : []
-  return items.filter((item) => Boolean(item?.is_fnb) && !Boolean(item?.is_delivered))
+  return items.filter((item) => Boolean(item?.is_fnb) && Number(item?.qty || 0) > 0 && !Boolean(item?.is_delivered))
 }
 
 const showFnbDeliveryGuardAlert = async () => {

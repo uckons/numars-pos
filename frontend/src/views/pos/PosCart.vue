@@ -627,7 +627,7 @@ const guardCheckoutByBarDelivery = async () => {
       return false
     }
 
-    const hasUndeliveredFnb = orderItems.some((item) => Boolean(item?.is_fnb) && !Boolean(item?.is_delivered))
+    const hasUndeliveredFnb = orderItems.some((item) => Boolean(item?.is_fnb) && Number(item?.qty || 0) > 0 && !Boolean(item?.is_delivered))
 
     if (hasUndeliveredFnb) {
       await showFnbDeliveryGuardAlert()

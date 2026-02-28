@@ -381,7 +381,7 @@ const cancel = async (id, fromModal = false) => {
       `).join('')}
     </div>
     <textarea id="cancel-note" class="swal2-textarea" placeholder="Alasan cancel (wajib), contoh: stok habis / item tidak tersedia" style="margin-top:12px;"></textarea>
-    <small style="color:#999">Item yang tidak dicancel akan tetap dikirim (delivered) otomatis.</small>
+    <small style="color:#999;display:block;line-height:1.45;margin-top:6px;">Item yang tidak dicancel akan tetap dikirim (delivered) otomatis.</small>
   `
 
   const confirm = await Swal.fire({
@@ -419,11 +419,19 @@ const cancel = async (id, fromModal = false) => {
   if (!confirm.isConfirmed) return
 
   const payload = confirm.value || {}
-  await api.post(`/orders/bar/${id}/cancel`, payload)
-  await loadAll({ silent: true })
-  await Swal.fire({ icon: 'success', title: 'Cancel diproses', text: 'Item yang tidak dicancel tetap delivered.' })
+  try {
+    await api.post(`/orders/bar/${id}/cancel`, payload)
+    await loadAll({ silent: true })
+    await Swal.fire({ icon: 'success', title: 'Cancel diproses', text: 'Item yang tidak dicancel tetap delivered.' })
 
-  if (fromModal) closeInboxDetail()
+    if (fromModal) closeInboxDetail()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Cancel gagal',
+      text: err.response?.data?.message || err.message || 'Gagal memproses cancel item'
+    })
+  }
 }
 
 
