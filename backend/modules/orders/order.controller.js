@@ -174,6 +174,57 @@ const buildIncrementalFnbSnapshot = async (db, orderId, previousRows = []) => {
     .filter(item => Number(item.qty || 0) > 0)
 }
 
+
+const FNB_DELIVERY_GUARD_MESSAGE = 'Pembayaran Gagal, masih ada item FNB yang belum dideliver oleh BAR, Check ke BAR terlebih dahulu untuk deliver Item!'
+const FNB_SAVE_DRAFT_FIRST_MESSAGE = 'masukan ke draft dulu untuk verifikasi order'
+
+
+const payloadContainsFnbItems = async (dbClient, items = []) => {
+  const resolvedIds = [...new Set(
+    (Array.isArray(items) ? items : [])
+      .map((item) => Number(item?.variant_service_id || item?.id || 0))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )]
+
+  if (!resolvedIds.length) return false
+
+  const { rows } = await dbClient.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM services
+       WHERE id = ANY($1::int[])
+         AND type = 'FNB'
+     ) AS has_fnb`,
+    [resolvedIds]
+  )
+
+  return Boolean(rows[0]?.has_fnb)
+}
+
+const hasUndeliveredFnbItems = async (dbClient, orderId) => {
+  const { rows } = await dbClient.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM order_items oi
+       JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
+       WHERE oi.order_id = $1
+         AND s.type = 'FNB'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM bar_orders bo
+           WHERE bo.order_id = oi.order_id
+             AND bo.status = 'DELIVERED'
+             AND bo.items_snapshot @> jsonb_build_array(
+               jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
+             )
+         )
+     ) AS blocked`,
+    [orderId]
+  )
+
+  return Boolean(rows[0]?.blocked)
+}
+
 const emitBarOrderNew = (req, payload) => {
   const io = req.app.get("io")
   if (!io) return
@@ -422,6 +473,10 @@ exports.close = async (req, res) => {
     } else {
       paymentAmount = total
       changeAmount = 0
+    }
+
+    if (await hasUndeliveredFnbItems(db, orderId)) {
+      return res.status(400).json({ message: FNB_DELIVERY_GUARD_MESSAGE })
     }
 
     // Update order dengan payment & status PAID
@@ -834,6 +889,10 @@ exports.createFromPos = async (req, res) => {
       return res.status(400).json({ message: "Item kosong" })
     }
 
+    if (await payloadContainsFnbItems(db, items)) {
+      return res.status(400).json({ message: FNB_SAVE_DRAFT_FIRST_MESSAGE })
+    }
+
     // 3️⃣ create order (PAID)
     const orderRes = await db.query(
       `
@@ -998,6 +1057,12 @@ exports.payBulk = async (req, res) => {
     if (notDraft.length) {
       const invalidIds = notDraft.map((row) => row.id).join(", ")
       throw new Error(`Hanya order DRAFT yang bisa dibayar gabungan. Invalid: #${invalidIds}`)
+    }
+
+    for (const order of rows) {
+      if (await hasUndeliveredFnbItems(client, Number(order.id))) {
+        throw new Error(FNB_DELIVERY_GUARD_MESSAGE)
+      }
     }
 
     await client.query(
@@ -1358,6 +1423,8 @@ exports.getKasirOrders = async (req, res) => {
         json_agg(
           DISTINCT jsonb_build_object(
             'service_id', oi.service_id,
+            'variant_service_id', oi.variant_service_id,
+            'resolved_service_id', COALESCE(oi.variant_service_id, oi.service_id),
             'service_name', oi.service_name,
             'qty', oi.qty,
             'subtotal', oi.subtotal,
@@ -1379,6 +1446,7 @@ exports.getKasirOrders = async (req, res) => {
                 AND therapist_name.name <> ''
             ),
             'room_name', oi.room_name,
+            'type', s.type,
             'is_fnb', (s.type = 'FNB'),
             'is_delivered', (
               s.type = 'FNB' AND EXISTS (
@@ -1387,7 +1455,7 @@ exports.getKasirOrders = async (req, res) => {
                 WHERE bo.order_id = o.id
                   AND bo.status = 'DELIVERED'
                   AND bo.items_snapshot @> jsonb_build_array(
-                    jsonb_build_object('service_id', oi.service_id)
+                    jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
                   )
               )
             )
@@ -1396,7 +1464,7 @@ exports.getKasirOrders = async (req, res) => {
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN services s ON s.id = oi.service_id
+      LEFT JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN LATERAL (
         SELECT COALESCE(
@@ -1449,6 +1517,8 @@ exports.getById = async (req, res) => {
         json_agg(
           json_build_object(
             'service_id', oi.service_id,
+            'variant_service_id', oi.variant_service_id,
+            'resolved_service_id', COALESCE(oi.variant_service_id, oi.service_id),
             'service_name', oi.service_name,
             'qty', oi.qty,
             'price', oi.price,
@@ -1456,12 +1526,25 @@ exports.getById = async (req, res) => {
             'therapist_name', oi.therapist_name,
             'room_name', oi.room_name,
             'price_label', oi.price_label,
-            'is_package', oi.is_package_snapshot
+            'is_package', oi.is_package_snapshot,
+            'type', s.type,
+            'is_fnb', (s.type = 'FNB'),
+            'is_delivered', (
+              s.type = 'FNB' AND EXISTS (
+                SELECT 1
+                FROM bar_orders bo
+                WHERE bo.order_id = o.id
+                  AND bo.status = 'DELIVERED'
+                  AND bo.items_snapshot @> jsonb_build_array(
+                    jsonb_build_object('service_id', COALESCE(oi.variant_service_id, oi.service_id))
+                  )
+              )
+            )
           ) ORDER BY oi.id
         ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN services s ON s.id = oi.service_id
+      LEFT JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
       WHERE o.id = $1
       GROUP BY o.id
       `,
