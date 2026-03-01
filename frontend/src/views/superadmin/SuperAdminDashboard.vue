@@ -46,7 +46,7 @@
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/store/auth.store"
-import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut, Printer, ScrollText, Calculator } from "lucide-vue-next"
+import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut, Printer, ScrollText, Calculator, BookCopy } from "lucide-vue-next"
 import AuditLogs from "./AuditLogs.vue"
 import StockDashboard from "@/views/stock/StockDashboard.vue"
 import Users from "./Users.vue"
