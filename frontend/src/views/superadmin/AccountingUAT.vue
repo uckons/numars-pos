@@ -426,6 +426,10 @@
       </div>
     </section>
 
+    <section class="card" v-if="activeModule === 'coa'">
+      <ChartOfAccounts />
+    </section>
+
     <section class="card" v-if="activeModule === 'reporting'">
       <h3>Financial Reporting Menu</h3>
       <div class="report-grid">
@@ -444,6 +448,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 import api from '@/services/api'
+import ChartOfAccounts from './ChartOfAccounts.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -451,6 +456,7 @@ const today = new Date().toISOString().slice(0, 10)
 
 const moduleMenus = [
   { key: 'manual-journal', label: 'General Ledger', desc: 'Manual journal & queue' },
+  { key: 'coa', label: 'Chart of Accounts', desc: 'Setup kode akun dari UI' },
   { key: 'approval', label: 'Approval Queue', desc: 'Approval SLA & escalation' },
   { key: 'recurring', label: 'Recurring', desc: 'Recurring journal templates' },
   { key: 'ap', label: 'Accounts Payable', desc: 'Vendor bills & payable draft' },
@@ -482,6 +488,10 @@ const goBackToDashboard = () => {
   }
   if (route.path.startsWith('/superadmin')) {
     router.push('/superadmin')
+    return
+  }
+  if (route.path.startsWith('/owner')) {
+    router.push('/owner')
     return
   }
   router.back()

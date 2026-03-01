@@ -51,6 +51,38 @@ const ensureTherapistPinColumn = async (db) => {
   `)
 }
 
+const ensureAgentProfileStorage = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agent_profiles (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agent_profile_grade_cuts (
+      id SERIAL PRIMARY KEY,
+      agent_profile_id INT NOT NULL REFERENCES agent_profiles(id) ON DELETE CASCADE,
+      grade_id INT NOT NULL REFERENCES therapist_grades(id) ON DELETE CASCADE,
+      cut_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (agent_profile_id, grade_id)
+    )
+  `)
+
+  await db.query(`
+    ALTER TABLE therapists
+    ADD COLUMN IF NOT EXISTS agent_profile_id INT REFERENCES agent_profiles(id)
+  `)
+
+  await db.query(`
+    ALTER TABLE therapists
+    ADD COLUMN IF NOT EXISTS agent_cut_override NUMERIC(14,2)
+  `)
+}
+
 const getBusinessDateForBranch = async (db, branchId) => {
   const { rows } = await db.query(
     `WITH cfg AS (
@@ -93,6 +125,7 @@ exports.getTherapists = async (req, res) => {
   try {
     const db = req.app.get("db")
     await ensureTherapistPinColumn(db)
+    await ensureAgentProfileStorage(db)
     const { 
       page = 1, 
       limit = 25, 
@@ -166,12 +199,18 @@ exports.getTherapists = async (req, res) => {
         t.grade_id,
         t.active,
         (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
+        t.agent_profile_id,
+        ap.name AS agent_profile_name,
+        t.agent_cut_override,
+        COALESCE(t.agent_cut_override, apgc.cut_amount, 0) AS agent_cut_amount,
         tg.name AS grade_name,
         ${gradeCommissionExpr} AS commission_amount,
         ${gradeCommissionExpr} AS commission_percent,
         b.name AS branch_name
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+      LEFT JOIN agent_profiles ap ON ap.id = t.agent_profile_id
+      LEFT JOIN agent_profile_grade_cuts apgc ON apgc.agent_profile_id = t.agent_profile_id AND apgc.grade_id = t.grade_id
       LEFT JOIN branches b ON b.id = t.branch_id
       ${whereClause}
       ORDER BY t.name ASC
@@ -201,6 +240,7 @@ exports.getTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
     await ensureTherapistPinColumn(db)
+    await ensureAgentProfileStorage(db)
     const { id } = req.params
     const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
 
@@ -212,12 +252,18 @@ exports.getTherapist = async (req, res) => {
         t.grade_id,
         t.active,
         (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
+        t.agent_profile_id,
+        ap.name AS agent_profile_name,
+        t.agent_cut_override,
+        COALESCE(t.agent_cut_override, apgc.cut_amount, 0) AS agent_cut_amount,
         tg.name AS grade_name,
         ${gradeCommissionExpr} AS commission_amount,
         ${gradeCommissionExpr} AS commission_percent,
         b.name AS branch_name
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+      LEFT JOIN agent_profiles ap ON ap.id = t.agent_profile_id
+      LEFT JOIN agent_profile_grade_cuts apgc ON apgc.agent_profile_id = t.agent_profile_id AND apgc.grade_id = t.grade_id
       LEFT JOIN branches b ON b.id = t.branch_id
       WHERE t.id = $1
     `, [id])
@@ -336,7 +382,8 @@ exports.createTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
     await ensureTherapistPinColumn(db)
-    const { name, grade_id, branch_id, attendance_pin } = req.body
+    await ensureAgentProfileStorage(db)
+    const { name, grade_id, branch_id, attendance_pin, agent_profile_id, agent_cut_override } = req.body
 
     // Validation
     if (!name || !grade_id) {
@@ -351,12 +398,21 @@ exports.createTherapist = async (req, res) => {
       return res.status(400).json({ message: 'PIN absensi minimal 4 karakter' })
     }
 
+    const normalizedAgentOverride = agent_cut_override === undefined || agent_cut_override === null || agent_cut_override === ''
+      ? null
+      : Number(agent_cut_override)
+    if (normalizedAgentOverride !== null && (Number.isNaN(normalizedAgentOverride) || normalizedAgentOverride < 0)) {
+      return res.status(400).json({ message: 'Potongan agent manual harus angka >= 0' })
+    }
+
     const { rows } = await db.query(`
-      INSERT INTO therapists (name, grade_id, branch_id, active, attendance_pin)
-      VALUES ($1, $2, $3, true, $4)
+      INSERT INTO therapists (name, grade_id, branch_id, active, attendance_pin, agent_profile_id, agent_cut_override)
+      VALUES ($1, $2, $3, true, $4, $5, $6)
       RETURNING id, name, grade_id, branch_id, active,
-        (attendance_pin IS NOT NULL AND attendance_pin <> '') AS has_attendance_pin
-    `, [name, grade_id, finalBranchId, normalizedPin || null])
+        (attendance_pin IS NOT NULL AND attendance_pin <> '') AS has_attendance_pin,
+        agent_profile_id,
+        agent_cut_override
+    `, [name, grade_id, finalBranchId, normalizedPin || null, agent_profile_id || null, normalizedAgentOverride])
 
     res.status(201).json(rows[0])
   } catch (err) {
@@ -370,8 +426,9 @@ exports.updateTherapist = async (req, res) => {
   try {
     const db = req.app.get("db")
     await ensureTherapistPinColumn(db)
+    await ensureAgentProfileStorage(db)
     const { id } = req.params
-    const { name, grade_id, branch_id, active, attendance_pin, service_addon_amount } = req.body
+    const { name, grade_id, branch_id, active, attendance_pin, service_addon_amount, agent_profile_id, agent_cut_override } = req.body
 
     // Build update fields
     let updateFields = []
@@ -423,6 +480,24 @@ exports.updateTherapist = async (req, res) => {
       paramIndex++
     }
 
+    if (agent_profile_id !== undefined) {
+      updateFields.push(`agent_profile_id = $${paramIndex}`)
+      params.push(agent_profile_id || null)
+      paramIndex++
+    }
+
+    if (agent_cut_override !== undefined) {
+      const normalizedOverride = agent_cut_override === null || agent_cut_override === ''
+        ? null
+        : Number(agent_cut_override)
+      if (normalizedOverride !== null && (Number.isNaN(normalizedOverride) || normalizedOverride < 0)) {
+        return res.status(400).json({ message: 'Potongan agent manual harus angka >= 0' })
+      }
+      updateFields.push(`agent_cut_override = $${paramIndex}`)
+      params.push(normalizedOverride)
+      paramIndex++
+    }
+
     if (updateFields.length === 0) {
       return res.status(400).json({ message: "No fields to update" })
     }
@@ -434,7 +509,9 @@ exports.updateTherapist = async (req, res) => {
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
       RETURNING id, name, grade_id, branch_id, active,
-        (attendance_pin IS NOT NULL AND attendance_pin <> '') AS has_attendance_pin
+        (attendance_pin IS NOT NULL AND attendance_pin <> '') AS has_attendance_pin,
+        agent_profile_id,
+        agent_cut_override
     `, params)
 
     if (rows.length === 0) {
@@ -444,6 +521,159 @@ exports.updateTherapist = async (req, res) => {
     res.json(rows[0])
   } catch (err) {
     console.error("UPDATE THERAPIST ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.getAgentProfiles = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureAgentProfileStorage(db)
+    const { include_inactive } = req.query
+
+    const where = include_inactive === 'true' ? '' : 'WHERE ap.active = true'
+    const { rows } = await db.query(
+      `SELECT
+         ap.id,
+         ap.name,
+         ap.active,
+         COALESCE(
+           json_agg(
+             json_build_object(
+               'grade_id', g.id,
+               'grade_name', g.name,
+               'cut_amount', COALESCE(apgc.cut_amount, 0)
+             )
+             ORDER BY g.name
+           ) FILTER (WHERE g.id IS NOT NULL),
+           '[]'::json
+         ) AS grade_cuts
+       FROM agent_profiles ap
+       LEFT JOIN therapist_grades g ON true
+       LEFT JOIN agent_profile_grade_cuts apgc
+         ON apgc.agent_profile_id = ap.id
+        AND apgc.grade_id = g.id
+       ${where}
+       GROUP BY ap.id
+       ORDER BY ap.name ASC`
+    )
+
+    res.json(rows)
+  } catch (err) {
+    console.error('GET AGENT PROFILES ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.createAgentProfile = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureAgentProfileStorage(db)
+    const name = String(req.body?.name || '').trim()
+    const gradeCuts = Array.isArray(req.body?.grade_cuts) ? req.body.grade_cuts : []
+
+    if (!name) {
+      return res.status(400).json({ message: 'Nama agent profile wajib diisi' })
+    }
+
+    const { rows } = await db.query(
+      `INSERT INTO agent_profiles (name, active)
+       VALUES ($1, true)
+       RETURNING id, name, active`,
+      [name]
+    )
+
+    const profile = rows[0]
+    for (const item of gradeCuts) {
+      const gradeId = Number(item?.grade_id)
+      const cutAmount = Number(item?.cut_amount || 0)
+      if (!Number.isInteger(gradeId) || gradeId <= 0) continue
+      if (Number.isNaN(cutAmount) || cutAmount < 0) {
+        return res.status(400).json({ message: 'Nominal potongan grade harus angka >= 0' })
+      }
+      await db.query(
+        `INSERT INTO agent_profile_grade_cuts (agent_profile_id, grade_id, cut_amount)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (agent_profile_id, grade_id)
+         DO UPDATE SET cut_amount = EXCLUDED.cut_amount`,
+        [profile.id, gradeId, cutAmount]
+      )
+    }
+
+    res.status(201).json(profile)
+  } catch (err) {
+    console.error('CREATE AGENT PROFILE ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.updateAgentProfile = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureAgentProfileStorage(db)
+    const profileId = Number(req.params.id)
+    const { name, active, grade_cuts } = req.body || {}
+
+    if (!Number.isInteger(profileId) || profileId <= 0) {
+      return res.status(400).json({ message: 'Agent profile tidak valid' })
+    }
+
+    const fields = []
+    const params = []
+    let idx = 1
+    if (name !== undefined) {
+      fields.push(`name = $${idx++}`)
+      params.push(String(name || '').trim())
+    }
+    if (active !== undefined) {
+      fields.push(`active = $${idx++}`)
+      params.push(Boolean(active))
+    }
+
+    if (fields.length) {
+      params.push(profileId)
+      const updated = await db.query(
+        `UPDATE agent_profiles
+         SET ${fields.join(', ')}
+         WHERE id = $${idx}
+         RETURNING id, name, active`,
+        params
+      )
+      if (!updated.rows.length) {
+        return res.status(404).json({ message: 'Agent profile tidak ditemukan' })
+      }
+    }
+
+    if (Array.isArray(grade_cuts)) {
+      for (const item of grade_cuts) {
+        const gradeId = Number(item?.grade_id)
+        const cutAmount = Number(item?.cut_amount || 0)
+        if (!Number.isInteger(gradeId) || gradeId <= 0) continue
+        if (Number.isNaN(cutAmount) || cutAmount < 0) {
+          return res.status(400).json({ message: 'Nominal potongan grade harus angka >= 0' })
+        }
+        await db.query(
+          `INSERT INTO agent_profile_grade_cuts (agent_profile_id, grade_id, cut_amount)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (agent_profile_id, grade_id)
+           DO UPDATE SET cut_amount = EXCLUDED.cut_amount`,
+          [profileId, gradeId, cutAmount]
+        )
+      }
+    }
+
+    const latest = await db.query(
+      'SELECT id, name, active FROM agent_profiles WHERE id = $1',
+      [profileId]
+    )
+
+    if (!latest.rows.length) {
+      return res.status(404).json({ message: 'Agent profile tidak ditemukan' })
+    }
+
+    res.json(latest.rows[0])
+  } catch (err) {
+    console.error('UPDATE AGENT PROFILE ERROR:', err)
     res.status(500).json({ message: err.message })
   }
 }
