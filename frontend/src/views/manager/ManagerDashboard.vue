@@ -13,6 +13,8 @@
         <button class="nav-btn" :class="{active:tab==='branches'}" @click="tab='branches'"><Building2 size="18" /> Branches</button>
         <button class="nav-btn" :class="{active:tab==='services'}" @click="tab='services'"><BellRing size="18" /> Services</button>
         <button class="nav-btn" :class="{active:tab==='therapists'}" @click="tab='therapists'"><UsersIcon size="18" /> Therapists</button>
+        <button class="nav-btn" :class="{active:tab==='agent-profiles'}" @click="tab='agent-profiles'"><Calculator size="18" /> Agent Profiles</button>
+        <button class="nav-btn" :class="{active:tab==='coa'}" @click="tab='coa'"><BookCopy size="18" /> COA</button>
         <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
@@ -135,6 +137,8 @@
       <Branches v-else-if="tab==='branches'" />
       <Services v-else-if="tab==='services'" :branch-id="Number(selectedBranch) || 1" />
       <Therapists v-else-if="tab==='therapists'" />
+      <AgentProfiles v-else-if="tab==='agent-profiles'" />
+      <ChartOfAccounts v-else-if="tab==='coa'" />
       <Rooms v-else-if="tab==='rooms'" />
       <StockDashboard v-else-if="tab==='stock'" />
       <Grades v-else-if="tab==='grades'" />
@@ -162,9 +166,11 @@ import StockDashboard from "../stock/StockDashboard.vue"
 import ProfilePasswordCard from "../../components/ProfilePasswordCard.vue"
 import AuditLogs from "../superadmin/AuditLogs.vue"
 import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
+import AgentProfiles from "../superadmin/AgentProfiles.vue"
+import ChartOfAccounts from "../superadmin/ChartOfAccounts.vue"
 import { useAuthStore } from "../../store/auth.store"
 // Keep Users icon aliased to avoid SFC identifier collisions with local/component names.
-import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
+import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer, Calculator, BookCopy } from "lucide-vue-next"
 
 const tab = ref("accounting-uat")
 const branches = ref([])
