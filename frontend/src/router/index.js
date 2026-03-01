@@ -54,6 +54,12 @@ const routes = [
     meta: { auth: true, roles: ['SuperAdmin'] }
   },
 
+  {
+    path: '/owner/accounting-uat',
+    component: AccountingUAT,
+    meta: { auth: true, roles: ['Owner', 'SuperAdmin'] }
+  },
+
   // SUPERVISOR
   {
     path: "/supervisor",

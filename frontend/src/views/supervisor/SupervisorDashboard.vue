@@ -133,7 +133,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in filteredTherapistPnl" :key="`${row.therapist_name}-${row.category}-${row.service_name}`">
+          <tr v-for="row in filteredTherapistPnl" :key="row._key || `${row.therapist_name}-${row.category}-${row.service_name}`">
             <td>{{ row.therapist_name }}</td>
             <td>{{ row.grade_name }}</td>
             <td>{{ row.service_name }}</td>
@@ -286,6 +286,7 @@ const undoPagination = ref({ page: 1, page_size: 20, total: 0, total_pages: 1 })
 
 const reportFilters = ref({ date_from: "", date_to: "" })
 const report = ref({ summary: { revenue: 0, paid_orders: 0, items_sold: 0 }, breakdown: [], service_details: [], pnl_services: [], therapist_pnl: [] })
+const therapistMaster = ref([])
 const selectedCategory = ref('')
 const therapistFilterName = ref('')
 
@@ -303,10 +304,35 @@ const totalStockValue = computed(() => fnbItems.value.reduce((acc, i) => acc + N
 const pendingCount = computed(() => stockRequests.value.filter((i) => i.status === "PENDING").length)
 const undoPendingCount = computed(() => undoRequests.value.filter((i) => i.status === "PENDING").length)
 const selectedCategoryServices = computed(() => (report.value.service_details || []).filter((r) => r.category === selectedCategory.value))
-const therapistNameOptions = computed(() => [...new Set((report.value.therapist_pnl || []).map((r) => r.therapist_name))].sort())
+const therapistNameOptions = computed(() => {
+  const reportNames = (report.value.therapist_pnl || []).map((r) => String(r.therapist_name || '').trim()).filter(Boolean)
+  const masterNames = (therapistMaster.value || []).map((r) => String(r.name || '').trim()).filter(Boolean)
+  return [...new Set([...reportNames, ...masterNames])].sort()
+})
+
 const filteredTherapistPnl = computed(() => {
   const rows = report.value.therapist_pnl || []
-  return therapistFilterName.value ? rows.filter((r) => r.therapist_name === therapistFilterName.value) : rows
+  if (rows.length) {
+    return therapistFilterName.value ? rows.filter((r) => r.therapist_name === therapistFilterName.value) : rows
+  }
+
+  const fallbackRows = (therapistMaster.value || []).map((t) => ({
+    _key: `master-${t.id}`,
+    therapist_name: t.name,
+    grade_name: t.grade_name || '-',
+    category: '-',
+    service_name: '-',
+    qty: 0,
+    happy_hour_revenue: 0,
+    non_happy_hour_revenue: 0,
+    package_revenue: 0,
+    non_package_revenue: 0,
+    therapist_total_kerja: 0
+  }))
+
+  return therapistFilterName.value
+    ? fallbackRows.filter((r) => r.therapist_name === therapistFilterName.value)
+    : fallbackRows
 })
 const therapistPerformanceMap = computed(() => {
   const map = new Map()
@@ -373,8 +399,18 @@ const loadReport = async () => {
   report.value = res.data
 }
 
+
+const loadTherapistMaster = async () => {
+  try {
+    const res = await api.get('/therapists', { params: { page: 1, limit: 200, active: 'true' } })
+    therapistMaster.value = Array.isArray(res.data?.data) ? res.data.data : []
+  } catch (err) {
+    therapistMaster.value = []
+  }
+}
+
 const loadAll = async () => {
-  await Promise.all([loadOutletSession(), loadFnb(), loadStockRequests(), loadUndoRequests(), loadReport()])
+  await Promise.all([loadOutletSession(), loadFnb(), loadStockRequests(), loadUndoRequests(), loadReport(), loadTherapistMaster()])
 }
 
 const approveStock = async (id) => { await api.post(`/fnb/stock/requests/${id}/approve`); await Swal.fire({ icon: 'success', title: 'Request stock approved' }); await Promise.all([loadStockRequests(), loadFnb()]) }

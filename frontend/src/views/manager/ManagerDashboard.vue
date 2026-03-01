@@ -13,6 +13,7 @@
         <button class="nav-btn" :class="{active:tab==='branches'}" @click="tab='branches'"><Building2 size="18" /> Branches</button>
         <button class="nav-btn" :class="{active:tab==='services'}" @click="tab='services'"><BellRing size="18" /> Services</button>
         <button class="nav-btn" :class="{active:tab==='therapists'}" @click="tab='therapists'"><UsersIcon size="18" /> Therapists</button>
+        <button class="nav-btn" :class="{active:tab==='agent-profiles'}" @click="tab='agent-profiles'"><Calculator size="18" /> Agent Profiles</button>
         <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
@@ -61,6 +62,58 @@
           <article class="card kpi"><p>Beban Terapis (Kerja × Komisi)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
           <article class="card kpi"><p>Total Beban</p><h3>Rp {{ formatCurrency(totalExpense) }}</h3></article>
           <article class="card kpi"><p>Net Profit/Loss</p><h3 :class="netProfit>=0?'good':'bad'">Rp {{ formatCurrency(netProfit) }}</h3></article>
+        </section>
+
+
+
+        <section class="card">
+          <div class="table-head">
+            <h4>Finance Report Terapis & Agent</h4>
+            <small class="muted">Formula: (Base Price Non-HH) - (agent_fee + salon + room + safety + denda + lain_lain) × total_kerja</small>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Terapis</th>
+                <th>Grade</th>
+                <th>Base Non-HH</th>
+                <th>Total Kerja</th>
+                <th>Agent Fee</th>
+                <th>Salon</th>
+                <th>Room</th>
+                <th>Safety</th>
+                <th>Denda</th>
+                <th>Lain-lain</th>
+                <th>Total Potongan</th>
+                <th>Pendapatan Terapis</th>
+                <th>Pendapatan Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!therapistFinanceRows.length">
+                <td colspan="13" class="muted">Belum ada data terapis untuk periode ini.</td>
+              </tr>
+              <tr v-for="row in therapistFinanceRows" :key="row.key">
+                <td>{{ row.therapist_name }}</td>
+                <td>{{ row.grade_name }}</td>
+                <td class="num">Rp {{ formatCurrency(row.base_non_hh) }}</td>
+                <td class="num">{{ row.total_kerja }}</td>
+                <td class="num">Rp {{ formatCurrency(row.agent_fee) }}</td>
+                <td><input class="mini-select" type="number" min="0" :value="row.salon" @input="setTherapistManual(row.therapist_name, 'salon', $event.target.value)" /></td>
+                <td><input class="mini-select" type="number" min="0" :value="row.room" @input="setTherapistManual(row.therapist_name, 'room', $event.target.value)" /></td>
+                <td><input class="mini-select" type="number" min="0" :value="row.safety" @input="setTherapistManual(row.therapist_name, 'safety', $event.target.value)" /></td>
+                <td><input class="mini-select" type="number" min="0" :value="row.denda" @input="setTherapistManual(row.therapist_name, 'denda', $event.target.value)" /></td>
+                <td><input class="mini-select" type="number" min="0" :value="row.lain_lain" @input="setTherapistManual(row.therapist_name, 'lain_lain', $event.target.value)" /></td>
+                <td class="num">Rp {{ formatCurrency(row.total_deduction_amount) }}</td>
+                <td class="num" :class="row.therapist_income >= 0 ? 'good' : 'bad'">Rp {{ formatCurrency(row.therapist_income) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="totals">
+            <span>Total Pendapatan Terapis: <strong>Rp {{ formatCurrency(totalTherapistIncome) }}</strong></span>
+            <span>Total Pendapatan Agent: <strong>Rp {{ formatCurrency(totalAgentIncome) }}</strong></span>
+          </div>
         </section>
 
         <section class="card chart-grid">
@@ -135,6 +188,7 @@
       <Branches v-else-if="tab==='branches'" />
       <Services v-else-if="tab==='services'" :branch-id="Number(selectedBranch) || 1" />
       <Therapists v-else-if="tab==='therapists'" />
+      <AgentProfiles v-else-if="tab==='agent-profiles'" />
       <Rooms v-else-if="tab==='rooms'" />
       <StockDashboard v-else-if="tab==='stock'" />
       <Grades v-else-if="tab==='grades'" />
@@ -162,9 +216,10 @@ import StockDashboard from "../stock/StockDashboard.vue"
 import ProfilePasswordCard from "../../components/ProfilePasswordCard.vue"
 import AuditLogs from "../superadmin/AuditLogs.vue"
 import PrinterAgentTools from "../superadmin/PrinterAgentTools.vue"
+import AgentProfiles from "../superadmin/AgentProfiles.vue"
 import { useAuthStore } from "../../store/auth.store"
 // Keep Users icon aliased to avoid SFC identifier collisions with local/component names.
-import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer } from "lucide-vue-next"
+import { ChartNoAxesColumn, ReceiptText, Timer, Building2, BellRing, Users as UsersIcon, DoorOpen, Package, Trophy, LogOut, User, ScrollText, ShieldCheck, Printer, Calculator } from "lucide-vue-next"
 
 const tab = ref("accounting-uat")
 const branches = ref([])
@@ -178,6 +233,9 @@ const fixedSalaryCost = ref(0)
 const manualExpenses = ref([])
 const ordersPage = ref(1)
 const ordersPageSize = ref(25)
+const therapistAnalytics = ref([])
+const therapistMaster = ref([])
+const therapistManualCosts = ref({})
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -204,15 +262,21 @@ const loadReport = async () => {
   loading.value = true
   loadError.value = ""
   try {
-    const [ordersRes, branchRes] = await Promise.all([
+    const [ordersRes, branchRes, analyticsRes, therapistRes] = await Promise.all([
       api.get("/superadmin/orders"),
-      api.get("/superadmin/branches")
+      api.get("/superadmin/branches"),
+      api.get('/dashboard/kasir/analytics', { params: { preset: 'daily', date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined } }),
+      api.get('/therapists', { params: { page: 1, limit: 500, active: 'true', ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } })
     ])
     orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
     branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
+    therapistAnalytics.value = Array.isArray(analyticsRes.data?.therapist_pnl) ? analyticsRes.data.therapist_pnl : []
+    therapistMaster.value = Array.isArray(therapistRes.data?.data) ? therapistRes.data.data : []
   } catch (err) {
     orders.value = []
     branches.value = []
+    therapistAnalytics.value = []
+    therapistMaster.value = []
     loadError.value = err?.response?.data?.message || "Gagal memuat data manager"
     await Swal.fire({ icon: "error", title: "Load report gagal", text: loadError.value })
   } finally {
@@ -258,7 +322,92 @@ const pagedFilteredOrders = computed(() => {
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Number(o.total || 0), 0))
 const paidOrders = computed(() => paidOrdersList.value.length)
-const therapistSalaryCost = computed(() => 0)
+const normalizeTherapistName = (name) => String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/gi, '')
+
+const therapistMasterMap = computed(() => {
+  const map = new Map()
+  for (const item of therapistMaster.value) {
+    const key = normalizeTherapistName(item.name)
+    if (!key) continue
+    if (!map.has(key)) map.set(key, item)
+  }
+  return map
+})
+
+const getTherapistManual = (name) => {
+  const key = normalizeTherapistName(name)
+  return therapistManualCosts.value[key] || { salon: 0, room: 0, safety: 0, denda: 0, lain_lain: 0 }
+}
+
+const setTherapistManual = (name, field, value) => {
+  const key = normalizeTherapistName(name)
+  if (!key) return
+  const current = getTherapistManual(name)
+  therapistManualCosts.value = {
+    ...therapistManualCosts.value,
+    [key]: {
+      ...current,
+      [field]: Math.max(0, Number(value || 0))
+    }
+  }
+}
+
+const therapistFinanceRows = computed(() => {
+  const grouped = new Map()
+  for (const row of therapistAnalytics.value) {
+    const name = String(row.therapist_name || '').trim()
+    if (!name) continue
+    const key = normalizeTherapistName(name)
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        key,
+        therapist_name: name,
+        base_non_hh: 0,
+        total_kerja: 0
+      })
+    }
+    const acc = grouped.get(key)
+    acc.base_non_hh += Number(row.non_happy_hour_revenue || 0)
+    acc.total_kerja = Math.max(acc.total_kerja, Number(row.therapist_total_kerja || row.total_revenue || 0))
+  }
+
+  if (!grouped.size) {
+    for (const t of therapistMaster.value) {
+      const key = normalizeTherapistName(t.name)
+      if (!key || grouped.has(key)) continue
+      grouped.set(key, { key, therapist_name: t.name, base_non_hh: 0, total_kerja: 0 })
+    }
+  }
+
+  return [...grouped.values()].map((item) => {
+    const master = therapistMasterMap.value.get(item.key)
+    const manual = getTherapistManual(item.therapist_name)
+    const agentFee = Number(master?.agent_cut_amount || master?.agent_cut_override || 0)
+    const totalRateDeduction = agentFee + Number(manual.salon || 0) + Number(manual.room || 0) + Number(manual.safety || 0) + Number(manual.denda || 0) + Number(manual.lain_lain || 0)
+    const totalDeductionAmount = totalRateDeduction * Number(item.total_kerja || 0)
+    const therapistIncome = Number(item.base_non_hh || 0) - totalDeductionAmount
+    const agentIncome = Number(agentFee || 0) * Number(item.total_kerja || 0)
+
+    return {
+      ...item,
+      grade_name: master?.grade_name || '-',
+      agent_fee: agentFee,
+      salon: Number(manual.salon || 0),
+      room: Number(manual.room || 0),
+      safety: Number(manual.safety || 0),
+      denda: Number(manual.denda || 0),
+      lain_lain: Number(manual.lain_lain || 0),
+      total_deduction_amount: totalDeductionAmount,
+      therapist_income: therapistIncome,
+      agent_income: agentIncome
+    }
+  }).sort((a, b) => a.therapist_name.localeCompare(b.therapist_name))
+})
+
+const totalTherapistIncome = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Number(row.therapist_income || 0), 0))
+const totalAgentIncome = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Number(row.agent_income || 0), 0))
+
+const therapistSalaryCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
 const totalExpense = computed(() => therapistSalaryCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
