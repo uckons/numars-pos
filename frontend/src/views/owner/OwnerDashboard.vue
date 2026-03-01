@@ -5,6 +5,7 @@
       <nav>
         <button class="nav-btn" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">📊 Dashboard</button>
         <button class="nav-btn" :class="{ active: tab === 'agent-profiles' }" @click="tab = 'agent-profiles'">🧮 Agent Profiles</button>
+        <button class="nav-btn" :class="{ active: tab === 'coa' }" @click="tab = 'coa'">📚 COA</button>
       </nav>
       <button class="logout nav-btn" @click="logout">Logout</button>
     </aside>
@@ -56,6 +57,7 @@
       </div>
 
       <AgentProfiles v-else-if="tab === 'agent-profiles'" />
+      <ChartOfAccounts v-else-if="tab === 'coa'" />
     </main>
   </div>
 </template>
@@ -65,6 +67,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth.store'
 import AgentProfiles from '../superadmin/AgentProfiles.vue'
+import ChartOfAccounts from '../superadmin/ChartOfAccounts.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
