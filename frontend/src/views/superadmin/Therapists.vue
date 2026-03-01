@@ -2,9 +2,12 @@
   <div class="therapists-page">
     <div class="page-header">
       <h1>👤 Manajemen Terapis</h1>
-      <button class="btn btn-add" @click="openAddModal">
-        ➕ Tambah Terapis
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-outline" @click="openAgentGridModal">🧮 Grid Agent</button>
+        <button class="btn btn-add" @click="openAddModal">
+          ➕ Tambah Terapis
+        </button>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -62,6 +65,8 @@
             <th>Nama</th>
             <th>Grade</th>
             <th>Komisi</th>
+            <th>Agent</th>
+            <th>Potongan Agent</th>
             <th>Cabang</th>
             <th>Status</th>
             <th>PIN Absensi</th>
@@ -70,12 +75,12 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="8" class="loading">
+            <td colspan="10" class="loading">
               Loading...
             </td>
           </tr>
           <tr v-else-if="therapists.length === 0">
-            <td colspan="8" class="empty">
+            <td colspan="10" class="empty">
               Tidak ada data terapis
             </td>
           </tr>
@@ -88,6 +93,8 @@
               </span>
             </td>
             <td>{{ formatAccounting(getTherapistCommission(therapist)) }}</td>
+            <td>{{ therapist.agent_profile_name || '-' }}</td>
+            <td>{{ formatAccounting(getTherapistAgentCut(therapist)) }}</td>
             <td>{{ therapist.branch_name }}</td>
             <td>
               <span class="status" :class="therapist.active ? 'status-active' : 'status-inactive'">
@@ -188,6 +195,27 @@
             </select>
           </div>
 
+          <div class="form-group">
+            <label>Agent Profile</label>
+            <select v-model="form.agent_profile_id">
+              <option value="">Tanpa Agent</option>
+              <option v-for="agent in agentProfiles" :key="agent.id" :value="agent.id">
+                {{ agent.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Potongan Agent Manual</label>
+            <input
+              type="number"
+              min="0"
+              v-model="form.agent_cut_override"
+              placeholder="Kosong = ikut grid agent profile"
+            />
+            <small class="help-text">Contoh: Terapis Grade Pink bisa override jadi Rp 50.000.</small>
+          </div>
+
           <div class="form-group" v-if="isEdit">
             <label>Status</label>
             <select v-model="form.active">
@@ -207,6 +235,69 @@
         </form>
       </div>
     </div>
+
+
+    <!-- Modal Agent Grid Profile -->
+    <div v-if="showAgentGridModal" class="modal-overlay" @click="closeAgentGridModal">
+      <div class="modal-content agent-grid-modal" @click.stop>
+        <div class="modal-header">
+          <h2>🧮 Grid Potongan Agent</h2>
+          <button class="modal-close" @click="closeAgentGridModal">✕</button>
+        </div>
+
+        <div class="agent-grid-toolbar">
+          <div class="form-group">
+            <label>Pilih Agent Profile</label>
+            <select v-model="agentGridForm.id" @change="onChangeAgentGridProfile">
+              <option value="">-- Pilih Profile --</option>
+              <option v-for="agent in agentProfiles" :key="agent.id" :value="agent.id">
+                {{ agent.name }}
+              </option>
+            </select>
+          </div>
+
+          <button class="btn btn-secondary" type="button" @click="startCreateAgentGridProfile">+ Profile Baru</button>
+        </div>
+
+        <div class="form-group">
+          <label>Nama Agent Profile</label>
+          <input v-model="agentGridForm.name" type="text" placeholder="Contoh: Agent A" />
+        </div>
+
+        <div class="table-container">
+          <table class="therapists-table">
+            <thead>
+              <tr>
+                <th>Grade</th>
+                <th>Potongan (Rp)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in agentGridForm.grade_cuts" :key="row.grade_id">
+                <td>{{ row.grade_name }}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    v-model="row.cut_amount"
+                    class="agent-grid-input"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-primary" :disabled="agentGridSubmitting" @click="saveAgentGridProfile">
+            {{ agentGridSubmitting ? 'Menyimpan...' : 'Simpan Grid' }}
+          </button>
+          <button class="btn btn-secondary" @click="closeAgentGridModal">Tutup</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -220,8 +311,11 @@ import 'sweetalert2/dist/sweetalert2.min.css'
 const therapists = ref([])
 const grades = ref([])
 const branches = ref([])
+const agentProfiles = ref([])
 const loading = ref(false)
 const submitting = ref(false)
+const showAgentGridModal = ref(false)
+const agentGridSubmitting = ref(false)
 
 const filters = ref({
   grade_id: '',
@@ -246,7 +340,15 @@ const form = ref({
   grade_id: '',
   branch_id: '',
   active: true,
-  attendance_pin: ''
+  attendance_pin: '',
+  agent_profile_id: '',
+  agent_cut_override: ''
+})
+
+const agentGridForm = ref({
+  id: '',
+  name: '',
+  grade_cuts: []
 })
 
 let searchTimeout = null
@@ -272,6 +374,27 @@ const formatAccounting = (value) => {
 
 const getGradeCommission = (grade) => Number(grade?.commission_amount ?? grade?.commission_percent ?? 0)
 const getTherapistCommission = (therapist) => Number(therapist?.commission_amount ?? therapist?.commission_percent ?? 0)
+const getTherapistAgentCut = (therapist) => Number(therapist?.agent_cut_amount ?? therapist?.agent_cut_override ?? 0)
+
+const makeDefaultGradeCuts = () => grades.value.map((grade) => ({
+  grade_id: grade.id,
+  grade_name: grade.name,
+  cut_amount: 0
+}))
+
+const hydrateAgentGridForm = (profile = null) => {
+  const cutsMap = new Map((profile?.grade_cuts || []).map((item) => [Number(item.grade_id), Number(item.cut_amount || 0)]))
+  agentGridForm.value = {
+    id: profile?.id || '',
+    name: profile?.name || '',
+    grade_cuts: grades.value.map((grade) => ({
+      grade_id: grade.id,
+      grade_name: grade.name,
+      cut_amount: cutsMap.get(Number(grade.id)) ?? 0
+    }))
+  }
+}
+
 
 // Fetch Therapists
 const fetchTherapists = async () => {
@@ -324,6 +447,81 @@ const fetchBranches = async () => {
   }
 }
 
+
+const fetchAgentProfiles = async () => {
+  try {
+    const res = await api.get('/therapists/agent-profiles')
+    agentProfiles.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Fetch agent profiles error:', err)
+    agentProfiles.value = []
+  }
+}
+
+
+
+const openAgentGridModal = () => {
+  showAgentGridModal.value = true
+  if (!agentProfiles.value.length) {
+    hydrateAgentGridForm(null)
+    return
+  }
+  const first = agentProfiles.value[0]
+  hydrateAgentGridForm(first)
+}
+
+const closeAgentGridModal = () => {
+  showAgentGridModal.value = false
+}
+
+const onChangeAgentGridProfile = () => {
+  const selected = agentProfiles.value.find((item) => Number(item.id) === Number(agentGridForm.value.id))
+  hydrateAgentGridForm(selected || null)
+}
+
+const startCreateAgentGridProfile = () => {
+  hydrateAgentGridForm(null)
+}
+
+const saveAgentGridProfile = async () => {
+  try {
+    const name = String(agentGridForm.value.name || '').trim()
+    if (!name) {
+      await SwalTheme.fire({ icon: 'warning', title: 'Nama wajib diisi', text: 'Isi nama agent profile dulu.' })
+      return
+    }
+
+    const payload = {
+      name,
+      grade_cuts: agentGridForm.value.grade_cuts.map((row) => ({
+        grade_id: row.grade_id,
+        cut_amount: Number(row.cut_amount || 0)
+      }))
+    }
+
+    agentGridSubmitting.value = true
+    if (agentGridForm.value.id) {
+      await api.put(`/therapists/agent-profiles/${agentGridForm.value.id}`, payload)
+    } else {
+      await api.post('/therapists/agent-profiles', payload)
+    }
+
+    await fetchAgentProfiles()
+    const latest = agentProfiles.value.find((item) => item.name === name)
+    hydrateAgentGridForm(latest || null)
+    await SwalTheme.fire({ icon: 'success', title: 'Berhasil', text: 'Grid agent profile berhasil disimpan', timer: 1800, showConfirmButton: false })
+  } catch (err) {
+    console.error('Save agent grid error:', err)
+    await SwalTheme.fire({
+      icon: 'error',
+      title: 'Gagal',
+      text: err.response?.data?.message || 'Gagal menyimpan grid agent profile'
+    })
+  } finally {
+    agentGridSubmitting.value = false
+  }
+}
+
 // Debounce Search
 const debounceSearch = () => {
   clearTimeout(searchTimeout)
@@ -360,7 +558,9 @@ const openAddModal = () => {
     grade_id: '',
     branch_id: '',
     active: true,
-    attendance_pin: ''
+    attendance_pin: '',
+    agent_profile_id: '',
+    agent_cut_override: ''
   }
   showModal.value = true
 }
@@ -374,7 +574,9 @@ const openEditModal = (therapist) => {
     grade_id: therapist.grade_id,
     branch_id: therapist.branch_id,
     active: therapist.active,
-    attendance_pin: ''
+    attendance_pin: '',
+    agent_profile_id: therapist.agent_profile_id || '',
+    agent_cut_override: therapist.agent_cut_override ?? ''
   }
   showModal.value = true
 }
@@ -387,7 +589,9 @@ const closeModal = () => {
     grade_id: '',
     branch_id: '',
     active: true,
-    attendance_pin: ''
+    attendance_pin: '',
+    agent_profile_id: '',
+    agent_cut_override: ''
   }
 }
 
@@ -474,6 +678,7 @@ const deleteTherapist = async (therapist) => {
 onMounted(() => {
   fetchGrades()
   fetchBranches()
+  fetchAgentProfiles()
   fetchTherapists()
 })
 </script>
@@ -492,6 +697,21 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #c9a24d;
+  border: 1px solid #c9a24d;
+}
+
+.btn-outline:hover {
+  background: rgba(201, 162, 77, 0.15);
 }
 
 .page-header h1 {
@@ -610,6 +830,27 @@ onMounted(() => {
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 24px;
+}
+
+.agent-grid-modal {
+  max-width: 920px;
+}
+
+.agent-grid-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.agent-grid-input {
+  width: 100%;
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #0e0e0e;
+  color: #fff;
 }
 
 .therapists-table {
