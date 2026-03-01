@@ -5,7 +5,7 @@
       <nav>
         <button class="nav-btn" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">📊 Dashboard</button>
         <button class="nav-btn" :class="{ active: tab === 'agent-profiles' }" @click="tab = 'agent-profiles'">🧮 Agent Profiles</button>
-        <button class="nav-btn" :class="{ active: tab === 'coa' }" @click="tab = 'coa'">📚 COA</button>
+        <button class="nav-btn" @click="openAccountingUAT">📒 Accounting UAT</button>
       </nav>
       <button class="logout nav-btn" @click="logout">Logout</button>
     </aside>
@@ -57,7 +57,6 @@
       </div>
 
       <AgentProfiles v-else-if="tab === 'agent-profiles'" />
-      <ChartOfAccounts v-else-if="tab === 'coa'" />
     </main>
   </div>
 </template>
@@ -67,7 +66,6 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth.store'
 import AgentProfiles from '../superadmin/AgentProfiles.vue'
-import ChartOfAccounts from '../superadmin/ChartOfAccounts.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -88,6 +86,11 @@ const format = n => new Intl.NumberFormat('id-ID').format(n || 0)
 const barHeight = (value) => {
   const max = Math.max(...daily.value.map(d => d.total), 1)
   return `${(value / max) * 160}px`
+}
+
+const openAccountingUAT = () => {
+  localStorage.setItem('accountingUAT.activeModule', 'coa')
+  router.push('/owner/accounting-uat?module=coa')
 }
 
 const logout = () => {
