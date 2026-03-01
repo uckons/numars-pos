@@ -189,6 +189,39 @@ const ensureTherapistPayrollTable = async () => {
   `)
 }
 
+
+const ensureAgentProfileStorage = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agent_profiles (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agent_profile_grade_cuts (
+      id SERIAL PRIMARY KEY,
+      agent_profile_id INT NOT NULL REFERENCES agent_profiles(id) ON DELETE CASCADE,
+      grade_id INT NOT NULL REFERENCES therapist_grades(id) ON DELETE CASCADE,
+      cut_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (agent_profile_id, grade_id)
+    )
+  `)
+
+  await db.query(`
+    ALTER TABLE therapists
+    ADD COLUMN IF NOT EXISTS agent_profile_id INT REFERENCES agent_profiles(id)
+  `)
+
+  await db.query(`
+    ALTER TABLE therapists
+    ADD COLUMN IF NOT EXISTS agent_cut_override NUMERIC(14,2)
+  `)
+}
+
 const resolveCommissionExpr = async () => {
   const { rows } = await db.query(`
     SELECT EXISTS (
@@ -204,6 +237,7 @@ const resolveCommissionExpr = async () => {
 
 exports.getTherapistPayrollSummary = async ({ branch_id, date_from, date_to }) => {
   await ensureTherapistPayrollTable()
+  await ensureAgentProfileStorage()
 
   const from = parseDate(date_from, 'Tanggal mulai')
   const to = parseDate(date_to, 'Tanggal akhir')
@@ -244,17 +278,23 @@ exports.getTherapistPayrollSummary = async ({ branch_id, date_from, date_to }) =
       w.therapist_id,
       COALESCE(th.name, 'Unknown Therapist') AS therapist_name,
       COALESCE(g.name, '-') AS grade_name,
+      COALESCE(ap.name, '-') AS agent_profile_name,
       ${commissionExpr} AS commission_amount,
+      COALESCE(th.agent_cut_override, apgc.cut_amount, 0)::numeric(14,2) AS agent_cut_amount,
       w.spa_work_count,
       w.lc_work_count,
       w.work_count,
       (w.work_count * ${commissionExpr})::numeric(14,2) AS gross_amount,
+      (w.work_count * COALESCE(th.agent_cut_override, apgc.cut_amount, 0))::numeric(14,2) AS agent_deduction_amount,
+      ((w.work_count * ${commissionExpr}) - (w.work_count * COALESCE(th.agent_cut_override, apgc.cut_amount, 0)))::numeric(14,2) AS net_amount,
       COALESCE(s.paid_amount, 0)::numeric(14,2) AS paid_amount,
-      ((w.work_count * ${commissionExpr}) - COALESCE(s.paid_amount, 0))::numeric(14,2) AS unsettled_amount,
+      (((w.work_count * ${commissionExpr}) - (w.work_count * COALESCE(th.agent_cut_override, apgc.cut_amount, 0))) - COALESCE(s.paid_amount, 0))::numeric(14,2) AS unsettled_amount,
       CASE WHEN COALESCE(s.paid_amount,0) > 0 THEN true ELSE false END AS already_paid
     FROM work_rows w
     LEFT JOIN therapists th ON th.id = w.therapist_id
     LEFT JOIN therapist_grades g ON g.id = th.grade_id
+    LEFT JOIN agent_profiles ap ON ap.id = th.agent_profile_id
+    LEFT JOIN agent_profile_grade_cuts apgc ON apgc.agent_profile_id = th.agent_profile_id AND apgc.grade_id = th.grade_id
     LEFT JOIN settlements s ON s.therapist_id = w.therapist_id
     ORDER BY therapist_name ASC
   `
@@ -269,11 +309,15 @@ exports.getTherapistPayrollSummary = async ({ branch_id, date_from, date_to }) =
       therapist_id: Number(r.therapist_id),
       therapist_name: r.therapist_name,
       grade_name: r.grade_name,
+      agent_profile_name: r.agent_profile_name,
       spa_work_count: Number(r.spa_work_count || 0),
       lc_work_count: Number(r.lc_work_count || 0),
       work_count: Number(r.work_count || 0),
       commission_amount: Number(r.commission_amount || 0),
       gross_amount: Number(r.gross_amount || 0),
+      agent_cut_amount: Number(r.agent_cut_amount || 0),
+      agent_deduction_amount: Number(r.agent_deduction_amount || 0),
+      net_amount: Number(r.net_amount || 0),
       paid_amount: Number(r.paid_amount || 0),
       unsettled_amount: Number(r.unsettled_amount || 0),
       already_paid: Boolean(r.already_paid)
