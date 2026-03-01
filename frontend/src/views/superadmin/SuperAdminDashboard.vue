@@ -12,6 +12,7 @@
         <button class="nav-btn" :class="{active:tab==='audit'}" @click="tab='audit'"><ShieldCheck size="18" /> Audit Logs</button>
         <button class="nav-btn" :class="{active:tab==='services'}" @click="tab='services'"><Store size="18" /> Services</button>
         <button class="nav-btn" :class="{active:tab==='therapists'}" @click="tab='therapists'"><UsersRound size="18" /> Therapists</button>
+        <button class="nav-btn" :class="{active:tab==='agent-profiles'}" @click="tab='agent-profiles'"><Calculator size="18" /> Agent Profiles</button>
         <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
@@ -32,6 +33,7 @@
       <AuditLogs v-if="tab==='audit'" />
       <Services v-if="tab==='services'" :branch-id="1" />
       <Therapists v-if="tab==='therapists'" />
+      <AgentProfiles v-if="tab==='agent-profiles'" />
       <Rooms v-if="tab==='rooms'" />
       <StockDashboard v-if="tab==='stock'" />
       <Grades v-if="tab==='grades'" />
@@ -56,6 +58,7 @@ import Therapists from './Therapists.vue'
 import Rooms from './Rooms.vue'
 import Grades from './Grades.vue'
 import PrinterAgentTools from './PrinterAgentTools.vue'
+import AgentProfiles from './AgentProfiles.vue'
 
 
 const tab = ref("users")
