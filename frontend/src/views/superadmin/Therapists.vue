@@ -62,6 +62,8 @@
             <th>Nama</th>
             <th>Grade</th>
             <th>Komisi</th>
+            <th>Agent</th>
+            <th>Potongan Agent</th>
             <th>Cabang</th>
             <th>Status</th>
             <th>PIN Absensi</th>
@@ -70,12 +72,12 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="8" class="loading">
+            <td colspan="10" class="loading">
               Loading...
             </td>
           </tr>
           <tr v-else-if="therapists.length === 0">
-            <td colspan="8" class="empty">
+            <td colspan="10" class="empty">
               Tidak ada data terapis
             </td>
           </tr>
@@ -88,6 +90,8 @@
               </span>
             </td>
             <td>{{ formatAccounting(getTherapistCommission(therapist)) }}</td>
+            <td>{{ therapist.agent_profile_name || '-' }}</td>
+            <td>{{ formatAccounting(getTherapistAgentCut(therapist)) }}</td>
             <td>{{ therapist.branch_name }}</td>
             <td>
               <span class="status" :class="therapist.active ? 'status-active' : 'status-inactive'">
@@ -188,6 +192,27 @@
             </select>
           </div>
 
+          <div class="form-group">
+            <label>Agent Profile</label>
+            <select v-model="form.agent_profile_id">
+              <option value="">Tanpa Agent</option>
+              <option v-for="agent in agentProfiles" :key="agent.id" :value="agent.id">
+                {{ agent.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Potongan Agent Manual</label>
+            <input
+              type="number"
+              min="0"
+              v-model="form.agent_cut_override"
+              placeholder="Kosong = ikut grid agent profile"
+            />
+            <small class="help-text">Contoh: Terapis Grade Pink bisa override jadi Rp 50.000.</small>
+          </div>
+
           <div class="form-group" v-if="isEdit">
             <label>Status</label>
             <select v-model="form.active">
@@ -220,6 +245,7 @@ import 'sweetalert2/dist/sweetalert2.min.css'
 const therapists = ref([])
 const grades = ref([])
 const branches = ref([])
+const agentProfiles = ref([])
 const loading = ref(false)
 const submitting = ref(false)
 
@@ -246,7 +272,9 @@ const form = ref({
   grade_id: '',
   branch_id: '',
   active: true,
-  attendance_pin: ''
+  attendance_pin: '',
+  agent_profile_id: '',
+  agent_cut_override: ''
 })
 
 let searchTimeout = null
@@ -272,6 +300,7 @@ const formatAccounting = (value) => {
 
 const getGradeCommission = (grade) => Number(grade?.commission_amount ?? grade?.commission_percent ?? 0)
 const getTherapistCommission = (therapist) => Number(therapist?.commission_amount ?? therapist?.commission_percent ?? 0)
+const getTherapistAgentCut = (therapist) => Number(therapist?.agent_cut_amount ?? therapist?.agent_cut_override ?? 0)
 
 // Fetch Therapists
 const fetchTherapists = async () => {
@@ -324,6 +353,17 @@ const fetchBranches = async () => {
   }
 }
 
+
+const fetchAgentProfiles = async () => {
+  try {
+    const res = await api.get('/therapists/agent-profiles')
+    agentProfiles.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Fetch agent profiles error:', err)
+    agentProfiles.value = []
+  }
+}
+
 // Debounce Search
 const debounceSearch = () => {
   clearTimeout(searchTimeout)
@@ -360,7 +400,9 @@ const openAddModal = () => {
     grade_id: '',
     branch_id: '',
     active: true,
-    attendance_pin: ''
+    attendance_pin: '',
+    agent_profile_id: '',
+    agent_cut_override: ''
   }
   showModal.value = true
 }
@@ -374,7 +416,9 @@ const openEditModal = (therapist) => {
     grade_id: therapist.grade_id,
     branch_id: therapist.branch_id,
     active: therapist.active,
-    attendance_pin: ''
+    attendance_pin: '',
+    agent_profile_id: therapist.agent_profile_id || '',
+    agent_cut_override: therapist.agent_cut_override ?? ''
   }
   showModal.value = true
 }
@@ -387,7 +431,9 @@ const closeModal = () => {
     grade_id: '',
     branch_id: '',
     active: true,
-    attendance_pin: ''
+    attendance_pin: '',
+    agent_profile_id: '',
+    agent_cut_override: ''
   }
 }
 
@@ -474,6 +520,7 @@ const deleteTherapist = async (therapist) => {
 onMounted(() => {
   fetchGrades()
   fetchBranches()
+  fetchAgentProfiles()
   fetchTherapists()
 })
 </script>

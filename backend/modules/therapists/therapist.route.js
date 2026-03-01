@@ -11,6 +11,12 @@ router.get("/", auth, controller.getTherapists)
 router.get("/attendance", auth, controller.getTherapistAttendance)
 router.post("/attendance/:id", auth, controller.setTherapistAttendance)
 
+
+// 👥 AGENT PROFILES
+router.get('/agent-profiles', auth, controller.getAgentProfiles)
+router.post('/agent-profiles', auth, controller.createAgentProfile)
+router.put('/agent-profiles/:id', auth, controller.updateAgentProfile)
+
 // 📋 GET SINGLE THERAPIST
 router.get("/:id", auth, controller.getTherapist)
 
