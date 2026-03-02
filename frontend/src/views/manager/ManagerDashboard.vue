@@ -188,8 +188,8 @@
                   <td></td>
                   <td colspan="7">
                     <div class="breakdown-grid">
-                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }} - {{ formatCurrency(row.spa_denda) }} - {{ formatCurrency(row.spa_lain_lain) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income) }}</strong></div>
-                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }} - {{ formatCurrency(row.lc_denda) }} - {{ formatCurrency(row.lc_lain_lain) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income) }}</strong></div>
+                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }}) × {{ row.spa_qty }} - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.spa_lain_lain) }}) = <strong>Rp {{ formatCurrency(row.spa_income) }}</strong></div>
+                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }}) × {{ row.lc_qty }} - ({{ formatCurrency(row.lc_denda) }} + {{ formatCurrency(row.lc_lain_lain) }}) = <strong>Rp {{ formatCurrency(row.lc_income) }}</strong></div>
                     </div>
                   </td>
                 </tr>
@@ -453,11 +453,11 @@ const therapistFinanceRows = computed(() => {
     const lcSalon = Number(financeConfig.value.lc_salon || 0)
     const lcLainLain = Number(financeConfig.value.lc_lain_lain || 0)
 
-    const spaNetRate = servicePrice - agentFee - spaRoom - spaSalon - spaSafety - spaDenda - spaLainLain
-    const lcNetRate = servicePrice - agentFee - lcRoom - lcSalon - lcDenda - lcLainLain
+    const spaNetRate = servicePrice - agentFee - spaRoom - spaSalon - spaSafety
+    const lcNetRate = servicePrice - agentFee - lcRoom - lcSalon
 
-    const spaIncome = spaNetRate * spaQty
-    const lcIncome = lcNetRate * lcQty
+    const spaIncome = (spaNetRate * spaQty) - (spaDenda + spaLainLain)
+    const lcIncome = (lcNetRate * lcQty) - (lcDenda + lcLainLain)
     const therapistIncome = spaIncome + lcIncome
     const agentIncome = (spaQty + lcQty) * agentFee
 
