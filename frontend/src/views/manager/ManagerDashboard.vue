@@ -60,7 +60,7 @@
         <section class="kpi-grid">
           <article class="card kpi"><p>Revenue</p><h3>Rp {{ formatCurrency(totalRevenue) }}</h3></article>
           <article class="card kpi"><p>Paid Orders</p><h3>{{ paidOrders }}</h3></article>
-          <article class="card kpi"><p>Beban Terapis (Kerja × Komisi)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
+          <article class="card kpi"><p>Beban Terapis (Komisi+Kerja+Agent+Salon)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
           <article class="card kpi"><p>Total Beban</p><h3>Rp {{ formatCurrency(totalExpense) }}</h3></article>
           <article class="card kpi"><p>Net Profit/Loss</p><h3 :class="netProfit>=0?'good':'bad'">Rp {{ formatCurrency(netProfit) }}</h3></article>
         </section>
@@ -90,7 +90,10 @@
           <table class="table">
             <tbody>
               <tr><td>Cash In (Revenue)</td><td class="num">Rp {{ formatCurrency(totalRevenue) }}</td></tr>
-              <tr><td>Cash Out (Beban Terapis)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
+              <tr><td>Cash Out (Beban Terapis + Agent + Salon)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
+              <tr><td class="muted">↳ Pendapatan Terapis</td><td class="num muted">Rp {{ formatCurrency(totalTherapistIncome) }}</td></tr>
+              <tr><td class="muted">↳ Pendapatan Agent</td><td class="num muted">Rp {{ formatCurrency(totalAgentIncome) }}</td></tr>
+              <tr><td class="muted">↳ Pendapatan Salon</td><td class="num muted">Rp {{ formatCurrency(totalSalonIncome) }}</td></tr>
               <tr><td>Cash Out (Gaji Karyawan)</td><td class="num">Rp {{ formatCurrency(fixedSalaryCost) }}</td></tr>
               <tr v-for="(e, idx) in manualExpenses" :key="idx"><td>{{ e.label }}</td><td class="num">Rp {{ formatCurrency(e.amount) }}</td></tr>
               <tr><td><strong>Net Cashflow</strong></td><td class="num"><strong>Rp {{ formatCurrency(netProfit) }}</strong></td></tr>
@@ -605,7 +608,8 @@ const salonIncomeRows = computed(() => therapistFinanceRows.value
 
 const totalSalonIncome = computed(() => salonIncomeRows.value.reduce((sum, row) => sum + Number(row.salon_income || 0), 0))
 
-const therapistSalaryCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
+const therapistBaseCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
+const therapistSalaryCost = computed(() => therapistBaseCost.value + Number(totalAgentIncome.value || 0) + Number(totalSalonIncome.value || 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
 const totalExpense = computed(() => therapistSalaryCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
