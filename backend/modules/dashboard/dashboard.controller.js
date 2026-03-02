@@ -14,6 +14,24 @@ exports.kasirAnalytics = async (req, res) => {
   }
 }
 
+exports.getTherapistFinanceConfig = async (req, res) => {
+  try {
+    const data = await service.getTherapistFinanceConfig(req.user, req.query)
+    res.json(data)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.saveTherapistFinanceConfig = async (req, res) => {
+  try {
+    const data = await service.saveTherapistFinanceConfig(req.user, req.body)
+    res.json(data)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
 
 exports.getOutletSessionStatus = async (req, res) => {
   try {
