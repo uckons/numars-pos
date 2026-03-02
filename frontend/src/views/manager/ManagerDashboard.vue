@@ -167,10 +167,10 @@
         <section class="card">
           <div class="table-head">
             <h4>Ringkasan Pendapatan Terapis</h4>
-            <small class="muted">Denda diinput per terapis. Klik baris untuk breakdown.</small>
+            <small class="muted">Denda & hutang diinput per terapis. Klik baris untuk breakdown.</small>
           </div>
           <table class="table">
-            <thead><tr><th></th><th>Terapis</th><th>Grade</th><th>Total Kerja SPA (QTY)</th><th>Total Kerja LC (QTY)</th><th>Denda SPA</th><th>Denda LC</th><th>Pendapatan Terapis</th></tr></thead>
+            <thead><tr><th></th><th>Terapis</th><th>Grade</th><th>Total Kerja SPA (QTY)</th><th>Total Kerja LC (QTY)</th><th>Denda</th><th>Hutang</th><th>Pendapatan Terapis</th></tr></thead>
             <tbody>
               <tr v-if="!therapistFinanceRows.length"><td colspan="8" class="muted">Belum ada data terapis untuk periode ini.</td></tr>
               <template v-for="row in therapistFinanceRows" :key="row.key">
@@ -188,8 +188,9 @@
                   <td></td>
                   <td colspan="7">
                     <div class="breakdown-grid">
-                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }}) × {{ row.spa_qty }} - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.spa_lain_lain) }}) = <strong>Rp {{ formatCurrency(row.spa_income) }}</strong></div>
-                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }}) × {{ row.lc_qty }} - ({{ formatCurrency(row.lc_denda) }} + {{ formatCurrency(row.lc_lain_lain) }}) = <strong>Rp {{ formatCurrency(row.lc_income) }}</strong></div>
+                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
+                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
+                      <div><strong>Total:</strong> (SPA + LC) - (Denda + Hutang + Lain-lain) = ({{ formatCurrency(row.spa_income_raw) }} + {{ formatCurrency(row.lc_income_raw) }}) - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.lc_denda) }} + {{ formatCurrency(row.total_lain_lain) }}) = <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
                     </div>
                   </td>
                 </tr>
@@ -202,18 +203,29 @@
         <section class="card">
           <div class="table-head">
             <h4>Laporan Pendapatan Agent</h4>
-            <small class="muted">Dipisah agar tidak ambigu dengan pendapatan terapis.</small>
+            <small class="muted">Klik baris agent untuk lihat breakdown per terapis.</small>
           </div>
           <table class="table">
             <thead><tr><th>Agent</th><th>Total Terapis</th><th>Total Kerja (SPA+LC)</th><th>Total Pendapatan Agent</th></tr></thead>
             <tbody>
               <tr v-if="!therapistFinanceRows.length"><td colspan="4" class="muted">Belum ada data agent untuk periode ini.</td></tr>
-              <tr v-for="row in agentFinanceRows" :key="`agent-${row.key}`">
-                <td>{{ row.agent_name }}</td>
-                <td class="num">{{ row.therapist_count }}</td>
-                <td class="num">{{ row.total_kerja }}</td>
-                <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
-              </tr>
+              <template v-for="row in agentFinanceRows" :key="`agent-${row.key}`">
+                <tr @click="toggleAgentBreakdown(row.key)" class="clickable-row">
+                  <td>{{ expandedAgentRows[row.key] ? '▾' : '▸' }} {{ row.agent_name }}</td>
+                  <td class="num">{{ row.therapist_count }}</td>
+                  <td class="num">{{ row.total_kerja }}</td>
+                  <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
+                </tr>
+                <tr v-if="expandedAgentRows[row.key]">
+                  <td colspan="4">
+                    <div class="breakdown-grid">
+                      <div v-for="detail in row.details" :key="`${row.key}-${detail.therapist_key}`">
+                        {{ detail.therapist_name }}: ({{ detail.total_kerja }} × Rp {{ formatCurrency(detail.agent_fee) }}) = <strong>Rp {{ formatCurrency(detail.agent_income) }}</strong>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
             <tfoot><tr><td colspan="3"><strong>Total Pendapatan Agent</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalAgentIncome) }}</strong></td></tr></tfoot>
           </table>
@@ -273,6 +285,7 @@ const therapistAnalytics = ref([])
 const therapistMaster = ref([])
 const financeConfig = ref({ spa_salon: 0, spa_room: 0, spa_safety: 0, spa_lain_lain: 0, lc_room: 0, lc_salon: 0, lc_lain_lain: 0 })
 const expandedFinanceRows = ref({})
+const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
 
 const auth = useAuthStore()
@@ -456,9 +469,10 @@ const therapistFinanceRows = computed(() => {
     const spaNetRate = servicePrice - agentFee - spaRoom - spaSalon - spaSafety
     const lcNetRate = servicePrice - agentFee - lcRoom - lcSalon
 
-    const spaIncome = (spaNetRate * spaQty) - (spaDenda + spaLainLain)
-    const lcIncome = (lcNetRate * lcQty) - (lcDenda + lcLainLain)
-    const therapistIncome = spaIncome + lcIncome
+    const spaIncomeRaw = spaNetRate * spaQty
+    const lcIncomeRaw = lcNetRate * lcQty
+    const totalLainLain = spaLainLain + lcLainLain
+    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + totalLainLain)
     const agentIncome = (spaQty + lcQty) * agentFee
 
     return {
@@ -476,8 +490,9 @@ const therapistFinanceRows = computed(() => {
       lc_salon: lcSalon,
       lc_denda: lcDenda,
       lc_lain_lain: lcLainLain,
-      spa_income: spaIncome,
-      lc_income: lcIncome,
+      spa_income_raw: spaIncomeRaw,
+      lc_income_raw: lcIncomeRaw,
+      total_lain_lain: totalLainLain,
       total_kerja: spaQty + lcQty,
       therapist_income: therapistIncome,
       agent_income: agentIncome
@@ -497,7 +512,8 @@ const agentFinanceRows = computed(() => {
         therapist_keys: new Set(),
         therapist_count: 0,
         total_kerja: 0,
-        agent_income: 0
+        agent_income: 0,
+        details: []
       })
     }
     const acc = grouped.get(key)
@@ -505,6 +521,13 @@ const agentFinanceRows = computed(() => {
     acc.total_kerja += Number(row.total_kerja || 0)
     acc.agent_income += Number(row.agent_income || 0)
     acc.therapist_count = acc.therapist_keys.size
+    acc.details.push({
+      therapist_key: row.key,
+      therapist_name: row.therapist_name,
+      total_kerja: Number(row.total_kerja || 0),
+      agent_fee: Number(row.agent_fee || 0),
+      agent_income: Number(row.agent_income || 0)
+    })
   }
 
   return [...grouped.values()]
@@ -513,7 +536,8 @@ const agentFinanceRows = computed(() => {
       agent_name: row.agent_name,
       therapist_count: row.therapist_count,
       total_kerja: row.total_kerja,
-      agent_income: row.agent_income
+      agent_income: row.agent_income,
+      details: row.details
     }))
     .sort((a, b) => a.agent_name.localeCompare(b.agent_name))
 })
@@ -633,6 +657,10 @@ const saveFinanceConfig = async () => {
 
 const toggleFinanceBreakdown = (key) => {
   expandedFinanceRows.value = { ...expandedFinanceRows.value, [key]: !expandedFinanceRows.value[key] }
+}
+
+const toggleAgentBreakdown = (key) => {
+  expandedAgentRows.value = { ...expandedAgentRows.value, [key]: !expandedAgentRows.value[key] }
 }
 
 const printTherapistFinanceReport = () => {
