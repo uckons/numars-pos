@@ -190,7 +190,6 @@
                     <div class="breakdown-grid">
                       <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }} - {{ formatCurrency(row.spa_denda) }} - {{ formatCurrency(row.spa_lain_lain) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income) }}</strong></div>
                       <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }} - {{ formatCurrency(row.lc_denda) }} - {{ formatCurrency(row.lc_lain_lain) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income) }}</strong></div>
-                      <div><strong>Agent:</strong> ({{ row.spa_qty }} + {{ row.lc_qty }}) × {{ formatCurrency(row.agent_fee) }} = <strong>Rp {{ formatCurrency(row.agent_income) }}</strong></div>
                     </div>
                   </td>
                 </tr>
@@ -206,18 +205,17 @@
             <small class="muted">Dipisah agar tidak ambigu dengan pendapatan terapis.</small>
           </div>
           <table class="table">
-            <thead><tr><th>Terapis</th><th>Grade</th><th>Total Kerja (SPA+LC)</th><th>Agent Fee</th><th>Pendapatan Agent</th></tr></thead>
+            <thead><tr><th>Agent</th><th>Total Terapis</th><th>Total Kerja (SPA+LC)</th><th>Total Pendapatan Agent</th></tr></thead>
             <tbody>
-              <tr v-if="!therapistFinanceRows.length"><td colspan="5" class="muted">Belum ada data agent untuk periode ini.</td></tr>
-              <tr v-for="row in therapistFinanceRows" :key="`${row.key}-agent`">
-                <td>{{ row.therapist_name }}</td>
-                <td>{{ row.grade_name }}</td>
+              <tr v-if="!therapistFinanceRows.length"><td colspan="4" class="muted">Belum ada data agent untuk periode ini.</td></tr>
+              <tr v-for="row in agentFinanceRows" :key="`agent-${row.key}`">
+                <td>{{ row.agent_name }}</td>
+                <td class="num">{{ row.therapist_count }}</td>
                 <td class="num">{{ row.total_kerja }}</td>
-                <td class="num">Rp {{ formatCurrency(row.agent_fee) }}</td>
                 <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
               </tr>
             </tbody>
-            <tfoot><tr><td colspan="4"><strong>Total Pendapatan Agent</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalAgentIncome) }}</strong></td></tr></tfoot>
+            <tfoot><tr><td colspan="3"><strong>Total Pendapatan Agent</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalAgentIncome) }}</strong></td></tr></tfoot>
           </table>
         </section>
       </section>
@@ -466,6 +464,7 @@ const therapistFinanceRows = computed(() => {
     return {
       ...item,
       grade_name: master?.grade_name || '-',
+      agent_profile_name: master?.agent_profile_name || '-',
       service_price: servicePrice,
       agent_fee: agentFee,
       spa_room: spaRoom,
@@ -486,8 +485,41 @@ const therapistFinanceRows = computed(() => {
   }).sort((a, b) => a.therapist_name.localeCompare(b.therapist_name))
 })
 
+const agentFinanceRows = computed(() => {
+  const grouped = new Map()
+  for (const row of therapistFinanceRows.value) {
+    const agentName = String(row.agent_profile_name || '-').trim() || '-'
+    const key = normalizeTherapistName(agentName) || 'no-agent'
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        key,
+        agent_name: agentName,
+        therapist_keys: new Set(),
+        therapist_count: 0,
+        total_kerja: 0,
+        agent_income: 0
+      })
+    }
+    const acc = grouped.get(key)
+    acc.therapist_keys.add(row.key)
+    acc.total_kerja += Number(row.total_kerja || 0)
+    acc.agent_income += Number(row.agent_income || 0)
+    acc.therapist_count = acc.therapist_keys.size
+  }
+
+  return [...grouped.values()]
+    .map((row) => ({
+      key: row.key,
+      agent_name: row.agent_name,
+      therapist_count: row.therapist_count,
+      total_kerja: row.total_kerja,
+      agent_income: row.agent_income
+    }))
+    .sort((a, b) => a.agent_name.localeCompare(b.agent_name))
+})
+
 const totalTherapistIncome = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Number(row.therapist_income || 0), 0))
-const totalAgentIncome = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Number(row.agent_income || 0), 0))
+const totalAgentIncome = computed(() => agentFinanceRows.value.reduce((sum, row) => sum + Number(row.agent_income || 0), 0))
 
 const therapistSalaryCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
