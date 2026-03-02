@@ -884,16 +884,6 @@ exports.updateGrade = async (req, res) => {
       paramIndex++
     }
 
-    if (attendance_pin !== undefined) {
-      const normalizedPin = String(attendance_pin || '').trim()
-      if (normalizedPin && normalizedPin.length < 4) {
-        return res.status(400).json({ message: 'PIN absensi minimal 4 karakter' })
-      }
-      updateFields.push(`attendance_pin = $${paramIndex}`)
-      params.push(normalizedPin || null)
-      paramIndex++
-    }
-
     if (updateFields.length === 0) {
       return res.status(400).json({ message: "No fields to update" })
     }
