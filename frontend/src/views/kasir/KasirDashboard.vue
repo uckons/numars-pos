@@ -78,6 +78,14 @@
               <button class="btn-state masuk" :disabled="isAttendanceButtonDisabled(t, 'MASUK')" @click="setTherapistAttendance(t, 'MASUK')">MASUK</button>
               <button class="btn-state off" :disabled="isAttendanceButtonDisabled(t, 'OFF')" @click="setTherapistAttendance(t, 'OFF')">OFF</button>
               <button class="btn-state close" :disabled="isAttendanceButtonDisabled(t, 'CLOSE')" @click="setTherapistAttendance(t, 'CLOSE')">CLOSE</button>
+              <button
+                class="btn-state salon"
+                :class="{ active: t.salon_used }"
+                :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'OFF'"
+                @click="toggleTherapistSalonUsage(t)"
+              >
+                SALON {{ t.salon_used ? 'ON' : 'OFF' }}
+              </button>
             </div>
           </div>
         </div>
@@ -483,6 +491,20 @@ const setTherapistAttendance = async (therapist, targetStatus) => {
   }
 }
 
+const toggleTherapistSalonUsage = async (therapist) => {
+  try {
+    const nextValue = !Boolean(therapist?.salon_used)
+    await api.post(`/therapists/attendance/${therapist.id}/salon-usage`, { salon_used: nextValue })
+    await loadTherapistAttendance()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal update pemakaian salon',
+      text: err.response?.data?.message || err.message || 'Terjadi kesalahan'
+    })
+  }
+}
+
 const formatMessageDate = (v) => new Date(v).toLocaleString('id-ID')
 
 onMounted(async () => {
@@ -748,6 +770,8 @@ onUnmounted(() => {
 .btn-state.masuk { background:#1f8f4f; color:#fff; }
 .btn-state.off { background:#9a7d0a; color:#111; }
 .btn-state.close { background:#4d4d4d; color:#fff; }
+.btn-state.salon { background:#123c6d; color:#d8ecff; }
+.btn-state.salon.active { background:#1f6ed4; color:#fff; }
 .btn-state:disabled { opacity:.45; cursor:not-allowed; }
 .badge { padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
 .badge-masuk { background:#1f8f4f; color:#fff; }

@@ -10,6 +10,8 @@ router.get("/", auth, controller.getTherapists)
 // 🕒 THERAPIST ATTENDANCE (Kasir)
 router.get("/attendance", auth, controller.getTherapistAttendance)
 router.post("/attendance/:id", auth, controller.setTherapistAttendance)
+router.post('/attendance/:id/salon-usage', auth, controller.setTherapistSalonUsage)
+router.get('/attendance/salon-usage/summary', auth, controller.getTherapistSalonUsageSummary)
 
 
 // 👥 AGENT PROFILES
