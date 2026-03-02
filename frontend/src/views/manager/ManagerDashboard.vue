@@ -195,13 +195,36 @@
                     <div class="breakdown-grid">
                       <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.room) }} - {{ formatCurrency(row.salon) }} - {{ formatCurrency(row.safety) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
                       <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.room) }} - {{ formatCurrency(row.salon) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
-                      <div><strong>Total:</strong> (SPA + LC) - (Denda + Hutang + Salon + Lain-lain) = ({{ formatCurrency(row.spa_income_raw) }} + {{ formatCurrency(row.lc_income_raw) }}) - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.lc_denda) }} + {{ formatCurrency(row.salon) }} + {{ formatCurrency(row.lain_lain) }}) = <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
+                      <div><strong>Total:</strong> (SPA + LC) - (Denda + Hutang + (Salon × Qty Pakai) + Lain-lain) = ({{ formatCurrency(row.spa_income_raw) }} + {{ formatCurrency(row.lc_income_raw) }}) - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.lc_denda) }} + ({{ formatCurrency(row.salon) }} × {{ row.salon_usage_qty }}) + {{ formatCurrency(row.lain_lain) }}) = <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
                     </div>
                   </td>
                 </tr>
               </template>
             </tbody>
             <tfoot><tr><td colspan="7"><strong>Total</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalTherapistIncome) }}</strong></td></tr></tfoot>
+          </table>
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h4>Laporan Pendapatan Salon</h4>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <small class="muted">Berdasarkan absensi harian (SALON ON saat status bukan OFF).</small>
+              <button class="btn" @click="printSalonReport">Print</button>
+            </div>
+          </div>
+          <table class="table">
+            <thead><tr><th>Terapis</th><th>Qty Pemakaian Salon</th><th>Rate Salon</th><th>Pendapatan Salon</th></tr></thead>
+            <tbody>
+              <tr v-if="!salonIncomeRows.length"><td colspan="4" class="muted">Belum ada data pendapatan salon.</td></tr>
+              <tr v-for="row in salonIncomeRows" :key="`salon-${row.key}`">
+                <td>{{ row.therapist_name }}</td>
+                <td class="num">{{ row.salon_usage_qty }}</td>
+                <td class="num">Rp {{ formatCurrency(row.salon_rate) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.salon_income) }} <button class="btn mini-print" @click.stop="printSingleSalonSlip(row)">Slip</button></td>
+              </tr>
+            </tbody>
+            <tfoot><tr><td colspan="3"><strong>Total Pendapatan Salon</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalSalonIncome) }}</strong></td></tr></tfoot>
           </table>
         </section>
 
@@ -295,6 +318,7 @@ const financeConfig = ref({ salon: 0, room: 0, safety: 0, lain_lain: 0 })
 const expandedFinanceRows = ref({})
 const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
+const salonUsageMap = ref({})
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -326,12 +350,13 @@ const loadReport = async () => {
   loading.value = true
   loadError.value = ""
   try {
-    const [ordersRes, branchRes, analyticsRes, therapistRes, financeCfgRes] = await Promise.all([
+    const [ordersRes, branchRes, analyticsRes, therapistRes, financeCfgRes, salonUsageRes] = await Promise.all([
       api.get("/superadmin/orders"),
       api.get("/superadmin/branches"),
       api.get('/dashboard/kasir/analytics', { params: { preset: 'daily', date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined } }),
       api.get('/therapists', { params: { page: 1, limit: 500, active: 'true', ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
-      api.get('/dashboard/therapist-finance-config', { params: { ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } })
+      api.get('/dashboard/therapist-finance-config', { params: { ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
+      api.get('/therapists/attendance/salon-usage/summary', { params: { date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined, ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } })
     ])
     orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
     branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
@@ -345,11 +370,22 @@ const loadReport = async () => {
       safety: Number(cfg.safety ?? cfg.spa_safety ?? cfg.lc_safety ?? 0),
       lain_lain: Number(cfg.lain_lain ?? cfg.spa_lain_lain ?? cfg.lc_lain_lain ?? 0)
     }
+
+    const usageRows = Array.isArray(salonUsageRes.data?.data) ? salonUsageRes.data.data : []
+    const usageMap = {}
+    for (const row of usageRows) {
+      const key = normalizeTherapistName(row.therapist_name)
+      if (!key) continue
+      usageMap[key] = Number(row.salon_usage_qty || 0)
+    }
+    salonUsageMap.value = usageMap
+
   } catch (err) {
     orders.value = []
     branches.value = []
     therapistAnalytics.value = []
     therapistMaster.value = []
+    salonUsageMap.value = {}
     loadError.value = err?.response?.data?.message || "Gagal memuat data manager"
     await Swal.fire({ icon: "error", title: "Load report gagal", text: loadError.value })
   } finally {
@@ -483,7 +519,9 @@ const therapistFinanceRows = computed(() => {
 
     const spaIncomeRaw = spaNetRate * spaQty
     const lcIncomeRaw = lcNetRate * lcQty
-    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + salon + lainLain)
+    const salonUsageQty = Number(salonUsageMap.value[item.key] || 0)
+    const salonDeduction = salon * salonUsageQty
+    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + salonDeduction + lainLain)
     const agentIncome = (spaQty + lcQty) * agentFee
 
     return {
@@ -495,6 +533,8 @@ const therapistFinanceRows = computed(() => {
       room,
       salon,
       safety,
+      salon_usage_qty: salonUsageQty,
+      salon_deduction: salonDeduction,
       spa_denda: spaDenda,
       lc_denda: lcDenda,
       lain_lain: lainLain,
@@ -551,6 +591,19 @@ const agentFinanceRows = computed(() => {
 
 const totalTherapistIncome = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Number(row.therapist_income || 0), 0))
 const totalAgentIncome = computed(() => agentFinanceRows.value.reduce((sum, row) => sum + Number(row.agent_income || 0), 0))
+
+const salonIncomeRows = computed(() => therapistFinanceRows.value
+  .map((row) => ({
+    key: row.key,
+    therapist_name: row.therapist_name,
+    salon_usage_qty: Number(row.salon_usage_qty || 0),
+    salon_rate: Number(row.salon || 0),
+    salon_income: Number(row.salon_deduction || 0)
+  }))
+  .filter((row) => row.salon_usage_qty > 0 || row.salon_income > 0)
+  .sort((a, b) => a.therapist_name.localeCompare(b.therapist_name)))
+
+const totalSalonIncome = computed(() => salonIncomeRows.value.reduce((sum, row) => sum + Number(row.salon_income || 0), 0))
 
 const therapistSalaryCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
@@ -763,7 +816,7 @@ const printSingleTherapistSlip = (row) => {
         <tr><td>Grade</td><td>${row.grade_name}</td></tr>
         <tr><td>Rumus SPA</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.room)} - ${printCurrency(row.salon)} - ${printCurrency(row.safety)}) × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
         <tr><td>Rumus LC</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.room)} - ${printCurrency(row.salon)}) × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
-        <tr><td>Potongan</td><td>Denda ${printCurrency(row.spa_denda)} + Hutang ${printCurrency(row.lc_denda)} + Salon ${printCurrency(row.salon)} + Lain-lain ${printCurrency(row.lain_lain)}</td></tr>
+        <tr><td>Potongan</td><td>Denda ${printCurrency(row.spa_denda)} + Hutang ${printCurrency(row.lc_denda)} + (Salon ${printCurrency(row.salon)} × Qty ${row.salon_usage_qty}) = ${printCurrency(row.salon_deduction)} + Lain-lain ${printCurrency(row.lain_lain)}</td></tr>
         <tr><td><strong>Total Pendapatan</strong></td><td><strong>${printCurrency(row.therapist_income)}</strong></td></tr>
       </tbody>
     </table>
@@ -795,6 +848,14 @@ const printSingleAgentSlip = (row) => {
 const printTherapistFinanceReport = (mode = 'all') => {
   const therapistHtml = buildTherapistTableHtml(therapistFinanceRows.value)
   const agentHtml = buildAgentTableHtml(agentFinanceRows.value)
+  const salonHtml = `
+    <div class="section-title">Laporan Pendapatan Salon</div>
+    <table>
+      <thead><tr><th>Terapis</th><th>Qty Pemakaian</th><th>Rate Salon</th><th>Pendapatan Salon</th></tr></thead>
+      <tbody>${salonIncomeRows.value.map((row) => `<tr><td>${row.therapist_name}</td><td class="num">${row.salon_usage_qty}</td><td class="num">${printCurrency(row.salon_rate)}</td><td class="num">${printCurrency(row.salon_income)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3"><strong>Total Pendapatan Salon</strong></td><td class="num"><strong>${printCurrency(totalSalonIncome.value)}</strong></td></tr></tfoot>
+    </table>
+  `
 
   if (mode === 'therapist') {
     openPrintWindow('Laporan Pendapatan Terapis', 'Laporan enterprise pendapatan terapis', therapistHtml)
@@ -804,7 +865,37 @@ const printTherapistFinanceReport = (mode = 'all') => {
     openPrintWindow('Laporan Pendapatan Agent', 'Laporan enterprise pendapatan agent', agentHtml)
     return
   }
-  openPrintWindow('Laporan Pendapatan Terapis & Agent', 'Laporan enterprise gabungan terapis dan agent', therapistHtml + agentHtml)
+  openPrintWindow('Laporan Pendapatan Terapis, Agent & Salon', 'Laporan enterprise gabungan terapis, agent, dan salon', therapistHtml + agentHtml + salonHtml)
+}
+
+const printSalonReport = () => {
+  const body = salonIncomeRows.value.map((row) => `
+    <tr><td>${row.therapist_name}</td><td class="num">${row.salon_usage_qty}</td><td class="num">${printCurrency(row.salon_rate)}</td><td class="num">${printCurrency(row.salon_income)}</td></tr>
+  `).join('')
+  const html = `
+    <div class="section-title">Laporan Pendapatan Salon</div>
+    <table>
+      <thead><tr><th>Terapis</th><th>Qty Pemakaian</th><th>Rate Salon</th><th>Pendapatan Salon</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td colspan="3"><strong>Total Pendapatan Salon</strong></td><td class="num"><strong>${printCurrency(totalSalonIncome.value)}</strong></td></tr></tfoot>
+    </table>
+  `
+  openPrintWindow('Laporan Pendapatan Salon', 'Laporan enterprise pendapatan salon', html)
+}
+
+const printSingleSalonSlip = (row) => {
+  const html = `
+    <div class="section-title">Slip Pendapatan Salon <span class="pill">${row.therapist_name}</span></div>
+    <table>
+      <tbody>
+        <tr><td>Nama Terapis</td><td>${row.therapist_name}</td></tr>
+        <tr><td>Qty Pemakaian Salon</td><td>${row.salon_usage_qty}</td></tr>
+        <tr><td>Rate Salon</td><td>${printCurrency(row.salon_rate)}</td></tr>
+        <tr><td><strong>Total Pendapatan Salon</strong></td><td><strong>${printCurrency(row.salon_income)}</strong></td></tr>
+      </tbody>
+    </table>
+  `
+  openPrintWindow('Slip Pendapatan Salon', 'Dokumen slip pendapatan salon', html)
 }
 
 const addExpense = async () => {
@@ -846,9 +937,9 @@ nav button.active { background:#c9a24d; color:#000; }
 .btn { background:transparent; border:1px solid #c9a24d; color:#c9a24d; border-radius:10px; padding:8px 14px; cursor:pointer; }
 .btn:disabled { opacity:.45; cursor:not-allowed; }
 .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
-.field { display:grid; gap:6px; }
+.field { display:grid; gap:6px; min-width:150px; }
 .field label { font-size:12px; color:#a5adba; }
-.field input, .field select { background:#090909; border:1px solid #2f3440; color:#fff; border-radius:10px; padding:8px 10px; min-width:150px; }
+.field input, .field select { background:#090909; border:1px solid #2f3440; color:#fff; border-radius:10px; padding:8px 10px; width:150px; height:42px; box-sizing:border-box; }
 .kpi-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; }
 .kpi h3 { margin-top:6px; }
 .good { color:#38d996; }
