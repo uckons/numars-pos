@@ -42,6 +42,11 @@ const ensureTherapistAttendanceTable = async (db) => {
       UNIQUE (therapist_id, business_date)
     )
   `)
+
+  await db.query(`
+    ALTER TABLE therapist_attendance
+    ADD COLUMN IF NOT EXISTS salon_used BOOLEAN NOT NULL DEFAULT false
+  `)
 }
 
 const ensureTherapistPinColumn = async (db) => {
@@ -293,9 +298,10 @@ exports.getTherapistAttendance = async (req, res) => {
          t.id,
          t.name,
          t.active,
-         (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
-         COALESCE(ta.status, 'OFF') AS attendance_status,
-         ta.updated_at
+       (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
+       COALESCE(ta.status, 'OFF') AS attendance_status,
+       COALESCE(ta.salon_used, false) AS salon_used,
+       ta.updated_at
        FROM therapists t
        LEFT JOIN therapist_attendance ta
          ON ta.therapist_id = t.id
@@ -357,22 +363,124 @@ exports.setTherapistAttendance = async (req, res) => {
       return res.status(400).json({ message: 'PIN absensi tidak sesuai' })
     }
 
+    const salonUsed = Boolean(req.body?.salon_used)
+
     const { rows } = await db.query(
-      `INSERT INTO therapist_attendance (therapist_id, branch_id, business_date, status, pin_input, updated_by, updated_at)
-       VALUES ($1, $2, $3::date, $4, $5, $6, NOW())
+      `INSERT INTO therapist_attendance (therapist_id, branch_id, business_date, status, pin_input, salon_used, updated_by, updated_at)
+       VALUES ($1, $2, $3::date, $4, $5, $6, $7, NOW())
        ON CONFLICT (therapist_id, business_date)
        DO UPDATE SET
          status = EXCLUDED.status,
          pin_input = EXCLUDED.pin_input,
+         salon_used = CASE WHEN EXCLUDED.status = 'OFF' THEN false ELSE EXCLUDED.salon_used END,
          updated_by = EXCLUDED.updated_by,
          updated_at = NOW()
-       RETURNING therapist_id, business_date, status, updated_at`,
-      [therapistId, branchId, businessDate, status, pinInput || null, req.user?.id || null]
+       RETURNING therapist_id, business_date, status, salon_used, updated_at`,
+      [therapistId, branchId, businessDate, status, pinInput || null, status === 'OFF' ? false : salonUsed, req.user?.id || null]
     )
 
     res.json({ success: true, attendance: rows[0] })
   } catch (err) {
     console.error('SET THERAPIST ATTENDANCE ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.setTherapistSalonUsage = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureTherapistAttendanceTable(db)
+
+    const therapistId = Number(req.params.id)
+    const salonUsed = Boolean(req.body?.salon_used)
+    if (!Number.isInteger(therapistId) || therapistId <= 0) {
+      return res.status(400).json({ message: 'Terapis tidak valid' })
+    }
+
+    const branchId = req.user?.branch_id
+    const businessDate = await getBusinessDateForBranch(db, branchId)
+
+    const attendanceRes = await db.query(
+      `SELECT therapist_id, status
+       FROM therapist_attendance
+       WHERE therapist_id = $1 AND branch_id = $2 AND business_date = $3::date
+       LIMIT 1`,
+      [therapistId, branchId, businessDate]
+    )
+
+    if (!attendanceRes.rows.length) {
+      return res.status(400).json({ message: 'Terapis belum absen hari ini. Absen MASUK terlebih dahulu.' })
+    }
+
+    const currentStatus = String(attendanceRes.rows[0].status || 'OFF').toUpperCase()
+    if (currentStatus === 'OFF') {
+      return res.status(400).json({ message: 'Status OFF tidak bisa menggunakan salon.' })
+    }
+
+    const { rows } = await db.query(
+      `UPDATE therapist_attendance
+       SET salon_used = $1,
+           updated_by = $2,
+           updated_at = NOW()
+       WHERE therapist_id = $3 AND branch_id = $4 AND business_date = $5::date
+       RETURNING therapist_id, business_date, status, salon_used, updated_at`,
+      [salonUsed, req.user?.id || null, therapistId, branchId, businessDate]
+    )
+
+    res.json({ success: true, attendance: rows[0] })
+  } catch (err) {
+    console.error('SET THERAPIST SALON USAGE ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.getTherapistSalonUsageSummary = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureTherapistAttendanceTable(db)
+    const requestedBranchId = req.query?.branch_id
+    const branchId = canAccessAllBranches(req.user?.role)
+      ? Number(requestedBranchId || req.user?.branch_id)
+      : Number(req.user?.branch_id)
+
+    const from = req.query?.date_from ? new Date(req.query.date_from) : new Date()
+    const to = req.query?.date_to ? new Date(req.query.date_to) : new Date()
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      return res.status(400).json({ message: 'Format tanggal tidak valid' })
+    }
+
+    const fromIso = from.toISOString().slice(0, 10)
+    const toIso = to.toISOString().slice(0, 10)
+
+    const { rows } = await db.query(
+      `SELECT
+         t.id AS therapist_id,
+         t.name AS therapist_name,
+         COALESCE(COUNT(*) FILTER (WHERE ta.salon_used = true AND ta.status <> 'OFF'), 0) AS salon_usage_qty
+       FROM therapists t
+       LEFT JOIN therapist_attendance ta
+         ON ta.therapist_id = t.id
+        AND ta.branch_id = $1
+        AND ta.business_date BETWEEN $2::date AND $3::date
+       WHERE t.branch_id = $1
+         AND t.active = true
+       GROUP BY t.id, t.name
+       ORDER BY t.name ASC`,
+      [branchId, fromIso, toIso]
+    )
+
+    res.json({
+      branch_id: branchId,
+      date_from: fromIso,
+      date_to: toIso,
+      data: rows.map((row) => ({
+        therapist_id: Number(row.therapist_id),
+        therapist_name: row.therapist_name,
+        salon_usage_qty: Number(row.salon_usage_qty || 0)
+      }))
+    })
+  } catch (err) {
+    console.error('GET THERAPIST SALON USAGE SUMMARY ERROR:', err)
     res.status(500).json({ message: err.message })
   }
 }
@@ -881,16 +989,6 @@ exports.updateGrade = async (req, res) => {
       }
       updateFields.push(`service_addon_amount = $${paramIndex}`)
       params.push(normalizedAddon)
-      paramIndex++
-    }
-
-    if (attendance_pin !== undefined) {
-      const normalizedPin = String(attendance_pin || '').trim()
-      if (normalizedPin && normalizedPin.length < 4) {
-        return res.status(400).json({ message: 'PIN absensi minimal 4 karakter' })
-      }
-      updateFields.push(`attendance_pin = $${paramIndex}`)
-      params.push(normalizedPin || null)
       paramIndex++
     }
 
