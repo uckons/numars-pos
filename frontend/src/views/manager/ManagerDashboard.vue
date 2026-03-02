@@ -61,6 +61,7 @@
           <article class="card kpi"><p>Revenue</p><h3>Rp {{ formatCurrency(totalRevenue) }}</h3></article>
           <article class="card kpi"><p>Paid Orders</p><h3>{{ paidOrders }}</h3></article>
           <article class="card kpi"><p>Beban Terapis (Komisi+Kerja+Agent+Salon)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
+          <article class="card kpi"><p>Beban FNB Paid (QTY × Modal)</p><h3>Rp {{ formatCurrency(fnbPaidModalCost) }}</h3></article>
           <article class="card kpi"><p>Total Beban</p><h3>Rp {{ formatCurrency(totalExpense) }}</h3></article>
           <article class="card kpi"><p>Net Profit/Loss</p><h3 :class="netProfit>=0?'good':'bad'">Rp {{ formatCurrency(netProfit) }}</h3></article>
         </section>
@@ -91,6 +92,7 @@
             <tbody>
               <tr><td>Cash In (Revenue)</td><td class="num">Rp {{ formatCurrency(totalRevenue) }}</td></tr>
               <tr><td>Cash Out (Beban Terapis + Agent + Salon)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
+              <tr><td>Cash Out (Beban FNB Paid: QTY × Modal)</td><td class="num">Rp {{ formatCurrency(fnbPaidModalCost) }}</td></tr>
               <tr><td class="muted">↳ Pendapatan Terapis</td><td class="num muted">Rp {{ formatCurrency(totalTherapistIncome) }}</td></tr>
               <tr><td class="muted">↳ Pendapatan Agent</td><td class="num muted">Rp {{ formatCurrency(totalAgentIncome) }}</td></tr>
               <tr><td class="muted">↳ Pendapatan Salon</td><td class="num muted">Rp {{ formatCurrency(totalSalonIncome) }}</td></tr>
@@ -434,6 +436,7 @@ const pagedFilteredOrders = computed(() => {
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Number(o.total || 0), 0))
 const paidOrders = computed(() => paidOrdersList.value.length)
+const fnbPaidModalCost = computed(() => paidOrdersList.value.reduce((sum, o) => sum + Number(o.fnb_modal_cost || 0), 0))
 const normalizeTherapistName = (name) => String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/gi, '')
 
 const therapistMasterMap = computed(() => {
@@ -611,7 +614,7 @@ const totalSalonIncome = computed(() => salonIncomeRows.value.reduce((sum, row) 
 const therapistBaseCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
 const therapistSalaryCost = computed(() => therapistBaseCost.value + Number(totalAgentIncome.value || 0) + Number(totalSalonIncome.value || 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
-const totalExpense = computed(() => therapistSalaryCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
+const totalExpense = computed(() => therapistSalaryCost.value + fnbPaidModalCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
 
 const trendBuckets = computed(() => {
