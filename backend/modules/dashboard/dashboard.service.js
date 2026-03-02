@@ -806,6 +806,113 @@ exports.kasirAnalytics = async (user, query = {}) => {
   }
 }
 
+const ensureTherapistFinanceConfigTable = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS therapist_finance_configs (
+      id SERIAL PRIMARY KEY,
+      branch_id INT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+      spa_salon NUMERIC(14,2) NOT NULL DEFAULT 0,
+      spa_room NUMERIC(14,2) NOT NULL DEFAULT 0,
+      spa_safety NUMERIC(14,2) NOT NULL DEFAULT 0,
+      spa_denda NUMERIC(14,2) NOT NULL DEFAULT 0,
+      spa_lain_lain NUMERIC(14,2) NOT NULL DEFAULT 0,
+      lc_sofa NUMERIC(14,2) NOT NULL DEFAULT 0,
+      lc_salon NUMERIC(14,2) NOT NULL DEFAULT 0,
+      lc_safety NUMERIC(14,2) NOT NULL DEFAULT 0,
+      lc_denda NUMERIC(14,2) NOT NULL DEFAULT 0,
+      lc_lain_lain NUMERIC(14,2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (branch_id)
+    )
+  `)
+}
+
+exports.getTherapistFinanceConfig = async (user, query = {}) => {
+  await ensureTherapistFinanceConfigTable()
+  const branchId = Number(query.branch_id || user.branch_id)
+  if (!branchId) {
+    throw new Error('branch_id wajib diisi')
+  }
+
+  const { rows } = await db.query(
+    `SELECT * FROM therapist_finance_configs WHERE branch_id = $1 LIMIT 1`,
+    [branchId]
+  )
+
+  const row = rows[0] || {}
+  return {
+    branch_id: branchId,
+    spa_salon: Number(row.spa_salon || 0),
+    spa_room: Number(row.spa_room || 0),
+    spa_safety: Number(row.spa_safety || 0),
+    spa_denda: Number(row.spa_denda || 0),
+    spa_lain_lain: Number(row.spa_lain_lain || 0),
+    lc_sofa: Number(row.lc_sofa || 0),
+    lc_salon: Number(row.lc_salon || 0),
+    lc_safety: Number(row.lc_safety || 0),
+    lc_denda: Number(row.lc_denda || 0),
+    lc_lain_lain: Number(row.lc_lain_lain || 0)
+  }
+}
+
+exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
+  await ensureTherapistFinanceConfigTable()
+  const branchId = Number(payload.branch_id || user.branch_id)
+  if (!branchId) {
+    throw new Error('branch_id wajib diisi')
+  }
+
+  const values = [
+    branchId,
+    Number(payload.spa_salon || 0),
+    Number(payload.spa_room || 0),
+    Number(payload.spa_safety || 0),
+    Number(payload.spa_denda || 0),
+    Number(payload.spa_lain_lain || 0),
+    Number(payload.lc_sofa || 0),
+    Number(payload.lc_salon || 0),
+    Number(payload.lc_safety || 0),
+    Number(payload.lc_denda || 0),
+    Number(payload.lc_lain_lain || 0)
+  ]
+
+  const { rows } = await db.query(
+    `INSERT INTO therapist_finance_configs (
+      branch_id, spa_salon, spa_room, spa_safety, spa_denda, spa_lain_lain,
+      lc_sofa, lc_salon, lc_safety, lc_denda, lc_lain_lain
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    ON CONFLICT (branch_id)
+    DO UPDATE SET
+      spa_salon = EXCLUDED.spa_salon,
+      spa_room = EXCLUDED.spa_room,
+      spa_safety = EXCLUDED.spa_safety,
+      spa_denda = EXCLUDED.spa_denda,
+      spa_lain_lain = EXCLUDED.spa_lain_lain,
+      lc_sofa = EXCLUDED.lc_sofa,
+      lc_salon = EXCLUDED.lc_salon,
+      lc_safety = EXCLUDED.lc_safety,
+      lc_denda = EXCLUDED.lc_denda,
+      lc_lain_lain = EXCLUDED.lc_lain_lain,
+      updated_at = NOW()
+    RETURNING *`,
+    values
+  )
+
+  return {
+    branch_id: branchId,
+    spa_salon: Number(rows[0].spa_salon || 0),
+    spa_room: Number(rows[0].spa_room || 0),
+    spa_safety: Number(rows[0].spa_safety || 0),
+    spa_denda: Number(rows[0].spa_denda || 0),
+    spa_lain_lain: Number(rows[0].spa_lain_lain || 0),
+    lc_sofa: Number(rows[0].lc_sofa || 0),
+    lc_salon: Number(rows[0].lc_salon || 0),
+    lc_safety: Number(rows[0].lc_safety || 0),
+    lc_denda: Number(rows[0].lc_denda || 0),
+    lc_lain_lain: Number(rows[0].lc_lain_lain || 0)
+  }
+}
+
 const ensureOutletSessionTable = async (db) => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS outlet_sessions (
