@@ -70,7 +70,7 @@
         <section class="card chart-grid">
           <div>
             <h4>Revenue Trend</h4>
-            <ApexChart type="area" :height="240" :series="trendSeries" :options="trendOptions" />
+            <ApexChart type="area" :height="210" :series="trendSeries" :options="trendOptions" />
           </div>
           <div>
             <h4>Breakdown Service</h4>
@@ -80,7 +80,7 @@
 
         <section class="card">
           <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
-          <ApexChart type="line" :height="250" :series="categoryTrendSeries" :options="categoryTrendOptions" />
+          <ApexChart type="line" :height="220" :series="categoryTrendSeries" :options="categoryTrendOptions" />
         </section>
 
         <section class="card">
@@ -627,13 +627,28 @@ const trendBuckets = computed(() => {
 })
 
 const formatAccountingNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const formatAxisNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+const normalizeChartMax = (value) => {
+  const safe = Math.max(0, Number(value || 0))
+  if (!safe) return 1000
+  const magnitude = 10 ** Math.floor(Math.log10(safe))
+  return Math.ceil((safe * 1.1) / magnitude) * magnitude
+}
 
 const trendSeries = computed(() => ([{ name: "Revenue", data: [...trendBuckets.value.values()].length ? [...trendBuckets.value.values()] : [0] }]))
+const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((v) => Number(v || 0)), 0))
 const trendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
   xaxis: { categories: [...trendBuckets.value.keys()].length ? [...trendBuckets.value.keys()] : ["No Data"] },
-  yaxis: { labels: { formatter: formatAccountingNumber } },
+  yaxis: {
+    min: 0,
+    max: normalizeChartMax(trendPeak.value),
+    tickAmount: 4,
+    forceNiceScale: true,
+    labels: { formatter: formatAxisNumber }
+  },
+  grid: { padding: { top: 4, bottom: 0 } },
   dataLabels: { enabled: false },
   tooltip: { y: { formatter: formatAccountingNumber } },
   colors: ["#5f85ff"]
@@ -678,11 +693,23 @@ const categoryTrendSeries = computed(() => {
   return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: days.map((d) => Number(categoryTrendData.value.get(d)?.[name] || 0)) }))
 })
 
+const categoryTrendPeak = computed(() => Math.max(
+  ...categoryTrendSeries.value.flatMap((series) => series.data.map((v) => Number(v || 0))),
+  0
+))
+
 const categoryTrendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
   xaxis: { categories: [...categoryTrendData.value.keys()].length ? [...categoryTrendData.value.keys()] : ["No Data"] },
-  yaxis: { labels: { formatter: formatAccountingNumber } },
+  yaxis: {
+    min: 0,
+    max: normalizeChartMax(categoryTrendPeak.value),
+    tickAmount: 4,
+    forceNiceScale: true,
+    labels: { formatter: formatAxisNumber }
+  },
+  grid: { padding: { top: 4, bottom: 0 } },
   tooltip: { y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
   stroke: { curve: "smooth", width: 2 },
