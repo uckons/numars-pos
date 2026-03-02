@@ -141,7 +141,9 @@
             <p class="muted">Rumus SPA dan LC terpisah, lalu dijumlahkan per terapis.</p>
           </div>
           <div class="hero-actions">
-            <button class="btn" @click="printTherapistFinanceReport">Print Report</button>
+            <button class="btn" @click="printTherapistFinanceReport('all')">Print Semua Laporan</button>
+            <button class="btn" @click="printTherapistFinanceReport('therapist')">Print Laporan Terapis</button>
+            <button class="btn" @click="printTherapistFinanceReport('agent')">Print Laporan Agent</button>
             <button class="btn" @click="saveFinanceConfig">Simpan Potongan</button>
             <button class="btn" @click="loadReport">Refresh</button>
           </div>
@@ -167,7 +169,10 @@
         <section class="card">
           <div class="table-head">
             <h4>Ringkasan Pendapatan Terapis</h4>
-            <small class="muted">Denda & hutang diinput per terapis. Klik baris untuk breakdown.</small>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <small class="muted">Denda & hutang diinput per terapis. Klik baris untuk breakdown.</small>
+              <button class="btn" @click="printTherapistFinanceReport('therapist')">Print</button>
+            </div>
           </div>
           <table class="table">
             <thead><tr><th></th><th>Terapis</th><th>Grade</th><th>Total Kerja SPA (QTY)</th><th>Total Kerja LC (QTY)</th><th>Denda</th><th>Hutang</th><th>Pendapatan Terapis</th></tr></thead>
@@ -182,7 +187,7 @@
                   <td class="num">{{ row.lc_qty }}</td>
                   <td><input class="mini-select" type="number" min="0" :value="row.spa_denda" @input.stop="setTherapistPenalty(row.therapist_name, 'spa_denda', $event.target.value)" /></td>
                   <td><input class="mini-select" type="number" min="0" :value="row.lc_denda" @input.stop="setTherapistPenalty(row.therapist_name, 'lc_denda', $event.target.value)" /></td>
-                  <td class="num" :class="row.therapist_income>=0 ? 'good' : 'bad'">Rp {{ formatCurrency(row.therapist_income) }}</td>
+                  <td class="num" :class="row.therapist_income>=0 ? 'good' : 'bad'">Rp {{ formatCurrency(row.therapist_income) }} <button class="btn mini-print" @click.stop="printSingleTherapistSlip(row)">Slip</button></td>
                 </tr>
                 <tr v-if="expandedFinanceRows[row.key]">
                   <td></td>
@@ -203,7 +208,10 @@
         <section class="card">
           <div class="table-head">
             <h4>Laporan Pendapatan Agent</h4>
-            <small class="muted">Klik baris agent untuk lihat breakdown per terapis.</small>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <small class="muted">Klik baris agent untuk lihat breakdown per terapis.</small>
+              <button class="btn" @click="printTherapistFinanceReport('agent')">Print</button>
+            </div>
           </div>
           <table class="table">
             <thead><tr><th>Agent</th><th>Total Terapis</th><th>Total Kerja (SPA+LC)</th><th>Total Pendapatan Agent</th></tr></thead>
@@ -214,7 +222,7 @@
                   <td>{{ expandedAgentRows[row.key] ? '▾' : '▸' }} {{ row.agent_name }}</td>
                   <td class="num">{{ row.therapist_count }}</td>
                   <td class="num">{{ row.total_kerja }}</td>
-                  <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
+                  <td class="num">Rp {{ formatCurrency(row.agent_income) }} <button class="btn mini-print" @click.stop="printSingleAgentSlip(row)">Slip</button></td>
                 </tr>
                 <tr v-if="expandedAgentRows[row.key]">
                   <td colspan="4">
@@ -663,8 +671,143 @@ const toggleAgentBreakdown = (key) => {
   expandedAgentRows.value = { ...expandedAgentRows.value, [key]: !expandedAgentRows.value[key] }
 }
 
-const printTherapistFinanceReport = () => {
-  window.print()
+const printCurrency = (v) => `Rp ${formatCurrency(v)}`
+
+const openPrintWindow = (title, subtitle, bodyHtml) => {
+  const win = window.open('', '_blank', 'width=1200,height=900')
+  if (!win) return
+  const printedAt = new Date().toLocaleString('id-ID')
+  win.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:0; background:#fff; }
+          .page { padding:28px 32px; }
+          .header { border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 16px; }
+          .brand { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
+          .subtitle { color:#555; margin-top:4px; font-size:12px; }
+          .meta { font-size: 12px; color:#555; margin-top: 8px; }
+          .section-title { font-size:15px; margin:14px 0 8px; font-weight:700; }
+          table { width:100%; border-collapse:collapse; font-size:12px; }
+          th, td { border:1px solid #ddd; padding:8px 10px; text-align:left; }
+          th { background:#f4f4f4; }
+          .num { text-align:right; }
+          .footer { margin-top:20px; font-size:12px; color:#666; }
+          .pill { display:inline-block; border:1px solid #999; border-radius:999px; padding:2px 8px; font-size:11px; color:#333; }
+          @media print { .page { padding: 12mm; } }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="header">
+            <div class="brand">NUMARS POS — Enterprise Financial Report</div>
+            <div class="subtitle">${subtitle}</div>
+            <div class="meta">Outlet: ${selectedBranch.value === 'ALL' ? 'Semua Outlet' : (branches.value.find((b) => String(b.id) === String(selectedBranch.value))?.name || '-')} | Periode: ${dateFrom.value || '-'} s/d ${dateTo.value || '-'} | Dicetak: ${printedAt}</div>
+          </div>
+          ${bodyHtml}
+          <div class="footer">Dokumen ini digenerate otomatis dari sistem dan dapat digunakan sebagai lampiran slip pendapatan.</div>
+        </div>
+      </body>
+    </html>
+  `)
+  win.document.close()
+  win.focus()
+  win.print()
+}
+
+const buildTherapistTableHtml = (rows) => {
+  const body = rows.map((row) => `
+    <tr>
+      <td>${row.therapist_name}</td>
+      <td>${row.grade_name}</td>
+      <td class="num">${row.spa_qty}</td>
+      <td class="num">${row.lc_qty}</td>
+      <td class="num">${printCurrency(row.spa_denda)}</td>
+      <td class="num">${printCurrency(row.lc_denda)}</td>
+      <td class="num">${printCurrency(row.therapist_income)}</td>
+    </tr>
+  `).join('')
+  return `
+    <div class="section-title">Laporan Pendapatan Terapis</div>
+    <table>
+      <thead><tr><th>Terapis</th><th>Grade</th><th>Total Kerja SPA</th><th>Total Kerja LC</th><th>Denda</th><th>Hutang</th><th>Pendapatan</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td colspan="6"><strong>Total Pendapatan Terapis</strong></td><td class="num"><strong>${printCurrency(totalTherapistIncome.value)}</strong></td></tr></tfoot>
+    </table>
+  `
+}
+
+const buildAgentTableHtml = (rows) => {
+  const body = rows.map((row) => `
+    <tr>
+      <td>${row.agent_name}</td>
+      <td class="num">${row.therapist_count}</td>
+      <td class="num">${row.total_kerja}</td>
+      <td class="num">${printCurrency(row.agent_income)}</td>
+    </tr>
+  `).join('')
+  return `
+    <div class="section-title">Laporan Pendapatan Agent</div>
+    <table>
+      <thead><tr><th>Agent</th><th>Total Terapis</th><th>Total Kerja</th><th>Pendapatan</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td colspan="3"><strong>Total Pendapatan Agent</strong></td><td class="num"><strong>${printCurrency(totalAgentIncome.value)}</strong></td></tr></tfoot>
+    </table>
+  `
+}
+
+const printSingleTherapistSlip = (row) => {
+  const html = `
+    <div class="section-title">Slip Pendapatan Terapis <span class="pill">${row.therapist_name}</span></div>
+    <table>
+      <tbody>
+        <tr><td>Nama Terapis</td><td>${row.therapist_name}</td></tr>
+        <tr><td>Grade</td><td>${row.grade_name}</td></tr>
+        <tr><td>Rumus SPA</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.spa_room)} - ${printCurrency(row.spa_salon)} - ${printCurrency(row.spa_safety)}) × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
+        <tr><td>Rumus LC</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.lc_room)} - ${printCurrency(row.lc_salon)}) × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
+        <tr><td>Potongan</td><td>Denda ${printCurrency(row.spa_denda)} + Hutang ${printCurrency(row.lc_denda)} + Lain-lain ${printCurrency(row.total_lain_lain)}</td></tr>
+        <tr><td><strong>Total Pendapatan</strong></td><td><strong>${printCurrency(row.therapist_income)}</strong></td></tr>
+      </tbody>
+    </table>
+  `
+  openPrintWindow('Slip Pendapatan Terapis', 'Dokumen slip pendapatan terapis', html)
+}
+
+const printSingleAgentSlip = (row) => {
+  const details = (row.details || []).map((d) => `<tr><td>${d.therapist_name}</td><td class="num">${d.total_kerja}</td><td class="num">${printCurrency(d.agent_fee)}</td><td class="num">${printCurrency(d.agent_income)}</td></tr>`).join('')
+  const html = `
+    <div class="section-title">Slip Pendapatan Agent <span class="pill">${row.agent_name}</span></div>
+    <table>
+      <tbody>
+        <tr><td>Agent</td><td>${row.agent_name}</td></tr>
+        <tr><td>Total Terapis</td><td>${row.therapist_count}</td></tr>
+        <tr><td>Total Kerja</td><td>${row.total_kerja}</td></tr>
+        <tr><td><strong>Total Pendapatan Agent</strong></td><td><strong>${printCurrency(row.agent_income)}</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="section-title">Breakdown Terapis</div>
+    <table>
+      <thead><tr><th>Terapis</th><th>Total Kerja</th><th>Agent Fee</th><th>Pendapatan Agent</th></tr></thead>
+      <tbody>${details}</tbody>
+    </table>
+  `
+  openPrintWindow('Slip Pendapatan Agent', 'Dokumen slip pendapatan agent', html)
+}
+
+const printTherapistFinanceReport = (mode = 'all') => {
+  const therapistHtml = buildTherapistTableHtml(therapistFinanceRows.value)
+  const agentHtml = buildAgentTableHtml(agentFinanceRows.value)
+
+  if (mode === 'therapist') {
+    openPrintWindow('Laporan Pendapatan Terapis', 'Laporan enterprise pendapatan terapis', therapistHtml)
+    return
+  }
+  if (mode === 'agent') {
+    openPrintWindow('Laporan Pendapatan Agent', 'Laporan enterprise pendapatan agent', agentHtml)
+    return
+  }
+  openPrintWindow('Laporan Pendapatan Terapis & Agent', 'Laporan enterprise gabungan terapis dan agent', therapistHtml + agentHtml)
 }
 
 const addExpense = async () => {
@@ -721,6 +864,7 @@ nav button.active { background:#c9a24d; color:#000; }
 .pagination { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:10px; }
 .pagination-inline { display:flex; align-items:center; gap:8px; }
 .mini-select { background:#090909; border:1px solid #2f3440; color:#fff; border-radius:8px; padding:6px 8px; }
+.mini-print { margin-left: 8px; padding: 2px 8px; font-size: 11px; border-radius: 6px; }
 .deduction-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
 .breakdown-grid { display:grid; gap:6px; }
 .clickable-row { cursor:pointer; }
