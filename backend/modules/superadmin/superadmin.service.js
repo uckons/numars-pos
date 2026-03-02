@@ -85,12 +85,14 @@ exports.orders = async () => {
       b.name AS branch_name,
       o.status,
       COALESCE(SUM(oi.subtotal), 0) AS total,
+      COALESCE(SUM(CASE WHEN s.type = 'FNB' THEN oi.qty * COALESCE(fi.modal, 0) ELSE 0 END), 0) AS fnb_modal_cost,
       o.created_at,
       STRING_AGG(DISTINCT s.type::text, ', ') AS category
     FROM orders o
     LEFT JOIN branches b ON b.id = o.branch_id
     LEFT JOIN order_items oi ON oi.order_id = o.id
-    LEFT JOIN services s ON s.id = oi.service_id
+    LEFT JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)
+    LEFT JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)
     GROUP BY o.id, o.branch_id, b.name, o.status, o.created_at
     ORDER BY o.created_at DESC
     LIMIT 2000
