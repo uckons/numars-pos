@@ -155,7 +155,7 @@
         </section>
 
         <section class="card">
-          <h4>Master Potongan Perhitungan</h4>
+          <h4>Master Potongan Global (Kecuali Denda)</h4>
           <div class="deduction-grid">
             <div class="field" v-for="field in financeConfigFields" :key="field.key">
               <label>{{ field.label }}</label>
@@ -166,13 +166,13 @@
 
         <section class="card">
           <div class="table-head">
-            <h4>Ringkasan Pendapatan Per Terapis</h4>
-            <small class="muted">Klik baris untuk lihat breakdown SPA/LC.</small>
+            <h4>Ringkasan Pendapatan Terapis</h4>
+            <small class="muted">Denda diinput per terapis. Klik baris untuk breakdown.</small>
           </div>
           <table class="table">
-            <thead><tr><th></th><th>Terapis</th><th>Grade</th><th>Total Kerja SPA (QTY)</th><th>Total Kerja LC (QTY)</th><th>Pendapatan Terapis</th><th>Pendapatan Agent</th></tr></thead>
+            <thead><tr><th></th><th>Terapis</th><th>Grade</th><th>Total Kerja SPA (QTY)</th><th>Total Kerja LC (QTY)</th><th>Denda SPA</th><th>Denda LC</th><th>Pendapatan Terapis</th></tr></thead>
             <tbody>
-              <tr v-if="!therapistFinanceRows.length"><td colspan="7" class="muted">Belum ada data terapis untuk periode ini.</td></tr>
+              <tr v-if="!therapistFinanceRows.length"><td colspan="8" class="muted">Belum ada data terapis untuk periode ini.</td></tr>
               <template v-for="row in therapistFinanceRows" :key="row.key">
                 <tr @click="toggleFinanceBreakdown(row.key)" class="clickable-row">
                   <td>{{ expandedFinanceRows[row.key] ? '▾' : '▸' }}</td>
@@ -180,22 +180,44 @@
                   <td>{{ row.grade_name }}</td>
                   <td class="num">{{ row.spa_qty }}</td>
                   <td class="num">{{ row.lc_qty }}</td>
+                  <td><input class="mini-select" type="number" min="0" :value="row.spa_denda" @input.stop="setTherapistPenalty(row.therapist_name, 'spa_denda', $event.target.value)" /></td>
+                  <td><input class="mini-select" type="number" min="0" :value="row.lc_denda" @input.stop="setTherapistPenalty(row.therapist_name, 'lc_denda', $event.target.value)" /></td>
                   <td class="num" :class="row.therapist_income>=0 ? 'good' : 'bad'">Rp {{ formatCurrency(row.therapist_income) }}</td>
-                  <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
                 </tr>
                 <tr v-if="expandedFinanceRows[row.key]">
                   <td></td>
-                  <td colspan="6">
+                  <td colspan="7">
                     <div class="breakdown-grid">
-                      <div><strong>SPA:</strong> ({{ formatCurrency(row.spa_base_non_hh) }} - {{ formatCurrency(row.spa_deduction_rate_total) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income) }}</strong></div>
-                      <div><strong>LC:</strong> ({{ formatCurrency(row.lc_base_non_hh) }} - {{ formatCurrency(row.lc_deduction_rate_total) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income) }}</strong></div>
+                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }} - {{ formatCurrency(row.spa_denda) }} - {{ formatCurrency(row.spa_lain_lain) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income) }}</strong></div>
+                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }} - {{ formatCurrency(row.lc_denda) }} - {{ formatCurrency(row.lc_lain_lain) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income) }}</strong></div>
                       <div><strong>Agent:</strong> ({{ row.spa_qty }} + {{ row.lc_qty }}) × {{ formatCurrency(row.agent_fee) }} = <strong>Rp {{ formatCurrency(row.agent_income) }}</strong></div>
                     </div>
                   </td>
                 </tr>
               </template>
             </tbody>
-            <tfoot><tr><td colspan="5"><strong>Total</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalTherapistIncome) }}</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalAgentIncome) }}</strong></td></tr></tfoot>
+            <tfoot><tr><td colspan="7"><strong>Total</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalTherapistIncome) }}</strong></td></tr></tfoot>
+          </table>
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h4>Laporan Pendapatan Agent</h4>
+            <small class="muted">Dipisah agar tidak ambigu dengan pendapatan terapis.</small>
+          </div>
+          <table class="table">
+            <thead><tr><th>Terapis</th><th>Grade</th><th>Total Kerja (SPA+LC)</th><th>Agent Fee</th><th>Pendapatan Agent</th></tr></thead>
+            <tbody>
+              <tr v-if="!therapistFinanceRows.length"><td colspan="5" class="muted">Belum ada data agent untuk periode ini.</td></tr>
+              <tr v-for="row in therapistFinanceRows" :key="`${row.key}-agent`">
+                <td>{{ row.therapist_name }}</td>
+                <td>{{ row.grade_name }}</td>
+                <td class="num">{{ row.total_kerja }}</td>
+                <td class="num">Rp {{ formatCurrency(row.agent_fee) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.agent_income) }}</td>
+              </tr>
+            </tbody>
+            <tfoot><tr><td colspan="4"><strong>Total Pendapatan Agent</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalAgentIncome) }}</strong></td></tr></tfoot>
           </table>
         </section>
       </section>
@@ -251,8 +273,9 @@ const ordersPage = ref(1)
 const ordersPageSize = ref(25)
 const therapistAnalytics = ref([])
 const therapistMaster = ref([])
-const financeConfig = ref({ spa_salon: 0, spa_room: 0, spa_safety: 0, spa_denda: 0, spa_lain_lain: 0, lc_sofa: 0, lc_salon: 0, lc_safety: 0, lc_denda: 0, lc_lain_lain: 0 })
+const financeConfig = ref({ spa_salon: 0, spa_room: 0, spa_safety: 0, spa_lain_lain: 0, lc_room: 0, lc_salon: 0, lc_lain_lain: 0 })
 const expandedFinanceRows = ref({})
+const therapistPenalties = ref({})
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -358,6 +381,24 @@ const therapistMasterMap = computed(() => {
   return map
 })
 
+const getTherapistPenalty = (name) => {
+  const key = normalizeTherapistName(name)
+  return therapistPenalties.value[key] || { spa_denda: 0, lc_denda: 0 }
+}
+
+const setTherapistPenalty = (name, field, value) => {
+  const key = normalizeTherapistName(name)
+  if (!key) return
+  const current = getTherapistPenalty(name)
+  therapistPenalties.value = {
+    ...therapistPenalties.value,
+    [key]: {
+      ...current,
+      [field]: Math.max(0, Number(value || 0))
+    }
+  }
+}
+
 const therapistFinanceRows = computed(() => {
   const grouped = new Map()
   for (const row of therapistAnalytics.value) {
@@ -401,25 +442,41 @@ const therapistFinanceRows = computed(() => {
     const agentFee = Number(master?.agent_cut_amount || master?.agent_cut_override || 0)
     const spaQty = Number(item.spa_qty || 0)
     const lcQty = Number(item.lc_qty || 0)
-    const spaBasePerUnit = spaQty > 0 ? Number(item.spa_non_hh_total || 0) / spaQty : 0
-    const lcBasePerUnit = lcQty > 0 ? Number(item.lc_non_hh_total || 0) / lcQty : 0
+    const servicePrice = Number(master?.commission_amount || 0)
+    const penalty = getTherapistPenalty(item.therapist_name)
+    const spaDenda = Number(penalty.spa_denda || 0)
+    const lcDenda = Number(penalty.lc_denda || 0)
 
-    const spaDedRate = agentFee + Number(financeConfig.value.spa_salon || 0) + Number(financeConfig.value.spa_room || 0) + Number(financeConfig.value.spa_safety || 0) + Number(financeConfig.value.spa_denda || 0) + Number(financeConfig.value.spa_lain_lain || 0)
-    const lcDedRate = agentFee + Number(financeConfig.value.lc_sofa || 0) + Number(financeConfig.value.lc_salon || 0) + Number(financeConfig.value.lc_safety || 0) + Number(financeConfig.value.lc_denda || 0) + Number(financeConfig.value.lc_lain_lain || 0)
+    const spaRoom = Number(financeConfig.value.spa_room || 0)
+    const spaSalon = Number(financeConfig.value.spa_salon || 0)
+    const spaSafety = Number(financeConfig.value.spa_safety || 0)
+    const spaLainLain = Number(financeConfig.value.spa_lain_lain || 0)
+    const lcRoom = Number(financeConfig.value.lc_room || 0)
+    const lcSalon = Number(financeConfig.value.lc_salon || 0)
+    const lcLainLain = Number(financeConfig.value.lc_lain_lain || 0)
 
-    const spaIncome = (spaBasePerUnit - spaDedRate) * spaQty
-    const lcIncome = (lcBasePerUnit - lcDedRate) * lcQty
+    const spaNetRate = servicePrice - agentFee - spaRoom - spaSalon - spaSafety - spaDenda - spaLainLain
+    const lcNetRate = servicePrice - agentFee - lcRoom - lcSalon - lcDenda - lcLainLain
+
+    const spaIncome = spaNetRate * spaQty
+    const lcIncome = lcNetRate * lcQty
     const therapistIncome = spaIncome + lcIncome
     const agentIncome = (spaQty + lcQty) * agentFee
 
     return {
       ...item,
       grade_name: master?.grade_name || '-',
+      service_price: servicePrice,
       agent_fee: agentFee,
-      spa_base_non_hh: spaBasePerUnit,
-      lc_base_non_hh: lcBasePerUnit,
-      spa_deduction_rate_total: spaDedRate,
-      lc_deduction_rate_total: lcDedRate,
+      spa_room: spaRoom,
+      spa_salon: spaSalon,
+      spa_safety: spaSafety,
+      spa_denda: spaDenda,
+      spa_lain_lain: spaLainLain,
+      lc_room: lcRoom,
+      lc_salon: lcSalon,
+      lc_denda: lcDenda,
+      lc_lain_lain: lcLainLain,
       spa_income: spaIncome,
       lc_income: lcIncome,
       total_kerja: spaQty + lcQty,
@@ -514,12 +571,9 @@ const financeConfigFields = [
   { key: 'spa_salon', label: 'SPA - Salon' },
   { key: 'spa_room', label: 'SPA - Room' },
   { key: 'spa_safety', label: 'SPA - Safety' },
-  { key: 'spa_denda', label: 'SPA - Denda' },
   { key: 'spa_lain_lain', label: 'SPA - Lain-lain' },
-  { key: 'lc_sofa', label: 'LC - SOFA' },
+  { key: 'lc_room', label: 'LC - Room' },
   { key: 'lc_salon', label: 'LC - Salon' },
-  { key: 'lc_safety', label: 'LC - Safety' },
-  { key: 'lc_denda', label: 'LC - Denda' },
   { key: 'lc_lain_lain', label: 'LC - Lain-lain' }
 ]
 
@@ -531,7 +585,13 @@ const saveFinanceConfig = async () => {
   try {
     await api.post('/dashboard/therapist-finance-config', {
       ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
-      ...financeConfig.value
+      spa_salon: Number(financeConfig.value.spa_salon || 0),
+      spa_room: Number(financeConfig.value.spa_room || 0),
+      spa_safety: Number(financeConfig.value.spa_safety || 0),
+      spa_lain_lain: Number(financeConfig.value.spa_lain_lain || 0),
+      lc_room: Number(financeConfig.value.lc_room || 0),
+      lc_salon: Number(financeConfig.value.lc_salon || 0),
+      lc_lain_lain: Number(financeConfig.value.lc_lain_lain || 0)
     })
     await Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Master potongan disimpan' })
   } catch (err) {

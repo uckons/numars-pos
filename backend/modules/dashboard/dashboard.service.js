@@ -817,6 +817,7 @@ const ensureTherapistFinanceConfigTable = async () => {
       spa_denda NUMERIC(14,2) NOT NULL DEFAULT 0,
       spa_lain_lain NUMERIC(14,2) NOT NULL DEFAULT 0,
       lc_sofa NUMERIC(14,2) NOT NULL DEFAULT 0,
+      lc_room NUMERIC(14,2) NOT NULL DEFAULT 0,
       lc_salon NUMERIC(14,2) NOT NULL DEFAULT 0,
       lc_safety NUMERIC(14,2) NOT NULL DEFAULT 0,
       lc_denda NUMERIC(14,2) NOT NULL DEFAULT 0,
@@ -824,6 +825,11 @@ const ensureTherapistFinanceConfigTable = async () => {
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       UNIQUE (branch_id)
     )
+  `)
+
+  await db.query(`
+    ALTER TABLE therapist_finance_configs
+    ADD COLUMN IF NOT EXISTS lc_room NUMERIC(14,2) NOT NULL DEFAULT 0
   `)
 }
 
@@ -848,6 +854,7 @@ exports.getTherapistFinanceConfig = async (user, query = {}) => {
     spa_denda: Number(row.spa_denda || 0),
     spa_lain_lain: Number(row.spa_lain_lain || 0),
     lc_sofa: Number(row.lc_sofa || 0),
+    lc_room: Number(row.lc_room || 0),
     lc_salon: Number(row.lc_salon || 0),
     lc_safety: Number(row.lc_safety || 0),
     lc_denda: Number(row.lc_denda || 0),
@@ -870,6 +877,7 @@ exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
     Number(payload.spa_denda || 0),
     Number(payload.spa_lain_lain || 0),
     Number(payload.lc_sofa || 0),
+    Number(payload.lc_room || 0),
     Number(payload.lc_salon || 0),
     Number(payload.lc_safety || 0),
     Number(payload.lc_denda || 0),
@@ -879,8 +887,8 @@ exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
   const { rows } = await db.query(
     `INSERT INTO therapist_finance_configs (
       branch_id, spa_salon, spa_room, spa_safety, spa_denda, spa_lain_lain,
-      lc_sofa, lc_salon, lc_safety, lc_denda, lc_lain_lain
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      lc_sofa, lc_room, lc_salon, lc_safety, lc_denda, lc_lain_lain
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
     ON CONFLICT (branch_id)
     DO UPDATE SET
       spa_salon = EXCLUDED.spa_salon,
@@ -889,6 +897,7 @@ exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
       spa_denda = EXCLUDED.spa_denda,
       spa_lain_lain = EXCLUDED.spa_lain_lain,
       lc_sofa = EXCLUDED.lc_sofa,
+      lc_room = EXCLUDED.lc_room,
       lc_salon = EXCLUDED.lc_salon,
       lc_safety = EXCLUDED.lc_safety,
       lc_denda = EXCLUDED.lc_denda,
@@ -906,6 +915,7 @@ exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
     spa_denda: Number(rows[0].spa_denda || 0),
     spa_lain_lain: Number(rows[0].spa_lain_lain || 0),
     lc_sofa: Number(rows[0].lc_sofa || 0),
+    lc_room: Number(rows[0].lc_room || 0),
     lc_salon: Number(rows[0].lc_salon || 0),
     lc_safety: Number(rows[0].lc_safety || 0),
     lc_denda: Number(rows[0].lc_denda || 0),
