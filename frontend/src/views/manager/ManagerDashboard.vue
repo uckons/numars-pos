@@ -70,7 +70,7 @@
         <section class="card chart-grid">
           <div>
             <h4>Revenue Trend</h4>
-            <ApexChart type="area" :height="210" :series="trendSeries" :options="trendOptions" />
+            <ApexChart type="area" :height="170" :series="trendSeries" :options="trendOptions" />
           </div>
           <div>
             <h4>Breakdown Service</h4>
@@ -80,7 +80,7 @@
 
         <section class="card">
           <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
-          <ApexChart type="line" :height="220" :series="categoryTrendSeries" :options="categoryTrendOptions" />
+          <ApexChart type="line" :height="180" :series="categoryTrendSeries" :options="categoryTrendOptions" />
         </section>
 
         <section class="card">
@@ -644,11 +644,11 @@ const trendOptions = computed(() => ({
   yaxis: {
     min: 0,
     max: normalizeChartMax(trendPeak.value),
-    tickAmount: 4,
+    tickAmount: 7,
     forceNiceScale: true,
     labels: { formatter: formatAxisNumber }
   },
-  grid: { padding: { top: 4, bottom: 0 } },
+  grid: { padding: { top: 2, bottom: -4 } },
   dataLabels: { enabled: false },
   tooltip: { y: { formatter: formatAccountingNumber } },
   colors: ["#5f85ff"]
@@ -705,11 +705,11 @@ const categoryTrendOptions = computed(() => ({
   yaxis: {
     min: 0,
     max: normalizeChartMax(categoryTrendPeak.value),
-    tickAmount: 4,
+    tickAmount: 7,
     forceNiceScale: true,
     labels: { formatter: formatAxisNumber }
   },
-  grid: { padding: { top: 4, bottom: 0 } },
+  grid: { padding: { top: 2, bottom: -4 } },
   tooltip: { y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
   stroke: { curve: "smooth", width: 2 },
