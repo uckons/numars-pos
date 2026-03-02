@@ -193,9 +193,9 @@
                   <td></td>
                   <td colspan="7">
                     <div class="breakdown-grid">
-                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.spa_room) }} - {{ formatCurrency(row.spa_salon) }} - {{ formatCurrency(row.spa_safety) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
-                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.lc_room) }} - {{ formatCurrency(row.lc_salon) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
-                      <div><strong>Total:</strong> (SPA + LC) - (Denda + Hutang + Lain-lain) = ({{ formatCurrency(row.spa_income_raw) }} + {{ formatCurrency(row.lc_income_raw) }}) - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.lc_denda) }} + {{ formatCurrency(row.total_lain_lain) }}) = <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
+                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.room) }} - {{ formatCurrency(row.salon) }} - {{ formatCurrency(row.safety) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
+                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.room) }} - {{ formatCurrency(row.salon) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
+                      <div><strong>Total:</strong> (SPA + LC) - (Denda + Hutang + Salon + Lain-lain) = ({{ formatCurrency(row.spa_income_raw) }} + {{ formatCurrency(row.lc_income_raw) }}) - ({{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.lc_denda) }} + {{ formatCurrency(row.salon) }} + {{ formatCurrency(row.lain_lain) }}) = <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
                     </div>
                   </td>
                 </tr>
@@ -291,7 +291,7 @@ const ordersPage = ref(1)
 const ordersPageSize = ref(25)
 const therapistAnalytics = ref([])
 const therapistMaster = ref([])
-const financeConfig = ref({ spa_salon: 0, spa_room: 0, spa_safety: 0, spa_lain_lain: 0, lc_room: 0, lc_salon: 0, lc_lain_lain: 0 })
+const financeConfig = ref({ salon: 0, room: 0, safety: 0, lain_lain: 0 })
 const expandedFinanceRows = ref({})
 const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
@@ -337,7 +337,14 @@ const loadReport = async () => {
     branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
     therapistAnalytics.value = Array.isArray(analyticsRes.data?.therapist_pnl) ? analyticsRes.data.therapist_pnl : []
     therapistMaster.value = Array.isArray(therapistRes.data?.data) ? therapistRes.data.data : []
-    financeConfig.value = { ...financeConfig.value, ...(financeCfgRes.data || {}) }
+    const cfg = financeCfgRes.data || {}
+    financeConfig.value = {
+      ...financeConfig.value,
+      salon: Number(cfg.salon ?? cfg.spa_salon ?? cfg.lc_salon ?? 0),
+      room: Number(cfg.room ?? cfg.spa_room ?? cfg.lc_room ?? cfg.lc_sofa ?? 0),
+      safety: Number(cfg.safety ?? cfg.spa_safety ?? cfg.lc_safety ?? 0),
+      lain_lain: Number(cfg.lain_lain ?? cfg.spa_lain_lain ?? cfg.lc_lain_lain ?? 0)
+    }
   } catch (err) {
     orders.value = []
     branches.value = []
@@ -466,21 +473,17 @@ const therapistFinanceRows = computed(() => {
     const spaDenda = Number(penalty.spa_denda || 0)
     const lcDenda = Number(penalty.lc_denda || 0)
 
-    const spaRoom = Number(financeConfig.value.spa_room || 0)
-    const spaSalon = Number(financeConfig.value.spa_salon || 0)
-    const spaSafety = Number(financeConfig.value.spa_safety || 0)
-    const spaLainLain = Number(financeConfig.value.spa_lain_lain || 0)
-    const lcRoom = Number(financeConfig.value.lc_room || 0)
-    const lcSalon = Number(financeConfig.value.lc_salon || 0)
-    const lcLainLain = Number(financeConfig.value.lc_lain_lain || 0)
+    const room = Number(financeConfig.value.room || 0)
+    const salon = Number(financeConfig.value.salon || 0)
+    const safety = Number(financeConfig.value.safety || 0)
+    const lainLain = Number(financeConfig.value.lain_lain || 0)
 
-    const spaNetRate = servicePrice - agentFee - spaRoom - spaSalon - spaSafety
-    const lcNetRate = servicePrice - agentFee - lcRoom - lcSalon
+    const spaNetRate = servicePrice - agentFee - room - salon - safety
+    const lcNetRate = servicePrice - agentFee - room - salon
 
     const spaIncomeRaw = spaNetRate * spaQty
     const lcIncomeRaw = lcNetRate * lcQty
-    const totalLainLain = spaLainLain + lcLainLain
-    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + totalLainLain)
+    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + salon + lainLain)
     const agentIncome = (spaQty + lcQty) * agentFee
 
     return {
@@ -489,18 +492,14 @@ const therapistFinanceRows = computed(() => {
       agent_profile_name: master?.agent_profile_name || '-',
       service_price: servicePrice,
       agent_fee: agentFee,
-      spa_room: spaRoom,
-      spa_salon: spaSalon,
-      spa_safety: spaSafety,
+      room,
+      salon,
+      safety,
       spa_denda: spaDenda,
-      spa_lain_lain: spaLainLain,
-      lc_room: lcRoom,
-      lc_salon: lcSalon,
       lc_denda: lcDenda,
-      lc_lain_lain: lcLainLain,
+      lain_lain: lainLain,
       spa_income_raw: spaIncomeRaw,
       lc_income_raw: lcIncomeRaw,
-      total_lain_lain: totalLainLain,
       total_kerja: spaQty + lcQty,
       therapist_income: therapistIncome,
       agent_income: agentIncome
@@ -632,13 +631,10 @@ const categoryTrendOptions = computed(() => ({
 }))
 
 const financeConfigFields = [
-  { key: 'spa_salon', label: 'SPA - Salon' },
-  { key: 'spa_room', label: 'SPA - Room' },
-  { key: 'spa_safety', label: 'SPA - Safety' },
-  { key: 'spa_lain_lain', label: 'SPA - Lain-lain' },
-  { key: 'lc_room', label: 'LC - Room' },
-  { key: 'lc_salon', label: 'LC - Salon' },
-  { key: 'lc_lain_lain', label: 'LC - Lain-lain' }
+  { key: 'salon', label: 'SALON' },
+  { key: 'room', label: 'ROOM' },
+  { key: 'safety', label: 'SAFETY' },
+  { key: 'lain_lain', label: 'LAIN-LAIN' }
 ]
 
 const setFinanceConfigField = (key, value) => {
@@ -649,13 +645,14 @@ const saveFinanceConfig = async () => {
   try {
     await api.post('/dashboard/therapist-finance-config', {
       ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
-      spa_salon: Number(financeConfig.value.spa_salon || 0),
-      spa_room: Number(financeConfig.value.spa_room || 0),
-      spa_safety: Number(financeConfig.value.spa_safety || 0),
-      spa_lain_lain: Number(financeConfig.value.spa_lain_lain || 0),
-      lc_room: Number(financeConfig.value.lc_room || 0),
-      lc_salon: Number(financeConfig.value.lc_salon || 0),
-      lc_lain_lain: Number(financeConfig.value.lc_lain_lain || 0)
+      spa_salon: Number(financeConfig.value.salon || 0),
+      lc_salon: Number(financeConfig.value.salon || 0),
+      spa_room: Number(financeConfig.value.room || 0),
+      lc_room: Number(financeConfig.value.room || 0),
+      spa_safety: Number(financeConfig.value.safety || 0),
+      lc_safety: Number(financeConfig.value.safety || 0),
+      spa_lain_lain: Number(financeConfig.value.lain_lain || 0),
+      lc_lain_lain: Number(financeConfig.value.lain_lain || 0)
     })
     await Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Master potongan disimpan' })
   } catch (err) {
@@ -764,9 +761,9 @@ const printSingleTherapistSlip = (row) => {
       <tbody>
         <tr><td>Nama Terapis</td><td>${row.therapist_name}</td></tr>
         <tr><td>Grade</td><td>${row.grade_name}</td></tr>
-        <tr><td>Rumus SPA</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.spa_room)} - ${printCurrency(row.spa_salon)} - ${printCurrency(row.spa_safety)}) × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
-        <tr><td>Rumus LC</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.lc_room)} - ${printCurrency(row.lc_salon)}) × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
-        <tr><td>Potongan</td><td>Denda ${printCurrency(row.spa_denda)} + Hutang ${printCurrency(row.lc_denda)} + Lain-lain ${printCurrency(row.total_lain_lain)}</td></tr>
+        <tr><td>Rumus SPA</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.room)} - ${printCurrency(row.salon)} - ${printCurrency(row.safety)}) × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
+        <tr><td>Rumus LC</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.room)} - ${printCurrency(row.salon)}) × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
+        <tr><td>Potongan</td><td>Denda ${printCurrency(row.spa_denda)} + Hutang ${printCurrency(row.lc_denda)} + Salon ${printCurrency(row.salon)} + Lain-lain ${printCurrency(row.lain_lain)}</td></tr>
         <tr><td><strong>Total Pendapatan</strong></td><td><strong>${printCurrency(row.therapist_income)}</strong></td></tr>
       </tbody>
     </table>
