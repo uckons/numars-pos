@@ -647,44 +647,53 @@ const normalizeChartMax = (value) => {
   return Math.ceil((safe * 1.1) / magnitude) * magnitude
 }
 
+const roundUpToStep = (value, step) => {
+  const safe = Math.max(0, Number(value || 0))
+  if (!safe) return step
+  return Math.ceil(safe / step) * step
+}
+
 const trendSeries = computed(() => ([{ name: "Revenue", data: trendPoints.value.length ? trendPoints.value : [{ x: new Date().setHours(0, 0, 0, 0), y: 0 }] }]))
 const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((item) => Number(item?.y || 0)), 0))
 const trendOptions = computed(() => ({
   chart: {
     background: "transparent",
     zoom: { enabled: true, type: "x", autoScaleYaxis: true },
-    toolbar: { show: true, tools: { download: false } }
+    toolbar: { show: true, tools: { download: false } },
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 8, color: "#6f8dff", opacity: 0.5 }
   },
   theme: { mode: "dark" },
   xaxis: {
     type: "datetime",
-    labels: { datetimeUTC: false }
+    labels: { datetimeUTC: false, style: { colors: "#ced8ff" } },
+    axisBorder: { color: "rgba(255,255,255,0.18)" }
   },
   yaxis: {
     min: 0,
     max: normalizeChartMax(trendPeak.value),
     tickAmount: 10,
     forceNiceScale: true,
-    labels: { formatter: formatAxisNumber }
+    labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
   },
   grid: {
-    borderColor: "rgba(255,255,255,0.12)",
-    strokeDashArray: 0,
+    borderColor: "rgba(122, 162, 255, 0.2)",
+    strokeDashArray: 3,
     padding: { top: 2, bottom: -6 }
   },
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.25,
-      opacityFrom: 0.45,
-      opacityTo: 0.02,
-      stops: [0, 90, 100]
+      shadeIntensity: 0.35,
+      opacityFrom: 0.65,
+      opacityTo: 0.15,
+      stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 2.5 },
+  stroke: { curve: "smooth", width: 3 },
+  markers: { size: 3, strokeWidth: 0, hover: { size: 5 } },
   dataLabels: { enabled: false },
-  tooltip: { y: { formatter: formatAccountingNumber } },
-  colors: ["#5f85ff"]
+  tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
+  colors: ["#7aa2ff"]
 }))
 
 const breakdownMap = computed(() => {
@@ -757,32 +766,48 @@ const categoryTrendPeak = computed(() => Math.max(
   0
 ))
 
+const categoryAxisStep = 250000
+const categoryTrendYAxisMax = computed(() => roundUpToStep(categoryTrendPeak.value, categoryAxisStep))
+const categoryTrendTickAmount = computed(() => {
+  const ticks = Math.floor(categoryTrendYAxisMax.value / categoryAxisStep)
+  return Math.max(1, ticks)
+})
+
 const categoryTrendOptions = computed(() => ({
-  chart: { toolbar: { show: false }, background: "transparent" },
+  chart: {
+    toolbar: { show: false },
+    background: "transparent",
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 6, color: "#5f85ff", opacity: 0.35 }
+  },
   theme: { mode: "dark" },
-  xaxis: { type: "datetime", labels: { datetimeUTC: false } },
+  xaxis: {
+    type: "datetime",
+    labels: { datetimeUTC: false, style: { colors: "#ced8ff" } },
+    axisBorder: { color: "rgba(255,255,255,0.18)" }
+  },
   yaxis: {
     min: 0,
-    max: normalizeChartMax(categoryTrendPeak.value),
-    tickAmount: 10,
-    forceNiceScale: true,
-    labels: { formatter: formatAxisNumber }
+    max: categoryTrendYAxisMax.value,
+    tickAmount: categoryTrendTickAmount.value,
+    forceNiceScale: false,
+    labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
   },
-  grid: { borderColor: "rgba(255,255,255,0.12)", padding: { top: 2, bottom: -6 } },
-  tooltip: { y: { formatter: formatAccountingNumber } },
+  grid: { borderColor: "rgba(122, 162, 255, 0.2)", strokeDashArray: 3, padding: { top: 2, bottom: -6 } },
+  tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
+  markers: { size: 2.5, strokeWidth: 0, hover: { size: 4 } },
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.25,
-      opacityFrom: 0.28,
-      opacityTo: 0.05,
+      shadeIntensity: 0.35,
+      opacityFrom: 0.4,
+      opacityTo: 0.12,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 2.2 },
-  legend: { position: "top" },
-  colors: ["#ff9f43", "#5f85ff", "#38d996", "#e056fd"]
+  stroke: { curve: "smooth", width: 2.8 },
+  legend: { position: "top", labels: { colors: "#eef2ff" } },
+  colors: ["#ffb45c", "#7aa2ff", "#45e3b3", "#e686ff"]
 }))
 
 const financeConfigFields = [
