@@ -779,6 +779,35 @@ const finalizeCompletedOrder = async (orderId) => {
 
 
 // lanjut ke modal print utama (tanpa modal perantara draft)
+
+const askCashAmountCorrection = async (minimumAmount) => {
+  const { value, isConfirmed } = await SwalTheme.fire({
+    title: 'Masukkan Jumlah Uang',
+    html: `
+      <div style="text-align:left;margin-top:8px;">
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Jumlah Bayar Cash (Rp)</label>
+        <input id="pay-amount-correction" type="number" min="${Math.max(0, Number(minimumAmount || 0))}" class="swal2-input" style="margin:0;max-width:100%;" value="${Math.max(0, Number(minimumAmount || 0))}" />
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Simpan',
+    cancelButtonText: 'Batal',
+    focusConfirm: false,
+    preConfirm: () => {
+      const raw = document.getElementById('pay-amount-correction')?.value
+      const amount = Math.round(Number(raw || 0))
+      if (amount < Number(minimumAmount || 0)) {
+        Swal.showValidationMessage(`Jumlah bayar cash minimal Rp ${format(minimumAmount)}`)
+        return false
+      }
+      return amount
+    }
+  })
+
+  if (!isConfirmed) return null
+  return Number(value || 0)
+}
+
 const proceedToPrintCartStep = async () => {
   try {
     receiptLoading.value = true
@@ -790,10 +819,27 @@ const proceedToPrintCartStep = async () => {
     showReceiptModal.value = true
     inPrintCartStep.value = true
   } catch (err) {
+    const message = err.response?.data?.message || err.message || "Gagal menyiapkan print cart"
+
+    if (pendingPayment.value?.payment_method === 'CASH' && /Jumlah bayar cash kurang/i.test(String(message || ''))) {
+      const subtotal = Math.round(Number(grandTotal.value || 0))
+      const discountAmount = Math.max(0, Math.round(Number(pendingPayment.value?.discount_amount || 0)))
+      const minimumAmount = Math.max(0, subtotal - discountAmount)
+      const correctedAmount = await askCashAmountCorrection(minimumAmount)
+      if (correctedAmount !== null) {
+        pendingPayment.value = {
+          ...pendingPayment.value,
+          payment_amount: correctedAmount
+        }
+        receiptData.value = buildDraftReceiptPreview(pendingPayment.value)
+      }
+      return
+    }
+
     await SwalTheme.fire({
       icon: "error",
       title: "Gagal",
-      text: err.response?.data?.message || err.message || "Gagal menyiapkan print cart",
+      text: message,
       confirmButtonText: "OK"
     })
   } finally {
@@ -1202,6 +1248,8 @@ const saveDraft = async () => {
   cursor: not-allowed;
 }
 /* ===== SweetAlert2 Black & Gold theme (scoped using :deep) ===== */
+:deep(.swal2-container) { z-index: 20000 !important; }
+
 :deep(.swal-theme-popup) {
   background: linear-gradient(145deg, #0e0e0e, #151515) !important;
   color: #fff !important;
