@@ -660,7 +660,7 @@ const trendOptions = computed(() => ({
     background: "transparent",
     zoom: { enabled: true, type: "x", autoScaleYaxis: true },
     toolbar: { show: true, tools: { download: false } },
-    dropShadow: { enabled: true, top: 0, left: 0, blur: 8, color: "#6f8dff", opacity: 0.5 }
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 7, color: "#1e88e5", opacity: 0.45 }
   },
   theme: { mode: "dark" },
   xaxis: {
@@ -684,16 +684,16 @@ const trendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.65,
-      opacityTo: 0.15,
+      opacityFrom: 0.36,
+      opacityTo: 0.08,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 3 },
-  markers: { size: 3, strokeWidth: 0, hover: { size: 5 } },
+  stroke: { curve: "smooth", width: 3.6 },
+  markers: { size: 0, hover: { size: 5 } },
   dataLabels: { enabled: false },
   tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
-  colors: ["#7aa2ff"]
+  colors: ["#1e88e5"]
 }))
 
 const breakdownMap = computed(() => {
@@ -766,7 +766,7 @@ const categoryTrendPeak = computed(() => Math.max(
   0
 ))
 
-const categoryAxisStep = 250000
+const categoryAxisStep = 1000000
 const categoryTrendYAxisMax = computed(() => roundUpToStep(categoryTrendPeak.value, categoryAxisStep))
 const categoryTrendTickAmount = computed(() => {
   const ticks = Math.floor(categoryTrendYAxisMax.value / categoryAxisStep)
@@ -777,7 +777,7 @@ const categoryTrendOptions = computed(() => ({
   chart: {
     toolbar: { show: false },
     background: "transparent",
-    dropShadow: { enabled: true, top: 0, left: 0, blur: 6, color: "#5f85ff", opacity: 0.35 }
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 5, color: "#1e88e5", opacity: 0.28 }
   },
   theme: { mode: "dark" },
   xaxis: {
@@ -800,14 +800,14 @@ const categoryTrendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.4,
-      opacityTo: 0.12,
+      opacityFrom: 0.3,
+      opacityTo: 0.08,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 2.8 },
+  stroke: { curve: "smooth", width: 3 },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
-  colors: ["#ffb45c", "#7aa2ff", "#45e3b3", "#e686ff"]
+  colors: ["#1e88e5", "#00c896", "#4fc3f7", "#26a69a"]
 }))
 
 const financeConfigFields = [
