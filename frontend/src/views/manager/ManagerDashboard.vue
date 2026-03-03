@@ -70,7 +70,7 @@
         <section class="card chart-grid">
           <div>
             <h4>Revenue Trend</h4>
-            <ApexChart type="area" :height="170" :series="trendSeries" :options="trendOptions" />
+            <ApexChart type="area" :height="180" :series="trendSeries" :options="trendOptions" />
           </div>
           <div>
             <h4>Breakdown Service</h4>
@@ -80,7 +80,7 @@
 
         <section class="card">
           <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
-          <ApexChart type="line" :height="180" :series="categoryTrendSeries" :options="categoryTrendOptions" />
+          <ApexChart type="area" :height="170" :series="categoryTrendSeries" :options="categoryTrendOptions" />
         </section>
 
         <section class="card">
@@ -617,14 +617,26 @@ const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => 
 const totalExpense = computed(() => therapistSalaryCost.value + fnbPaidModalCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
 
-const trendBuckets = computed(() => {
+const formatDateKey = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("id-ID")
+}
+
+const buildSortedDailyRevenue = (list, allocator) => {
   const map = new Map()
-  for (const o of paidOrdersList.value) {
-    const key = new Date(o.created_at).toLocaleDateString("id-ID")
-    map.set(key, (map.get(key) || 0) + Number(o.total || 0))
+  for (const order of list) {
+    const key = formatDateKey(order.created_at)
+    if (!key) continue
+    if (!map.has(key)) {
+      map.set(key, { x: new Date(order.created_at).setHours(0, 0, 0, 0), y: 0 })
+    }
+    const row = map.get(key)
+    row.y += Number(allocator(order) || 0)
   }
-  return map
-})
+  return [...map.values()].sort((a, b) => a.x - b.x)
+}
+
+const trendPoints = computed(() => buildSortedDailyRevenue(paidOrdersList.value, (order) => order.total))
 
 const formatAccountingNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const formatAxisNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -635,23 +647,53 @@ const normalizeChartMax = (value) => {
   return Math.ceil((safe * 1.1) / magnitude) * magnitude
 }
 
-const trendSeries = computed(() => ([{ name: "Revenue", data: [...trendBuckets.value.values()].length ? [...trendBuckets.value.values()] : [0] }]))
-const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((v) => Number(v || 0)), 0))
+const roundUpToStep = (value, step) => {
+  const safe = Math.max(0, Number(value || 0))
+  if (!safe) return step
+  return Math.ceil(safe / step) * step
+}
+
+const trendSeries = computed(() => ([{ name: "Revenue", data: trendPoints.value.length ? trendPoints.value : [{ x: new Date().setHours(0, 0, 0, 0), y: 0 }] }]))
+const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((item) => Number(item?.y || 0)), 0))
 const trendOptions = computed(() => ({
-  chart: { toolbar: { show: false }, background: "transparent" },
+  chart: {
+    background: "transparent",
+    zoom: { enabled: true, type: "x", autoScaleYaxis: true },
+    toolbar: { show: true, tools: { download: false } },
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 7, color: "#1e88e5", opacity: 0.45 }
+  },
   theme: { mode: "dark" },
-  xaxis: { categories: [...trendBuckets.value.keys()].length ? [...trendBuckets.value.keys()] : ["No Data"] },
+  xaxis: {
+    type: "datetime",
+    labels: { datetimeUTC: false, style: { colors: "#ced8ff" } },
+    axisBorder: { color: "rgba(255,255,255,0.18)" }
+  },
   yaxis: {
     min: 0,
     max: normalizeChartMax(trendPeak.value),
-    tickAmount: 7,
+    tickAmount: 10,
     forceNiceScale: true,
-    labels: { formatter: formatAxisNumber }
+    labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
   },
-  grid: { padding: { top: 2, bottom: -4 } },
+  grid: {
+    borderColor: "rgba(122, 162, 255, 0.2)",
+    strokeDashArray: 3,
+    padding: { top: 2, bottom: -6 }
+  },
+  fill: {
+    type: "gradient",
+    gradient: {
+      shadeIntensity: 0.35,
+      opacityFrom: 0.36,
+      opacityTo: 0.08,
+      stops: [0, 85, 100]
+    }
+  },
+  stroke: { curve: "smooth", width: 3.6 },
+  markers: { size: 0, hover: { size: 5 } },
   dataLabels: { enabled: false },
-  tooltip: { y: { formatter: formatAccountingNumber } },
-  colors: ["#5f85ff"]
+  tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
+  colors: ["#1e88e5"]
 }))
 
 const breakdownMap = computed(() => {
@@ -668,53 +710,104 @@ const breakdownSeries = computed(() => [...breakdownMap.value.values()].length ?
 const breakdownOptions = computed(() => ({
   labels: [...breakdownMap.value.keys()].length ? [...breakdownMap.value.keys()] : ["No Data"],
   theme: { mode: "dark" },
+  fill: {
+    type: "gradient",
+    gradient: {
+      shade: "dark",
+      type: "horizontal",
+      shadeIntensity: 0.3,
+      opacityFrom: 0.95,
+      opacityTo: 0.7,
+      stops: [0, 70, 100]
+    }
+  },
+  stroke: { width: 1, colors: ["rgba(255,255,255,0.12)"] },
+  plotOptions: {
+    pie: {
+      donut: { size: "68%" }
+    }
+  },
   tooltip: { y: { formatter: formatAccountingNumber } },
-  legend: { position: "bottom" }
+  legend: { position: "bottom" },
+  colors: ["#5f85ff", "#38d996", "#ff9f43", "#e056fd", "#00d2ff", "#ff6b81"]
 }))
 
 const categoryTrendData = computed(() => {
   const keys = ["FNB", "SPA", "LC", "KTV"]
   const dayMap = new Map()
   for (const o of paidOrdersList.value) {
-    const day = new Date(o.created_at).toLocaleDateString("id-ID")
-    if (!dayMap.has(day)) dayMap.set(day, { FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+    const dayKey = formatDateKey(o.created_at)
+    if (!dayKey) continue
+    if (!dayMap.has(dayKey)) {
+      dayMap.set(dayKey, { x: new Date(o.created_at).setHours(0, 0, 0, 0), FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+    }
     const categories = String(o.category || "").toUpperCase().split(",").map((v) => v.trim()).filter(Boolean)
     const matched = keys.filter((k) => categories.some((cat) => cat.includes(k)))
     const divisor = matched.length || 1
     const allocated = Number(o.total || 0) / divisor
-    for (const cat of matched) dayMap.get(day)[cat] += allocated
+    for (const cat of matched) dayMap.get(dayKey)[cat] += allocated
   }
-  return dayMap
+  return [...dayMap.values()].sort((a, b) => a.x - b.x)
 })
 
 const categoryTrendSeries = computed(() => {
-  const days = [...categoryTrendData.value.keys()]
-  if (!days.length) return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [0] }))
-  return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: days.map((d) => Number(categoryTrendData.value.get(d)?.[name] || 0)) }))
+  if (!categoryTrendData.value.length) {
+    const fallbackX = new Date().setHours(0, 0, 0, 0)
+    return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [{ x: fallbackX, y: 0 }] }))
+  }
+  return ["FNB", "SPA", "LC", "KTV"].map((name) => ({
+    name,
+    data: categoryTrendData.value.map((row) => ({ x: row.x, y: Number(row[name] || 0) }))
+  }))
 })
 
 const categoryTrendPeak = computed(() => Math.max(
-  ...categoryTrendSeries.value.flatMap((series) => series.data.map((v) => Number(v || 0))),
+  ...categoryTrendSeries.value.flatMap((series) => series.data.map((item) => Number(item?.y || 0))),
   0
 ))
 
+const categoryAxisStep = 1000000
+const categoryTrendYAxisMax = computed(() => roundUpToStep(categoryTrendPeak.value, categoryAxisStep))
+const categoryTrendTickAmount = computed(() => {
+  const ticks = Math.floor(categoryTrendYAxisMax.value / categoryAxisStep)
+  return Math.max(1, ticks)
+})
+
 const categoryTrendOptions = computed(() => ({
-  chart: { toolbar: { show: false }, background: "transparent" },
+  chart: {
+    toolbar: { show: false },
+    background: "transparent",
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 5, color: "#1e88e5", opacity: 0.28 }
+  },
   theme: { mode: "dark" },
-  xaxis: { categories: [...categoryTrendData.value.keys()].length ? [...categoryTrendData.value.keys()] : ["No Data"] },
+  xaxis: {
+    type: "datetime",
+    labels: { datetimeUTC: false, style: { colors: "#ced8ff" } },
+    axisBorder: { color: "rgba(255,255,255,0.18)" }
+  },
   yaxis: {
     min: 0,
-    max: normalizeChartMax(categoryTrendPeak.value),
-    tickAmount: 7,
-    forceNiceScale: true,
-    labels: { formatter: formatAxisNumber }
+    max: categoryTrendYAxisMax.value,
+    tickAmount: categoryTrendTickAmount.value,
+    forceNiceScale: false,
+    labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
   },
-  grid: { padding: { top: 2, bottom: -4 } },
-  tooltip: { y: { formatter: formatAccountingNumber } },
+  grid: { borderColor: "rgba(122, 162, 255, 0.2)", strokeDashArray: 3, padding: { top: 2, bottom: -6 } },
+  tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  stroke: { curve: "smooth", width: 2 },
-  legend: { position: "top" },
-  colors: ["#ff9f43", "#5f85ff", "#38d996", "#e056fd"]
+  markers: { size: 2.5, strokeWidth: 0, hover: { size: 4 } },
+  fill: {
+    type: "gradient",
+    gradient: {
+      shadeIntensity: 0.35,
+      opacityFrom: 0.3,
+      opacityTo: 0.08,
+      stops: [0, 85, 100]
+    }
+  },
+  stroke: { curve: "smooth", width: 3 },
+  legend: { position: "top", labels: { colors: "#eef2ff" } },
+  colors: ["#1e88e5", "#00c896", "#4fc3f7", "#26a69a"]
 }))
 
 const financeConfigFields = [
