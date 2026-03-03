@@ -81,11 +81,12 @@
               <button
                 class="btn-state salon"
                 :class="{ active: t.salon_used }"
-                :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'OFF'"
+                :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'OFF' || t.salon_used"
                 @click="toggleTherapistSalonUsage(t)"
               >
                 SALON {{ t.salon_used ? 'ON' : 'OFF' }}
               </button>
+              <button class="btn-state absen" :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'MASUK'" @click="addTherapistAbsence(t)">ABSEN +1 ({{ t.absence_qty || 0 }})</button>
             </div>
           </div>
         </div>
@@ -491,6 +492,20 @@ const setTherapistAttendance = async (therapist, targetStatus) => {
   }
 }
 
+
+const addTherapistAbsence = async (therapist) => {
+  try {
+    await api.post(`/therapists/attendance/${therapist.id}/absen`, { qty: 1 })
+    await loadTherapistAttendance()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal tambah absen',
+      text: err.response?.data?.message || err.message || 'Terjadi kesalahan'
+    })
+  }
+}
+
 const toggleTherapistSalonUsage = async (therapist) => {
   try {
     const nextValue = !Boolean(therapist?.salon_used)
@@ -772,6 +787,7 @@ onUnmounted(() => {
 .btn-state.close { background:#4d4d4d; color:#fff; }
 .btn-state.salon { background:#123c6d; color:#d8ecff; }
 .btn-state.salon.active { background:#1f6ed4; color:#fff; }
+.btn-state.absen { background:#5a3a00; color:#fbbf24; }
 .btn-state:disabled { opacity:.45; cursor:not-allowed; }
 .badge { padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
 .badge-masuk { background:#1f8f4f; color:#fff; }
