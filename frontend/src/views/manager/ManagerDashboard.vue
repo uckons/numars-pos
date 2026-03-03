@@ -717,7 +717,8 @@ const trendOptions = computed(() => ({
     curve: "straight",
     width: 3,
     lineCap: "round",
-    lineJoin: "round"
+    lineJoin: "round",
+    show: true
   },
   markers: { 
     size: 4,
@@ -844,23 +845,23 @@ const categoryTrendOptions = computed(() => ({
   dataLabels: { enabled: false },
   markers: { 
     size: 0,
-    hover: { size: 6 } 
+    hover: { size: 8 } 
   },
   fill: {
     type: "gradient",
     gradient: {
       shadeIntensity: 0.6,
-      opacityFrom: 0.45,
+      opacityFrom: 0.55,
       opacityTo: 0.05,
       stops: [0, 100]
-    },
-    opacity: 0.8
+    }
   },
   stroke: { 
     curve: "spline", 
     width: 3,
     lineCap: "round",
-    lineJoin: "round"
+    lineJoin: "round",
+    show: true
   },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
   colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"]
