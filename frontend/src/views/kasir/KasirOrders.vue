@@ -793,7 +793,19 @@ const paySelectedOrders = async () => {
     cancelButtonText: 'Batal',
     confirmButtonColor: '#c9a24d',
     background: '#111',
-    color: '#fff'
+    color: '#fff',
+    didOpen: () => {
+      const selectEl = document.querySelector('.swal2-select')
+      if (selectEl) {
+        selectEl.style.background = '#111'
+        selectEl.style.color = '#fff'
+        selectEl.style.border = '1px solid #c9a24d'
+        for (const opt of selectEl.options) {
+          opt.style.color = '#111'
+          opt.style.background = '#fff'
+        }
+      }
+    }
   })
 
   if (!methodPick.isConfirmed || !methodPick.value) return
