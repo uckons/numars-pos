@@ -684,13 +684,13 @@ const trendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.22,
-      opacityTo: 0.03,
+      opacityFrom: 0.14,
+      opacityTo: 0.01,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 4 },
-  markers: { size: 2.2, colors: ["#4e73df"], strokeColors: "#0b1020", strokeWidth: 1, hover: { size: 5 } },
+  stroke: { curve: "straight", width: 4.8 },
+  markers: { size: 0, hover: { size: 4 } },
   dataLabels: { enabled: false },
   tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
   colors: ["#4e73df"]
@@ -795,17 +795,17 @@ const categoryTrendOptions = computed(() => ({
   grid: { borderColor: "rgba(132, 160, 230, 0.24)", strokeDashArray: 2, padding: { top: 2, bottom: -6 } },
   tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  markers: { size: 2.2, strokeWidth: 1, strokeColors: "#0b1020", hover: { size: 4.5 } },
+  markers: { size: 0, hover: { size: 4 } },
   fill: {
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.18,
-      opacityTo: 0.02,
+      opacityFrom: 0.12,
+      opacityTo: 0.01,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 3.2 },
+  stroke: { curve: "smooth", width: 3.8 },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
   colors: ["#ff9f43", "#4e73df", "#20c997", "#e056fd"]
 }))
