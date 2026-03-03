@@ -198,9 +198,11 @@
                   <td></td>
                   <td colspan="7">
                     <div class="breakdown-grid">
-                      <div><strong>SPA:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.room) }} - {{ formatCurrency(row.salon) }} - {{ formatCurrency(row.safety) }}) × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
-                      <div><strong>LC:</strong> ({{ formatCurrency(row.service_price) }} - {{ formatCurrency(row.agent_fee) }} - {{ formatCurrency(row.room) }} - {{ formatCurrency(row.salon) }}) × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
-                      <div><strong>Total:</strong> (SPA + LC) - ((Nilai Denda × Qty Absen) + Hutang + (Salon × Qty Pakai) + Lain-lain) = ({{ formatCurrency(row.spa_income_raw) }} + {{ formatCurrency(row.lc_income_raw) }}) - (({{ formatCurrency(row.denda_rate) }} × {{ row.absence_qty }}) = {{ formatCurrency(row.spa_denda) }} + {{ formatCurrency(row.lc_denda) }} + ({{ formatCurrency(row.salon) }} × {{ row.salon_usage_qty }}) + {{ formatCurrency(row.lain_lain) }}) = <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
+                      <div><strong>TOTAL SPA:</strong> Rp {{ formatCurrency(row.spa_net_rate) }} × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
+                      <div><strong>TOTAL LC:</strong> Rp {{ formatCurrency(row.lc_net_rate) }} × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
+                      <div><strong>Detil Potongan-potongan:</strong> Denda (Nilai Denda Rp {{ formatCurrency(row.denda_rate) }} × Qty Absen {{ row.absence_qty }}) = Rp {{ formatCurrency(row.spa_denda) }}, Salon (Rp {{ formatCurrency(row.salon) }} × Qty {{ row.salon_usage_qty }}) = Rp {{ formatCurrency(row.salon_deduction) }}, Hutang = Rp {{ formatCurrency(row.lc_denda) }}, Lain-lain = Rp {{ formatCurrency(row.lain_lain) }}</div>
+                      <div><strong>Total Pendapatan:</strong> <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
+                      <div><small class="muted">Note: sudah termasuk potongan room, agent dan safety.</small></div>
                     </div>
                   </td>
                 </tr>
@@ -561,6 +563,8 @@ const therapistFinanceRows = computed(() => {
       spa_denda: spaDenda,
       lc_denda: lcDenda,
       lain_lain: lainLain,
+      spa_net_rate: spaNetRate,
+      lc_net_rate: lcNetRate,
       spa_income_raw: spaIncomeRaw,
       lc_income_raw: lcIncomeRaw,
       total_kerja: spaQty + lcQty,
@@ -1038,10 +1042,11 @@ const printSingleTherapistSlip = (row) => {
       <tbody>
         <tr><td>Nama Terapis</td><td>${row.therapist_name}</td></tr>
         <tr><td>Grade</td><td>${row.grade_name}</td></tr>
-        <tr><td>Rumus SPA</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.room)} - ${printCurrency(row.salon)} - ${printCurrency(row.safety)}) × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
-        <tr><td>Rumus LC</td><td>(${printCurrency(row.service_price)} - ${printCurrency(row.agent_fee)} - ${printCurrency(row.room)} - ${printCurrency(row.salon)}) × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
-        <tr><td>Potongan</td><td>(Nilai Denda ${printCurrency(row.denda_rate)} × Qty Absen ${row.absence_qty}) = ${printCurrency(row.spa_denda)} + Hutang ${printCurrency(row.lc_denda)} + (Salon ${printCurrency(row.salon)} × Qty ${row.salon_usage_qty}) = ${printCurrency(row.salon_deduction)} + Lain-lain ${printCurrency(row.lain_lain)}</td></tr>
+        <tr><td>Total SPA</td><td>${printCurrency(row.spa_net_rate)} × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
+        <tr><td>Total LC</td><td>${printCurrency(row.lc_net_rate)} × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
+        <tr><td>Detil Potongan-potongan</td><td>Denda: (Nilai Denda ${printCurrency(row.denda_rate)} × Qty Absen ${row.absence_qty}) = ${printCurrency(row.spa_denda)}<br/>Salon: (${printCurrency(row.salon)} × Qty ${row.salon_usage_qty}) = ${printCurrency(row.salon_deduction)}<br/>Hutang: ${printCurrency(row.lc_denda)}<br/>Lain-Lain: ${printCurrency(row.lain_lain)}</td></tr>
         <tr><td><strong>Total Pendapatan</strong></td><td><strong>${printCurrency(row.therapist_income)}</strong></td></tr>
+        <tr><td>Note</td><td>sudah termasuk potongan room, agent dan safety</td></tr>
       </tbody>
     </table>
   `
