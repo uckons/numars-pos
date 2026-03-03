@@ -454,6 +454,16 @@ const paidOrders = computed(() => paidOrdersList.value.length)
 const fnbPaidModalCost = computed(() => paidOrdersList.value.reduce((sum, o) => sum + Number(o.fnb_modal_cost || 0), 0))
 const normalizeTherapistName = (name) => String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/gi, '')
 
+
+const splitTherapistNames = (rawName) => {
+  const value = String(rawName || '').trim()
+  if (!value) return []
+  return value
+    .split(/[,&/]+/)
+    .map((name) => String(name || '').trim())
+    .filter(Boolean)
+}
+
 const therapistMasterMap = computed(() => {
   const map = new Map()
   for (const item of therapistMaster.value) {
@@ -485,30 +495,35 @@ const setTherapistPenalty = (name, field, value) => {
 const therapistFinanceRows = computed(() => {
   const grouped = new Map()
   for (const row of therapistAnalytics.value) {
-    const name = String(row.therapist_name || '').trim()
-    if (!name) continue
-    const key = normalizeTherapistName(name)
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        key,
-        therapist_name: name,
-        spa_qty: 0,
-        lc_qty: 0,
-        spa_non_hh_total: 0,
-        lc_non_hh_total: 0
-      })
-    }
-    const acc = grouped.get(key)
+    const parsedNames = splitTherapistNames(row.therapist_name)
+    const therapistNames = parsedNames.length ? parsedNames : [String(row.therapist_name || '').trim()]
     const category = String(row.category || '').toUpperCase()
     const qty = Number(row.qty || 0)
     const nonHh = Number(row.non_happy_hour_revenue || 0)
-    if (category.includes('SPA')) {
-      acc.spa_qty += qty
-      acc.spa_non_hh_total += nonHh
-    }
-    if (category.includes('LC') || category.includes('LOUNGE')) {
-      acc.lc_qty += qty
-      acc.lc_non_hh_total += nonHh
+
+    for (const name of therapistNames) {
+      if (!name) continue
+      const key = normalizeTherapistName(name)
+      if (!key) continue
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          therapist_name: name,
+          spa_qty: 0,
+          lc_qty: 0,
+          spa_non_hh_total: 0,
+          lc_non_hh_total: 0
+        })
+      }
+      const acc = grouped.get(key)
+      if (category.includes('SPA')) {
+        acc.spa_qty += qty
+        acc.spa_non_hh_total += nonHh
+      }
+      if (category.includes('LC') || category.includes('LOUNGE') || category.includes('KTV') || category.includes('KARAOKE')) {
+        acc.lc_qty += qty
+        acc.lc_non_hh_total += nonHh
+      }
     }
   }
 
