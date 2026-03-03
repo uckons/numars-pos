@@ -47,6 +47,11 @@ const ensureTherapistAttendanceTable = async (db) => {
     ALTER TABLE therapist_attendance
     ADD COLUMN IF NOT EXISTS salon_used BOOLEAN NOT NULL DEFAULT false
   `)
+
+  await db.query(`
+    ALTER TABLE therapist_attendance
+    ADD COLUMN IF NOT EXISTS absence_qty INT NOT NULL DEFAULT 0
+  `)
 }
 
 const ensureTherapistPinColumn = async (db) => {
@@ -301,6 +306,7 @@ exports.getTherapistAttendance = async (req, res) => {
        (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
        COALESCE(ta.status, 'OFF') AS attendance_status,
        COALESCE(ta.salon_used, false) AS salon_used,
+       COALESCE(ta.absence_qty, 0) AS absence_qty,
        ta.updated_at
        FROM therapists t
        LEFT JOIN therapist_attendance ta
@@ -375,13 +381,73 @@ exports.setTherapistAttendance = async (req, res) => {
          salon_used = CASE WHEN EXCLUDED.status = 'OFF' THEN false ELSE EXCLUDED.salon_used END,
          updated_by = EXCLUDED.updated_by,
          updated_at = NOW()
-       RETURNING therapist_id, business_date, status, salon_used, updated_at`,
+       RETURNING therapist_id, business_date, status, salon_used, absence_qty, updated_at`,
       [therapistId, branchId, businessDate, status, pinInput || null, status === 'OFF' ? false : salonUsed, req.user?.id || null]
     )
 
     res.json({ success: true, attendance: rows[0] })
   } catch (err) {
     console.error('SET THERAPIST ATTENDANCE ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+
+exports.addTherapistAbsence = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureTherapistAttendanceTable(db)
+
+    const therapistId = Number(req.params.id)
+    if (!Number.isInteger(therapistId) || therapistId <= 0) {
+      return res.status(400).json({ message: 'Terapis tidak valid' })
+    }
+
+    const qtyDelta = Math.max(1, Number(req.body?.qty || 1))
+    const branchId = req.user?.branch_id
+    const businessDate = await getBusinessDateForBranch(db, branchId)
+
+    const attendanceRes = await db.query(
+      `SELECT therapist_id, status
+       FROM therapist_attendance
+       WHERE therapist_id = $1 AND branch_id = $2 AND business_date = $3::date
+       LIMIT 1`,
+      [therapistId, branchId, businessDate]
+    )
+
+    if (!attendanceRes.rows.length) {
+      const { rows } = await db.query(
+        `INSERT INTO therapist_attendance (therapist_id, branch_id, business_date, status, absence_qty, updated_by, updated_at)
+         VALUES ($1, $2, $3::date, 'OFF', $4, $5, NOW())
+         ON CONFLICT (therapist_id, business_date)
+         DO UPDATE SET
+           absence_qty = COALESCE(therapist_attendance.absence_qty, 0) + EXCLUDED.absence_qty,
+           updated_by = EXCLUDED.updated_by,
+           updated_at = NOW()
+         RETURNING therapist_id, business_date, status, salon_used, absence_qty, updated_at`,
+        [therapistId, branchId, businessDate, qtyDelta, req.user?.id || null]
+      )
+      return res.json({ success: true, attendance: rows[0] })
+    }
+
+    const currentStatus = String(attendanceRes.rows[0].status || 'OFF').toUpperCase()
+    if (currentStatus === 'MASUK') {
+      return res.status(400).json({ message: 'Status MASUK tidak dapat ditambahkan absen.' })
+    }
+
+    const { rows } = await db.query(
+      `UPDATE therapist_attendance
+       SET absence_qty = COALESCE(absence_qty, 0) + $1,
+           updated_by = $2,
+           updated_at = NOW()
+       WHERE therapist_id = $3 AND branch_id = $4 AND business_date = $5::date
+       RETURNING therapist_id, business_date, status, salon_used, absence_qty, updated_at`,
+      [qtyDelta, req.user?.id || null, therapistId, branchId, businessDate]
+    )
+
+    res.json({ success: true, attendance: rows[0] })
+  } catch (err) {
+    console.error('ADD THERAPIST ABSENCE ERROR:', err)
     res.status(500).json({ message: err.message })
   }
 }
@@ -481,6 +547,59 @@ exports.getTherapistSalonUsageSummary = async (req, res) => {
     })
   } catch (err) {
     console.error('GET THERAPIST SALON USAGE SUMMARY ERROR:', err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+
+
+exports.getTherapistAbsenceSummary = async (req, res) => {
+  try {
+    const db = req.app.get('db')
+    await ensureTherapistAttendanceTable(db)
+    const requestedBranchId = req.query?.branch_id
+    const branchId = canAccessAllBranches(req.user?.role)
+      ? Number(requestedBranchId || req.user?.branch_id)
+      : Number(req.user?.branch_id)
+
+    const from = req.query?.date_from ? new Date(req.query.date_from) : new Date()
+    const to = req.query?.date_to ? new Date(req.query.date_to) : new Date()
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      return res.status(400).json({ message: 'Format tanggal tidak valid' })
+    }
+
+    const fromIso = from.toISOString().slice(0, 10)
+    const toIso = to.toISOString().slice(0, 10)
+
+    const { rows } = await db.query(
+      `SELECT
+         t.id AS therapist_id,
+         t.name AS therapist_name,
+         COALESCE(SUM(CASE WHEN ta.status <> 'OFF' THEN COALESCE(ta.absence_qty, 0) ELSE 0 END), 0) AS absence_qty
+       FROM therapists t
+       LEFT JOIN therapist_attendance ta
+         ON ta.therapist_id = t.id
+        AND ta.branch_id = $1
+        AND ta.business_date BETWEEN $2::date AND $3::date
+       WHERE t.branch_id = $1
+         AND t.active = true
+       GROUP BY t.id, t.name
+       ORDER BY t.name ASC`,
+      [branchId, fromIso, toIso]
+    )
+
+    res.json({
+      branch_id: branchId,
+      date_from: fromIso,
+      date_to: toIso,
+      data: rows.map((row) => ({
+        therapist_id: Number(row.therapist_id),
+        therapist_name: row.therapist_name,
+        absence_qty: Number(row.absence_qty || 0)
+      }))
+    })
+  } catch (err) {
+    console.error('GET THERAPIST ABSENCE SUMMARY ERROR:', err)
     res.status(500).json({ message: err.message })
   }
 }

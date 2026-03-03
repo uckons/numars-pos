@@ -1,3 +1,6 @@
+/* Ensure swal is above app modals */
+.swal2-container { z-index: 20000 !important; }
+
 /* Black & Gold SweetAlert2 theme (global) */
 
 .swal-theme-popup {
