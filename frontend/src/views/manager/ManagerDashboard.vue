@@ -67,7 +67,7 @@
         </section>
 
 
-        <section class="card chart-grid">
+        <section class="card chart-grid chart-surface">
           <div>
             <h4>Revenue Trend</h4>
             <ApexChart type="area" :height="170" :series="trendSeries" :options="trendOptions" />
@@ -78,7 +78,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card chart-surface">
           <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
           <ApexChart type="line" :height="180" :series="categoryTrendSeries" :options="categoryTrendOptions" />
         </section>
@@ -644,13 +644,14 @@ const trendOptions = computed(() => ({
   yaxis: {
     min: 0,
     max: normalizeChartMax(trendPeak.value),
-    tickAmount: 7,
+    tickAmount: 5,
     forceNiceScale: true,
     labels: { formatter: formatAxisNumber }
   },
-  grid: { padding: { top: 2, bottom: -4 } },
+  grid: { borderColor: "rgba(255,255,255,.06)", strokeDashArray: 2, padding: { top: 2, bottom: -4 } },
   dataLabels: { enabled: false },
-  tooltip: { y: { formatter: formatAccountingNumber } },
+  tooltip: { shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
+  stroke: { curve: "monotoneCubic", width: 2 },
   colors: ["#5f85ff"]
 }))
 
@@ -705,14 +706,14 @@ const categoryTrendOptions = computed(() => ({
   yaxis: {
     min: 0,
     max: normalizeChartMax(categoryTrendPeak.value),
-    tickAmount: 7,
+    tickAmount: 5,
     forceNiceScale: true,
     labels: { formatter: formatAxisNumber }
   },
-  grid: { padding: { top: 2, bottom: -4 } },
-  tooltip: { y: { formatter: formatAccountingNumber } },
+  grid: { borderColor: "rgba(255,255,255,.06)", strokeDashArray: 2, padding: { top: 2, bottom: -4 } },
+  tooltip: { shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  stroke: { curve: "smooth", width: 2 },
+  stroke: { curve: "monotoneCubic", width: 2 },
   legend: { position: "top" },
   colors: ["#ff9f43", "#5f85ff", "#38d996", "#e056fd"]
 }))
@@ -965,6 +966,7 @@ nav button.active { background:#c9a24d; color:#000; }
 .content { flex:1; padding:20px; }
 .page { display:grid; gap:14px; }
 .card { background:linear-gradient(120deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:14px; }
+.chart-surface { background:linear-gradient(120deg, rgba(255,255,255,.012), rgba(255,255,255,.006)); border-color:rgba(255,255,255,.06); }
 .hero { display:flex; justify-content:space-between; align-items:center; }
 .muted { color:#a5adba; }
 .small { font-size: 12px; }
