@@ -673,86 +673,58 @@ const trendOptions = computed(() => ({
     },
     toolbar: {
       autoSelected: "zoom"
-    },
-    background: "transparent"
+    }
   },
-  dataLabels: {
-    enabled: false
+  plotOptions: {
+    line: {
+      dataLabels: {
+        enabled: false
+      }
+    }
   },
   stroke: {
-    curve: "straight",
-    width: 2.5,
-    colors: ["#5f85ff"],
-    show: true
+    width: 2,
+    curve: "straight"
   },
   markers: {
-    size: 4,
-    colors: ["#5f85ff"],
-    strokeColors: "#1a1f2e",
-    strokeWidth: 1.5,
+    size: 3,
+    strokeWidth: 0,
     hover: {
-      size: 6
+      size: 5
     }
   },
   xaxis: {
     type: "datetime",
-    tickAmount: 6,
     labels: {
       style: {
-        colors: "#9ca3af",
-        fontSize: "12px"
+        colors: "#9ca3af"
       }
     }
   },
   yaxis: {
-    title: {
-      text: undefined
-    },
     labels: {
       style: {
-        colors: "#9ca3af",
-        fontSize: "12px"
+        colors: "#9ca3af"
       },
       formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
     }
   },
-  fill: {
-    type: "gradient",
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.35,
-      opacityTo: 0.05,
-      stops: [20, 100, 100, 100]
-    }
-  },
   grid: {
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    strokeDashArray: 3,
-    xaxis: {
-      lines: {
-        show: false
-      }
-    }
+    borderColor: "rgba(255, 255, 255, 0.1)"
+  },
+  theme: {
+    mode: "dark"
   },
   tooltip: {
+    enabled: true,
     theme: "dark",
-    style: {
-      fontSize: "12px"
-    },
-    fixed: {
-      enabled: false
-    },
     x: {
-      formatter: (value) => new Date(value).toLocaleDateString("id-ID", { month: "short", day: "numeric" })
+      format: "dd MMM"
     },
     y: {
       formatter: (value) => {
         if (!value) return "Rp 0"
-        const formatted = value.toLocaleString("id-ID")
-        return `Rp ${formatted}`
-      },
-      title: {
-        formatter: () => "Revenue: "
+        return `Rp ${value.toLocaleString("id-ID")}`
       }
     }
   },
@@ -889,8 +861,14 @@ const categoryTrendOptions = computed(() => ({
     theme: "dark",
     shared: true,
     intersect: false,
+    x: {
+      format: "dd MMM"
+    },
     y: {
-      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
+      formatter: (value) => {
+        if (!value) return "Rp 0"
+        return `Rp ${value.toLocaleString("id-ID")}`
+      }
     }
   },
   grid: {
