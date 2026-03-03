@@ -14,11 +14,11 @@
         <div class="card-value">{{ grades.length }}</div>
       </div>
       <div class="card">
-        <div class="card-label">Min Komisi (Rp)</div>
+        <div class="card-label">Min Harga Service (Rp)</div>
         <div class="card-value">Rp {{ formatCurrency(minCommission) }}</div>
       </div>
       <div class="card">
-        <div class="card-label">Max Komisi (Rp)</div>
+        <div class="card-label">Max Harga Service (Rp)</div>
         <div class="card-value">Rp {{ formatCurrency(maxCommission) }}</div>
       </div>
     </div>
@@ -30,7 +30,7 @@
           <tr>
             <th>#</th>
             <th>Nama Grade</th>
-            <th>Komisi Fix (Rp)</th>
+            <th>Harga Service (Rp)</th>
             <th>Addon Service (Rp)</th>
             <th>Jumlah Terapis</th>
             <th>Aksi</th>
@@ -97,7 +97,7 @@
           </div>
 
           <div class="form-group">
-            <label>Komisi Fix (Rp) *</label>
+            <label>Harga Service (Rp) *</label>
             <input 
               type="number" 
               v-model.number="form.commission_amount" 
@@ -106,7 +106,7 @@
               step="1000"
               required
             />
-            <small class="hint">Nominal komisi fix rupiah per jumlah kerja (>= 0)</small>
+            <small class="hint">Nominal harga service per grade (>= 0)</small>
           </div>
 
           <div class="form-group">
