@@ -86,7 +86,7 @@
               >
                 SALON {{ t.salon_used ? 'ON' : 'OFF' }}
               </button>
-              <button class="btn-state absen" :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'OFF'" @click="addTherapistAbsence(t)">ABSEN +1 {{ t.absence_qty || 0 }}</button>
+              <button class="btn-state absen" :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'MASUK'" @click="addTherapistAbsence(t)">ABSEN +1 ({{ t.absence_qty || 0 }})</button>
             </div>
           </div>
         </div>

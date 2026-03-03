@@ -416,12 +416,23 @@ exports.addTherapistAbsence = async (req, res) => {
     )
 
     if (!attendanceRes.rows.length) {
-      return res.status(400).json({ message: 'Terapis belum absen hari ini. Absen MASUK terlebih dahulu.' })
+      const { rows } = await db.query(
+        `INSERT INTO therapist_attendance (therapist_id, branch_id, business_date, status, absence_qty, updated_by, updated_at)
+         VALUES ($1, $2, $3::date, 'OFF', $4, $5, NOW())
+         ON CONFLICT (therapist_id, business_date)
+         DO UPDATE SET
+           absence_qty = COALESCE(therapist_attendance.absence_qty, 0) + EXCLUDED.absence_qty,
+           updated_by = EXCLUDED.updated_by,
+           updated_at = NOW()
+         RETURNING therapist_id, business_date, status, salon_used, absence_qty, updated_at`,
+        [therapistId, branchId, businessDate, qtyDelta, req.user?.id || null]
+      )
+      return res.json({ success: true, attendance: rows[0] })
     }
 
     const currentStatus = String(attendanceRes.rows[0].status || 'OFF').toUpperCase()
-    if (currentStatus === 'OFF') {
-      return res.status(400).json({ message: 'Status OFF tidak dapat ditambahkan absen.' })
+    if (currentStatus === 'MASUK') {
+      return res.status(400).json({ message: 'Status MASUK tidak dapat ditambahkan absen.' })
     }
 
     const { rows } = await db.query(
