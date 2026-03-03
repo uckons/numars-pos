@@ -660,7 +660,7 @@ const trendOptions = computed(() => ({
     background: "transparent",
     zoom: { enabled: true, type: "x", autoScaleYaxis: true },
     toolbar: { show: true, tools: { download: false } },
-    dropShadow: { enabled: true, top: 0, left: 0, blur: 4, color: "#4e73df", opacity: 0.28 }
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 2, color: "#4e73df", opacity: 0.2 }
   },
   theme: { mode: "dark" },
   xaxis: {
@@ -684,16 +684,16 @@ const trendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.14,
-      opacityTo: 0.01,
+      opacityFrom: 0.08,
+      opacityTo: 0.0,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "straight", width: 4.8 },
+  stroke: { curve: "straight", width: 5.2, lineCap: "round" },
   markers: { size: 0, hover: { size: 4 } },
   dataLabels: { enabled: false },
   tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
-  colors: ["#4e73df"]
+  colors: ["#5f85ff"]
 }))
 
 const breakdownMap = computed(() => {
@@ -777,7 +777,7 @@ const categoryTrendOptions = computed(() => ({
   chart: {
     toolbar: { show: false },
     background: "transparent",
-    dropShadow: { enabled: true, top: 0, left: 0, blur: 3, color: "#4e73df", opacity: 0.2 }
+    dropShadow: { enabled: true, top: 0, left: 0, blur: 2, color: "#5f85ff", opacity: 0.16 }
   },
   theme: { mode: "dark" },
   xaxis: {
@@ -800,14 +800,14 @@ const categoryTrendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.12,
-      opacityTo: 0.01,
+      opacityFrom: 0.07,
+      opacityTo: 0.0,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 3.8 },
+  stroke: { curve: "smooth", width: 4.2, lineCap: "round" },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
-  colors: ["#ff9f43", "#4e73df", "#20c997", "#e056fd"]
+  colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"]
 }))
 
 const financeConfigFields = [
