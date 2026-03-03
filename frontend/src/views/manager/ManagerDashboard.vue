@@ -802,17 +802,17 @@ const categoryTrendOptions = computed(() => ({
   grid: { borderColor: "rgba(132, 160, 230, 0.24)", strokeDashArray: 2, padding: { top: 2, bottom: -6 } },
   tooltip: { theme: "dark", shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  markers: { size: 3, colors: ["#5f85ff"], strokeColors: "#0b1020", strokeWidth: 1, hover: { size: 5 } },
+  markers: { size: 4, colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"], strokeColors: "#0b1020", strokeWidth: 2, hover: { size: 6 } },
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.35,
-      opacityFrom: 0.03,
-      opacityTo: 0.0,
+      shadeIntensity: 0.4,
+      opacityFrom: 0.25,
+      opacityTo: 0.05,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 4.6, lineCap: "round" },
+  stroke: { curve: "smooth", width: 3, lineCap: "round" },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
   colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"]
 }))
