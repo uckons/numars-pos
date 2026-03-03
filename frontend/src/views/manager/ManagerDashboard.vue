@@ -681,7 +681,8 @@ const trendOptions = computed(() => ({
   },
   stroke: {
     curve: "straight",
-    width: 2,
+    width: 2.5,
+    colors: ["#5f85ff"],
     show: true
   },
   markers: {
@@ -738,8 +739,21 @@ const trendOptions = computed(() => ({
     style: {
       fontSize: "12px"
     },
+    fixed: {
+      enabled: false
+    },
+    x: {
+      formatter: (value) => new Date(value).toLocaleDateString("id-ID", { month: "short", day: "numeric" })
+    },
     y: {
-      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
+      formatter: (value) => {
+        if (!value) return "Rp 0"
+        const formatted = value.toLocaleString("id-ID")
+        return `Rp ${formatted}`
+      },
+      title: {
+        formatter: () => "Revenue: "
+      }
     }
   },
   colors: ["#5f85ff"]
