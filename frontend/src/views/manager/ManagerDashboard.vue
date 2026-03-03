@@ -673,7 +673,8 @@ const trendOptions = computed(() => ({
     },
     toolbar: {
       autoSelected: "zoom"
-    }
+    },
+    background: "transparent"
   },
   plotOptions: {
     line: {
@@ -683,7 +684,7 @@ const trendOptions = computed(() => ({
     }
   },
   stroke: {
-    width: 2,
+    width: 3,
     curve: "straight"
   },
   markers: {
