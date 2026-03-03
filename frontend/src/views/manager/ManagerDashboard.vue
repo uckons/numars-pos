@@ -679,9 +679,19 @@ const trendOptions = computed(() => ({
   dataLabels: {
     enabled: false
   },
+  stroke: {
+    curve: "straight",
+    width: 2.5,
+    colors: ["#5f85ff"]
+  },
   markers: {
-    size: 0,
-    style: "hollow"
+    size: 4,
+    colors: ["#5f85ff"],
+    strokeColors: "#1a1f2e",
+    strokeWidth: 1.5,
+    hover: {
+      size: 6
+    }
   },
   xaxis: {
     type: "datetime",
@@ -709,7 +719,7 @@ const trendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 1,
-      opacityFrom: 0.25,
+      opacityFrom: 0.35,
       opacityTo: 0.05,
       stops: [20, 100, 100, 100]
     }
@@ -727,6 +737,9 @@ const trendOptions = computed(() => ({
     theme: "dark",
     style: {
       fontSize: "12px"
+    },
+    y: {
+      formatter: (value) => value ? `Rp ${value.toLocaleString("id-ID")}` : "0"
     }
   },
   colors: ["#5f85ff"]
