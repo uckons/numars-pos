@@ -665,74 +665,69 @@ const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((item
 const trendOptions = computed(() => ({
   chart: {
     type: "line",
-    background: "transparent",
-    zoom: { 
-      enabled: true, 
-      type: "x", 
+    height: 350,
+    zoom: {
+      enabled: true,
+      type: "x",
       autoScaleYaxis: true
     },
-    toolbar: { 
-      show: true, 
-      tools: { 
-        download: true, 
-        selection: true, 
-        zoom: true, 
-        zoomin: true, 
-        zoomout: true, 
-        pan: true, 
-        reset: true 
-      } 
+    toolbar: {
+      autoSelected: "zoom"
     },
-    dropShadow: { enabled: false },
-    sparkline: { enabled: false }
+    background: "transparent"
   },
-  theme: { mode: "dark" },
+  dataLabels: {
+    enabled: false
+  },
+  markers: {
+    size: 0,
+    style: "hollow"
+  },
   xaxis: {
     type: "datetime",
-    labels: { datetimeUTC: false, format: "dd MMM", style: { colors: "#ced8ff" } },
-    axisBorder: { color: "rgba(255,255,255,0.18)" }
+    tickAmount: 6,
+    labels: {
+      style: {
+        colors: "#9ca3af",
+        fontSize: "12px"
+      }
+    }
   },
   yaxis: {
-    min: 0,
-    max: normalizeChartMax(trendPeak.value),
-    tickAmount: 10,
-    forceNiceScale: true,
-    labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
-  },
-  grid: {
-    borderColor: "rgba(132, 160, 230, 0.24)",
-    strokeDashArray: 2,
-    padding: { top: 2, bottom: -6 }
+    title: {
+      text: undefined
+    },
+    labels: {
+      style: {
+        colors: "#9ca3af",
+        fontSize: "12px"
+      },
+      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}M` : "0"
+    }
   },
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.5,
-      opacityFrom: 0.35,
+      shadeIntensity: 1,
+      opacityFrom: 0.25,
       opacityTo: 0.05,
-      stops: [0, 100]
+      stops: [20, 100, 100, 100]
     }
   },
-  stroke: { 
-    curve: "straight",
-    width: 3,
-    lineCap: "round",
-    lineJoin: "round",
-    show: true
+  grid: {
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    strokeDashArray: 3,
+    xaxis: {
+      lines: {
+        show: false
+      }
+    }
   },
-  markers: { 
-    size: 4,
-    colors: ["#5f85ff"],
-    strokeColors: "#0b1020",
-    strokeWidth: 2,
-    hover: { size: 7 }
-  },
-  dataLabels: { enabled: false },
-  tooltip: { 
-    theme: "dark", 
-    shared: false, 
-    intersect: false, 
-    y: { formatter: formatAccountingNumber } 
+  tooltip: {
+    theme: "dark",
+    style: {
+      fontSize: "12px"
+    }
   },
   colors: ["#5f85ff"]
 }))
@@ -817,54 +812,68 @@ const categoryTrendTickAmount = computed(() => {
 const categoryTrendOptions = computed(() => ({
   chart: {
     type: "area",
-    toolbar: { show: false },
+    height: 350,
+    stacked: false,
+    toolbar: {
+      show: false
+    },
     background: "transparent",
-    dropShadow: { enabled: false },
-    sparkline: { enabled: false },
-    stacked: false
+    zoom: {
+      enabled: false
+    }
   },
-  theme: { mode: "dark" },
-  xaxis: {
-    type: "datetime",
-    labels: { datetimeUTC: false, format: "dd MMM", style: { colors: "#ced8ff" } },
-    axisBorder: { color: "rgba(255,255,255,0.18)" }
+  dataLabels: {
+    enabled: false
   },
-  yaxis: {
-    min: 0,
-    max: categoryTrendYAxisMax.value,
-    tickAmount: categoryTrendTickAmount.value,
-    forceNiceScale: false,
-    labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
-  },
-  grid: { 
-    borderColor: "rgba(132, 160, 230, 0.24)", 
-    strokeDashArray: 2, 
-    padding: { top: 2, bottom: -6 } 
-  },
-  tooltip: { theme: "dark", shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
-  dataLabels: { enabled: false },
-  markers: { 
-    size: 0,
-    hover: { size: 8 } 
+  stroke: {
+    curve: "smooth",
+    width: 2
   },
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.6,
-      opacityFrom: 0.55,
-      opacityTo: 0.05,
-      stops: [0, 100]
+      opacityFrom: 0.6,
+      opacityTo: 0.1
     }
   },
-  stroke: { 
-    curve: "spline", 
-    width: 3,
-    lineCap: "round",
-    lineJoin: "round",
-    show: true
+  xaxis: {
+    type: "datetime",
+    tickAmount: 6,
+    labels: {
+      style: {
+        colors: "#9ca3af",
+        fontSize: "12px"
+      }
+    }
   },
-  legend: { position: "top", labels: { colors: "#eef2ff" } },
-  colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"]
+  yaxis: {
+    title: {
+      text: undefined
+    },
+    labels: {
+      style: {
+        colors: "#9ca3af",
+        fontSize: "12px"
+      },
+      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}M` : "0"
+    }
+  },
+  tooltip: {
+    theme: "dark",
+    shared: true,
+    intersect: false
+  },
+  grid: {
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    strokeDashArray: 3
+  },
+  colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"],
+  legend: {
+    position: "top",
+    labels: {
+      colors: "#9ca3af"
+    }
+  }
 }))
 
 const financeConfigFields = [
