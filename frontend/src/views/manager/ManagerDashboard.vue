@@ -70,11 +70,11 @@
         <section class="card chart-grid">
           <div>
             <h4>Revenue Trend</h4>
-            <ApexChart type="area" :height="180" :series="trendSeries" :options="trendOptions" />
+            <ApexChart type="line" :height="320" :series="trendSeries" :options="trendOptions" />
           </div>
           <div>
             <h4>Breakdown Service</h4>
-            <ApexChart type="donut" :height="240" :series="breakdownSeries" :options="breakdownOptions" />
+            <ApexChart type="donut" :height="320" :series="breakdownSeries" :options="breakdownOptions" />
           </div>
         </section>
 
@@ -664,10 +664,27 @@ const trendSeries = computed(() => ([{ name: "Revenue", data: trendPoints.value.
 const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((item) => Number(item?.y || 0)), 0))
 const trendOptions = computed(() => ({
   chart: {
+    type: "line",
     background: "transparent",
-    zoom: { enabled: true, type: "x", autoScaleYaxis: true },
-    toolbar: { show: true, tools: { download: false } },
-    dropShadow: { enabled: true, top: 0, left: 0, blur: 2, color: "#4e73df", opacity: 0.2 }
+    zoom: { 
+      enabled: true, 
+      type: "x", 
+      autoScaleYaxis: true
+    },
+    toolbar: { 
+      show: true, 
+      tools: { 
+        download: true, 
+        selection: true, 
+        zoom: true, 
+        zoomin: true, 
+        zoomout: true, 
+        pan: true, 
+        reset: true 
+      } 
+    },
+    dropShadow: { enabled: false },
+    sparkline: { enabled: false }
   },
   theme: { mode: "dark" },
   xaxis: {
@@ -690,16 +707,32 @@ const trendOptions = computed(() => ({
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.35,
-      opacityFrom: 0.0,
-      opacityTo: 0.0,
-      stops: [0, 85, 100]
+      shadeIntensity: 0.5,
+      opacityFrom: 0.35,
+      opacityTo: 0.05,
+      stops: [0, 100]
     }
   },
-  stroke: { curve: "straight", width: 6, lineCap: "round" },
-  markers: { size: 3, colors: ["#5f85ff"], strokeColors: "#0b1020", strokeWidth: 1, hover: { size: 5 } },
+  stroke: { 
+    curve: "straight",
+    width: 3,
+    lineCap: "round",
+    lineJoin: "round"
+  },
+  markers: { 
+    size: 4,
+    colors: ["#5f85ff"],
+    strokeColors: "#0b1020",
+    strokeWidth: 2,
+    hover: { size: 7 }
+  },
   dataLabels: { enabled: false },
-  tooltip: { theme: "dark", shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
+  tooltip: { 
+    theme: "dark", 
+    shared: false, 
+    intersect: false, 
+    y: { formatter: formatAccountingNumber } 
+  },
   colors: ["#5f85ff"]
 }))
 
@@ -782,9 +815,12 @@ const categoryTrendTickAmount = computed(() => {
 
 const categoryTrendOptions = computed(() => ({
   chart: {
+    type: "area",
     toolbar: { show: false },
     background: "transparent",
-    dropShadow: { enabled: true, top: 0, left: 0, blur: 2, color: "#5f85ff", opacity: 0.16 }
+    dropShadow: { enabled: false },
+    sparkline: { enabled: false },
+    stacked: false
   },
   theme: { mode: "dark" },
   xaxis: {
@@ -799,20 +835,33 @@ const categoryTrendOptions = computed(() => ({
     forceNiceScale: false,
     labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
   },
-  grid: { borderColor: "rgba(132, 160, 230, 0.24)", strokeDashArray: 2, padding: { top: 2, bottom: -6 } },
+  grid: { 
+    borderColor: "rgba(132, 160, 230, 0.24)", 
+    strokeDashArray: 2, 
+    padding: { top: 2, bottom: -6 } 
+  },
   tooltip: { theme: "dark", shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  markers: { size: 4, colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"], strokeColors: "#0b1020", strokeWidth: 2, hover: { size: 6 } },
+  markers: { 
+    size: 0,
+    hover: { size: 6 } 
+  },
   fill: {
     type: "gradient",
     gradient: {
-      shadeIntensity: 0.4,
-      opacityFrom: 0.25,
+      shadeIntensity: 0.6,
+      opacityFrom: 0.45,
       opacityTo: 0.05,
-      stops: [0, 85, 100]
-    }
+      stops: [0, 100]
+    },
+    opacity: 0.8
   },
-  stroke: { curve: "smooth", width: 3, lineCap: "round" },
+  stroke: { 
+    curve: "spline", 
+    width: 3,
+    lineCap: "round",
+    lineJoin: "round"
+  },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
   colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"]
 }))
