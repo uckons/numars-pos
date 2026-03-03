@@ -622,18 +622,25 @@ const formatDateKey = (value) => {
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("id-ID")
 }
 
+const startOfDayIso = (value = new Date()) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return new Date().toISOString()
+  date.setHours(0, 0, 0, 0)
+  return date.toISOString()
+}
+
 const buildSortedDailyRevenue = (list, allocator) => {
   const map = new Map()
   for (const order of list) {
     const key = formatDateKey(order.created_at)
     if (!key) continue
     if (!map.has(key)) {
-      map.set(key, { x: new Date(order.created_at).setHours(0, 0, 0, 0), y: 0 })
+      map.set(key, { x: startOfDayIso(order.created_at), y: 0 })
     }
     const row = map.get(key)
     row.y += Number(allocator(order) || 0)
   }
-  return [...map.values()].sort((a, b) => a.x - b.x)
+  return [...map.values()].sort((a, b) => new Date(a.x).getTime() - new Date(b.x).getTime())
 }
 
 const trendPoints = computed(() => buildSortedDailyRevenue(paidOrdersList.value, (order) => order.total))
@@ -653,7 +660,7 @@ const roundUpToStep = (value, step) => {
   return Math.ceil(safe / step) * step
 }
 
-const trendSeries = computed(() => ([{ name: "Revenue", data: trendPoints.value.length ? trendPoints.value : [{ x: new Date().setHours(0, 0, 0, 0), y: 0 }] }]))
+const trendSeries = computed(() => ([{ name: "Revenue", data: trendPoints.value.length ? trendPoints.value : [{ x: startOfDayIso(), y: 0 }] }]))
 const trendPeak = computed(() => Math.max(...trendSeries.value[0].data.map((item) => Number(item?.y || 0)), 0))
 const trendOptions = computed(() => ({
   chart: {
@@ -665,7 +672,7 @@ const trendOptions = computed(() => ({
   theme: { mode: "dark" },
   xaxis: {
     type: "datetime",
-    labels: { datetimeUTC: false, style: { colors: "#ced8ff" } },
+    labels: { datetimeUTC: false, format: "dd MMM", style: { colors: "#ced8ff" } },
     axisBorder: { color: "rgba(255,255,255,0.18)" }
   },
   yaxis: {
@@ -739,7 +746,7 @@ const categoryTrendData = computed(() => {
     const dayKey = formatDateKey(o.created_at)
     if (!dayKey) continue
     if (!dayMap.has(dayKey)) {
-      dayMap.set(dayKey, { x: new Date(o.created_at).setHours(0, 0, 0, 0), FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+      dayMap.set(dayKey, { x: startOfDayIso(o.created_at), FNB: 0, SPA: 0, LC: 0, KTV: 0 })
     }
     const categories = String(o.category || "").toUpperCase().split(",").map((v) => v.trim()).filter(Boolean)
     const matched = keys.filter((k) => categories.some((cat) => cat.includes(k)))
@@ -747,12 +754,12 @@ const categoryTrendData = computed(() => {
     const allocated = Number(o.total || 0) / divisor
     for (const cat of matched) dayMap.get(dayKey)[cat] += allocated
   }
-  return [...dayMap.values()].sort((a, b) => a.x - b.x)
+  return [...dayMap.values()].sort((a, b) => new Date(a.x).getTime() - new Date(b.x).getTime())
 })
 
 const categoryTrendSeries = computed(() => {
   if (!categoryTrendData.value.length) {
-    const fallbackX = new Date().setHours(0, 0, 0, 0)
+    const fallbackX = startOfDayIso()
     return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [{ x: fallbackX, y: 0 }] }))
   }
   return ["FNB", "SPA", "LC", "KTV"].map((name) => ({
@@ -782,7 +789,7 @@ const categoryTrendOptions = computed(() => ({
   theme: { mode: "dark" },
   xaxis: {
     type: "datetime",
-    labels: { datetimeUTC: false, style: { colors: "#ced8ff" } },
+    labels: { datetimeUTC: false, format: "dd MMM", style: { colors: "#ced8ff" } },
     axisBorder: { color: "rgba(255,255,255,0.18)" }
   },
   yaxis: {
