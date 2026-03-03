@@ -162,7 +162,7 @@
         </section>
 
         <section class="card">
-          <h4>Master Potongan Global (Kecuali Denda)</h4>
+          <h4>Master Potongan Global</h4>
           <div class="deduction-grid">
             <div class="field" v-for="field in financeConfigFields" :key="field.key">
               <label>{{ field.label }}</label>
@@ -175,7 +175,7 @@
           <div class="table-head">
             <h4>Ringkasan Pendapatan Terapis</h4>
             <div style="display:flex; align-items:center; gap:10px;">
-              <small class="muted">Denda & hutang diinput per terapis. Klik baris untuk breakdown.</small>
+              <small class="muted">Nilai denda dari master global, hutang diinput per terapis. Klik baris untuk breakdown.</small>
               <button class="btn" @click="printTherapistFinanceReport('therapist')">Print</button>
             </div>
           </div>
@@ -190,7 +190,7 @@
                   <td>{{ row.grade_name }}</td>
                   <td class="num">{{ row.spa_qty }}</td>
                   <td class="num">{{ row.lc_qty }}</td>
-                  <td><input class="mini-select" type="number" min="0" :value="row.denda_rate" @input.stop="setTherapistPenalty(row.therapist_name, 'spa_denda', $event.target.value)" /></td>
+                  <td class="num">Rp {{ formatCurrency(row.denda_rate) }} × {{ row.absence_qty }}</td>
                   <td><input class="mini-select" type="number" min="0" :value="row.lc_denda" @input.stop="setTherapistPenalty(row.therapist_name, 'lc_denda', $event.target.value)" /></td>
                   <td class="num" :class="row.therapist_income>=0 ? 'good' : 'bad'">Rp {{ formatCurrency(row.therapist_income) }} <button class="btn mini-print" @click.stop="printSingleTherapistSlip(row)">Slip</button></td>
                 </tr>
@@ -319,7 +319,7 @@ const ordersPage = ref(1)
 const ordersPageSize = ref(25)
 const therapistAnalytics = ref([])
 const therapistMaster = ref([])
-const financeConfig = ref({ salon: 0, room: 0, safety: 0, lain_lain: 0 })
+const financeConfig = ref({ salon: 0, room: 0, safety: 0, denda: 0, lain_lain: 0 })
 const expandedFinanceRows = ref({})
 const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
@@ -375,6 +375,7 @@ const loadReport = async () => {
       salon: Number(cfg.salon ?? cfg.spa_salon ?? cfg.lc_salon ?? 0),
       room: Number(cfg.room ?? cfg.spa_room ?? cfg.lc_room ?? cfg.lc_sofa ?? 0),
       safety: Number(cfg.safety ?? cfg.spa_safety ?? cfg.lc_safety ?? 0),
+      denda: Number(cfg.denda ?? cfg.spa_denda ?? cfg.lc_denda ?? 0),
       lain_lain: Number(cfg.lain_lain ?? cfg.spa_lain_lain ?? cfg.lc_lain_lain ?? 0)
     }
 
@@ -463,7 +464,7 @@ const therapistMasterMap = computed(() => {
 
 const getTherapistPenalty = (name) => {
   const key = normalizeTherapistName(name)
-  return therapistPenalties.value[key] || { spa_denda: 0, lc_denda: 0 }
+  return therapistPenalties.value[key] || { lc_denda: 0 }
 }
 
 const setTherapistPenalty = (name, field, value) => {
@@ -524,7 +525,7 @@ const therapistFinanceRows = computed(() => {
     const lcQty = Number(item.lc_qty || 0)
     const servicePrice = Number(master?.commission_amount || 0)
     const penalty = getTherapistPenalty(item.therapist_name)
-    const dendaRate = Number(penalty.spa_denda || 0)
+    const dendaRate = Number(financeConfig.value.denda || 0)
     const lcDenda = Number(penalty.lc_denda || 0)
 
     const room = Number(financeConfig.value.room || 0)
@@ -907,6 +908,7 @@ const financeConfigFields = [
   { key: 'salon', label: 'SALON' },
   { key: 'room', label: 'ROOM' },
   { key: 'safety', label: 'SAFETY' },
+  { key: 'denda', label: 'DENDA' },
   { key: 'lain_lain', label: 'LAIN-LAIN' }
 ]
 
@@ -924,6 +926,8 @@ const saveFinanceConfig = async () => {
       lc_room: Number(financeConfig.value.room || 0),
       spa_safety: Number(financeConfig.value.safety || 0),
       lc_safety: Number(financeConfig.value.safety || 0),
+      spa_denda: Number(financeConfig.value.denda || 0),
+      lc_denda: Number(financeConfig.value.denda || 0),
       spa_lain_lain: Number(financeConfig.value.lain_lain || 0),
       lc_lain_lain: Number(financeConfig.value.lain_lain || 0)
     })
