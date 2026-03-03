@@ -681,8 +681,8 @@ const trendOptions = computed(() => ({
   },
   stroke: {
     curve: "straight",
-    width: 2.5,
-    colors: ["#5f85ff"]
+    width: 2,
+    show: true
   },
   markers: {
     size: 4,
@@ -712,7 +712,7 @@ const trendOptions = computed(() => ({
         colors: "#9ca3af",
         fontSize: "12px"
       },
-      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}M` : "0"
+      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
     }
   },
   fill: {
@@ -739,7 +739,7 @@ const trendOptions = computed(() => ({
       fontSize: "12px"
     },
     y: {
-      formatter: (value) => value ? `Rp ${value.toLocaleString("id-ID")}` : "0"
+      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
     }
   },
   colors: ["#5f85ff"]
@@ -868,13 +868,16 @@ const categoryTrendOptions = computed(() => ({
         colors: "#9ca3af",
         fontSize: "12px"
       },
-      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}M` : "0"
+      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
     }
   },
   tooltip: {
     theme: "dark",
     shared: true,
-    intersect: false
+    intersect: false,
+    y: {
+      formatter: (value) => value ? `Rp ${(value / 1000000).toFixed(0)}JT` : "0"
+    }
   },
   grid: {
     borderColor: "rgba(255, 255, 255, 0.1)",
