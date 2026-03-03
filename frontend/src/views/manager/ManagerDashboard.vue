@@ -684,15 +684,15 @@ const trendOptions = computed(() => ({
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.08,
+      opacityFrom: 0.0,
       opacityTo: 0.0,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "straight", width: 5.2, lineCap: "round" },
-  markers: { size: 0, hover: { size: 4 } },
+  stroke: { curve: "straight", width: 6, lineCap: "round" },
+  markers: { size: 3, colors: ["#5f85ff"], strokeColors: "#0b1020", strokeWidth: 1, hover: { size: 5 } },
   dataLabels: { enabled: false },
-  tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
+  tooltip: { theme: "dark", shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
   colors: ["#5f85ff"]
 }))
 
@@ -793,19 +793,19 @@ const categoryTrendOptions = computed(() => ({
     labels: { formatter: formatAxisNumber, style: { colors: "#d7def7" } }
   },
   grid: { borderColor: "rgba(132, 160, 230, 0.24)", strokeDashArray: 2, padding: { top: 2, bottom: -6 } },
-  tooltip: { theme: "dark", y: { formatter: formatAccountingNumber } },
+  tooltip: { theme: "dark", shared: true, intersect: false, y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  markers: { size: 0, hover: { size: 4 } },
+  markers: { size: 3, colors: ["#5f85ff"], strokeColors: "#0b1020", strokeWidth: 1, hover: { size: 5 } },
   fill: {
     type: "gradient",
     gradient: {
       shadeIntensity: 0.35,
-      opacityFrom: 0.07,
+      opacityFrom: 0.03,
       opacityTo: 0.0,
       stops: [0, 85, 100]
     }
   },
-  stroke: { curve: "smooth", width: 4.2, lineCap: "round" },
+  stroke: { curve: "smooth", width: 4.6, lineCap: "round" },
   legend: { position: "top", labels: { colors: "#eef2ff" } },
   colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"]
 }))
