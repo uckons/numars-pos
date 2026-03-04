@@ -20,7 +20,7 @@
     "test:payroll-flex": "node --test tests/payroll-flex.service.test.js"
   },
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.13.5",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
