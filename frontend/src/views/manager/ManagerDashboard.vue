@@ -55,6 +55,7 @@
             <input type="number" min="0" v-model.number="fixedSalaryCost" />
           </div>
           <button class="btn" @click="loadReport">Terapkan</button>
+          <small class="small muted filter-note">Periode mengikuti jam operasional outlet.</small>
         </section>
 
         <section class="kpi-grid">
@@ -417,9 +418,8 @@ const loadReport = async () => {
 onMounted(async () => {
   const today = new Date()
   const first = new Date(today.getFullYear(), today.getMonth(), 1)
-  const firstISO = first.toISOString().slice(0, 10)
-  dateFrom.value = firstISO
-  dateTo.value = today.toISOString().slice(0, 10)
+  dateFrom.value = formatLocalYmd(first) || ""
+  dateTo.value = formatLocalYmd(today) || ""
   tab.value = 'report'
   await loadReport()
 })
@@ -436,9 +436,10 @@ watch(tab, async (value) => {
 
 const filteredOrders = computed(() => orders.value.filter((o) => {
   if (selectedBranch.value !== "ALL" && String(o.branch_id) !== String(selectedBranch.value)) return false
-  const dt = new Date(o.created_at)
-  if (dateFrom.value && dt < new Date(dateFrom.value)) return false
-  if (dateTo.value && dt > new Date(`${dateTo.value}T23:59:59`)) return false
+  const orderDateKey = getBusinessDateKey(o.created_at, o.branch_id)
+  if (!orderDateKey) return false
+  if (dateFrom.value && orderDateKey < dateFrom.value) return false
+  if (dateTo.value && orderDateKey > dateTo.value) return false
   return true
 }))
 
@@ -453,6 +454,68 @@ const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Nu
 const paidOrders = computed(() => paidOrdersList.value.length)
 const fnbPaidModalCost = computed(() => paidOrdersList.value.reduce((sum, o) => sum + Number(o.fnb_modal_cost || 0), 0))
 const normalizeTherapistName = (name) => String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/gi, '')
+
+const parseTimeToMinutes = (value, fallback = "00:00:00") => {
+  const raw = String(value || fallback)
+  const [h = "0", m = "0", s = "0"] = raw.split(":")
+  const hh = Number(h)
+  const mm = Number(m)
+  const ss = Number(s)
+  if ([hh, mm, ss].some((v) => Number.isNaN(v))) return 0
+  return hh * 60 + mm + ss / 60
+}
+
+const shiftYmd = (ymd, days) => {
+  if (!ymd) return null
+  const date = new Date(`${ymd}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return null
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+const toJakartaParts = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(date)
+  const map = Object.fromEntries(parts.filter((p) => p.type !== "literal").map((p) => [p.type, p.value]))
+  return {
+    ymd: `${map.year}-${map.month}-${map.day}`,
+    minutes: parseTimeToMinutes(`${map.hour}:${map.minute}:${map.second}`)
+  }
+}
+
+const branchScheduleMap = computed(() => {
+  const map = new Map()
+  for (const branch of branches.value) {
+    map.set(String(branch.id), {
+      open_time: String(branch.open_time || "10:00:00"),
+      close_time: String(branch.close_time || "03:00:00")
+    })
+  }
+  return map
+})
+
+const getBusinessDateKey = (createdAt, branchId) => {
+  const parts = toJakartaParts(createdAt)
+  if (!parts) return null
+  const schedule = branchScheduleMap.value.get(String(branchId)) || { open_time: "10:00:00", close_time: "03:00:00" }
+  const openMinutes = parseTimeToMinutes(schedule.open_time, "10:00:00")
+  const closeMinutes = parseTimeToMinutes(schedule.close_time, "03:00:00")
+  const overnight = closeMinutes <= openMinutes
+  if (overnight && parts.minutes < closeMinutes) {
+    return shiftYmd(parts.ymd, -1)
+  }
+  return parts.ymd
+}
 
 
 const splitTherapistNames = (rawName) => {
@@ -653,25 +716,30 @@ const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => 
 const totalExpense = computed(() => therapistSalaryCost.value + fnbPaidModalCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
 
-const formatDateKey = (value) => {
+const formatLocalYmd = (value = new Date()) => {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("id-ID")
+  if (Number.isNaN(date.getTime())) return null
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
 const startOfDayIso = (value = new Date()) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return new Date().toISOString()
-  date.setHours(0, 0, 0, 0)
-  return date.toISOString()
+  const ymd = formatLocalYmd(value)
+  if (!ymd) return new Date().toISOString()
+  return `${ymd}T00:00:00.000Z`
 }
+
+const startOfBusinessDayIso = (ymd) => (ymd ? `${ymd}T00:00:00.000Z` : startOfDayIso())
 
 const buildSortedDailyRevenue = (list, allocator) => {
   const map = new Map()
   for (const order of list) {
-    const key = formatDateKey(order.created_at)
+    const key = getBusinessDateKey(order.created_at, order.branch_id)
     if (!key) continue
     if (!map.has(key)) {
-      map.set(key, { x: startOfDayIso(order.created_at), y: 0 })
+      map.set(key, { x: startOfBusinessDayIso(key), y: 0 })
     }
     const row = map.get(key)
     row.y += Number(allocator(order) || 0)
@@ -809,10 +877,10 @@ const categoryTrendData = computed(() => {
   const keys = ["FNB", "SPA", "LC", "KTV"]
   const dayMap = new Map()
   for (const o of paidOrdersList.value) {
-    const dayKey = formatDateKey(o.created_at)
+    const dayKey = getBusinessDateKey(o.created_at, o.branch_id)
     if (!dayKey) continue
     if (!dayMap.has(dayKey)) {
-      dayMap.set(dayKey, { x: startOfDayIso(o.created_at), FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+      dayMap.set(dayKey, { x: startOfBusinessDayIso(dayKey), FNB: 0, SPA: 0, LC: 0, KTV: 0 })
     }
     const categories = String(o.category || "").toUpperCase().split(",").map((v) => v.trim()).filter(Boolean)
     const normalized = categories.map((cat) => cat.includes('KARAOKE') ? 'KTV' : cat)
