@@ -55,6 +55,7 @@
             <input type="number" min="0" v-model.number="fixedSalaryCost" />
           </div>
           <button class="btn" @click="loadReport">Terapkan</button>
+          <small class="small muted filter-note">Periode mengikuti jam operasional outlet.</small>
         </section>
 
         <section class="kpi-grid">
