@@ -526,7 +526,7 @@ exports.setTherapistSalonUsage = async (req, res) => {
     const businessDate = await getBusinessDateForBranch(db, branchId)
 
     const attendanceRes = await db.query(
-      `SELECT therapist_id, status, absence_qty
+      `SELECT therapist_id, status, salon_used, absence_qty
        FROM therapist_attendance
        WHERE therapist_id = $1 AND branch_id = $2 AND business_date = $3::date
        LIMIT 1`,
@@ -538,8 +538,12 @@ exports.setTherapistSalonUsage = async (req, res) => {
     }
 
     const currentStatus = String(attendanceRes.rows[0].status || 'OFF').toUpperCase()
+    const currentSalonUsed = Boolean(attendanceRes.rows[0].salon_used)
     if (currentStatus === 'OFF') {
       return res.status(400).json({ message: 'Status OFF tidak bisa menggunakan salon.' })
+    }
+    if (currentStatus === 'MASUK' && currentSalonUsed && !salonUsed) {
+      return res.status(400).json({ message: 'Salon yang sudah ON saat status MASUK tidak bisa diubah ke OFF.' })
     }
 
     const { rows } = await db.query(

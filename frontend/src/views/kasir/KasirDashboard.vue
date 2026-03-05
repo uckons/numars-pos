@@ -98,7 +98,7 @@
               <button
                 class="btn-state salon"
                 :class="{ active: t.salon_used }"
-                :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'OFF' || t.salon_used"
+                :disabled="isSalonButtonDisabled(t)"
                 @click="toggleTherapistSalonUsage(t)"
               >
                 SALON {{ t.salon_used ? 'ON' : 'OFF' }}
@@ -552,6 +552,12 @@ const setTherapistAttendance = async (therapist, targetStatus) => {
   }
 }
 
+
+
+const isSalonButtonDisabled = (therapist) => {
+  const status = String(therapist?.attendance_status || 'OFF').toUpperCase()
+  return status === 'OFF' || (status === 'MASUK' && Boolean(therapist?.salon_used))
+}
 
 const isAbsenceButtonDisabled = (therapist) => {
   const status = String(therapist?.attendance_status || 'OFF').toUpperCase()
