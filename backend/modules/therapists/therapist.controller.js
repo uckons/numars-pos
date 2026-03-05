@@ -638,7 +638,7 @@ exports.getTherapistAbsenceSummary = async (req, res) => {
       `SELECT
          t.id AS therapist_id,
          t.name AS therapist_name,
-         COALESCE(SUM(CASE WHEN ta.status <> 'OFF' THEN COALESCE(ta.absence_qty, 0) ELSE 0 END), 0) AS absence_qty
+         COALESCE(SUM(COALESCE(ta.absence_qty, 0)), 0) AS absence_qty
        FROM therapists t
        LEFT JOIN therapist_attendance ta
          ON ta.therapist_id = t.id
