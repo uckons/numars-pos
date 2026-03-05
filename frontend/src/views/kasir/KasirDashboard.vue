@@ -66,11 +66,28 @@
           </div>
           <button class="btn-close-modal" @click="showAttendanceModal = false">✕</button>
         </div>
+
+        <div class="attendance-toolbar">
+          <input
+            v-model.trim="attendanceSearch"
+            class="attendance-search"
+            type="text"
+            placeholder="Cari nama terapis..."
+            @keyup.enter="applyAttendanceFilters"
+          >
+          <select v-model="attendanceGradeId" class="attendance-grade" @change="applyAttendanceFilters">
+            <option value="">Semua Grade</option>
+            <option v-for="g in attendanceGrades" :key="g.id" :value="String(g.id)">{{ g.name }}</option>
+          </select>
+          <button class="btn-filter" @click="applyAttendanceFilters">Cari</button>
+        </div>
+
         <div v-if="!therapistAttendance.length" class="empty">Belum ada data terapis.</div>
         <div v-else class="attendance-list">
           <div v-for="t in therapistAttendance" :key="t.id" class="attendance-row">
             <div class="attendance-name">
               <strong>{{ t.name }}</strong>
+              <small class="grade-pill">{{ t.grade_name || '-' }}</small>
               <span class="badge" :class="`badge-${String(t.attendance_status || 'OFF').toLowerCase()}`">{{ t.attendance_status || 'OFF' }}</span>
               <small v-if="!t.has_attendance_pin" class="pin-warning">PIN belum diset</small>
             </div>
@@ -81,14 +98,20 @@
               <button
                 class="btn-state salon"
                 :class="{ active: t.salon_used }"
-                :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'OFF' || t.salon_used"
+                :disabled="isSalonButtonDisabled(t)"
                 @click="toggleTherapistSalonUsage(t)"
               >
                 SALON {{ t.salon_used ? 'ON' : 'OFF' }}
               </button>
-              <button class="btn-state absen" :disabled="String(t.attendance_status || 'OFF').toUpperCase() === 'MASUK'" @click="addTherapistAbsence(t)">ABSEN +1 ({{ t.absence_qty || 0 }})</button>
+              <button class="btn-state absen" :disabled="isAbsenceButtonDisabled(t)" @click="addTherapistAbsence(t)">ABSEN +1 ({{ t.absence_qty || 0 }})</button>
             </div>
           </div>
+        </div>
+
+        <div class="attendance-pagination" v-if="attendancePagination.totalPages > 1">
+          <button class="btn-page" :disabled="attendancePagination.page <= 1" @click="changeAttendancePage(attendancePagination.page - 1)">Prev</button>
+          <span>Halaman {{ attendancePagination.page }} / {{ attendancePagination.totalPages }}</span>
+          <button class="btn-page" :disabled="attendancePagination.page >= attendancePagination.totalPages" @click="changeAttendancePage(attendancePagination.page + 1)">Next</button>
         </div>
       </section>
     </div>
@@ -145,6 +168,11 @@ const stats = ref({
 const therapistAttendance = ref([])
 const attendanceBusinessDate = ref('')
 const showAttendanceModal = ref(false)
+const attendanceSearch = ref('')
+const attendanceGradeId = ref('')
+const attendanceGrades = ref([])
+const ATTENDANCE_PAGE_LIMIT = 10
+const attendancePagination = ref({ page: 1, limit: ATTENDANCE_PAGE_LIMIT, totalRecords: 0, totalPages: 1 })
 let attendanceInterval = null
 
 const barMessages = ref([])
@@ -418,15 +446,47 @@ const showUnreadBarRepopup = async () => {
   }
 }
 
-const loadTherapistAttendance = async () => {
+const loadAttendanceGrades = async () => {
   try {
-    const { data } = await api.get('/therapists/attendance')
+    const { data } = await api.get('/grades')
+    attendanceGrades.value = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : [])
+  } catch (err) {
+    console.error('Gagal load grade absensi', err)
+    attendanceGrades.value = []
+  }
+}
+
+const loadTherapistAttendance = async (page = attendancePagination.value.page) => {
+  try {
+    const params = {
+      page,
+      limit: ATTENDANCE_PAGE_LIMIT
+    }
+    if (attendanceSearch.value) params.search = attendanceSearch.value
+    if (attendanceGradeId.value) params.grade_id = attendanceGradeId.value
+
+    const { data } = await api.get('/therapists/attendance', { params })
     therapistAttendance.value = Array.isArray(data?.data) ? data.data : []
     attendanceBusinessDate.value = data?.business_date || ''
+    attendancePagination.value = {
+      page: Number(data?.pagination?.page || page),
+      limit: Number(data?.pagination?.limit || ATTENDANCE_PAGE_LIMIT),
+      totalRecords: Number(data?.pagination?.totalRecords || therapistAttendance.value.length),
+      totalPages: Number(data?.pagination?.totalPages || 1)
+    }
   } catch (err) {
     console.error('Gagal load absensi terapis', err)
     therapistAttendance.value = []
   }
+}
+
+const applyAttendanceFilters = async () => {
+  await loadTherapistAttendance(1)
+}
+
+const changeAttendancePage = async (nextPage) => {
+  if (nextPage < 1 || nextPage > attendancePagination.value.totalPages) return
+  await loadTherapistAttendance(nextPage)
 }
 
 const isAttendanceButtonDisabled = (therapist, targetStatus) => {
@@ -493,6 +553,18 @@ const setTherapistAttendance = async (therapist, targetStatus) => {
 }
 
 
+
+const isSalonButtonDisabled = (therapist) => {
+  const status = String(therapist?.attendance_status || 'OFF').toUpperCase()
+  return status === 'OFF' || (status === 'MASUK' && Boolean(therapist?.salon_used))
+}
+
+const isAbsenceButtonDisabled = (therapist) => {
+  const status = String(therapist?.attendance_status || 'OFF').toUpperCase()
+  const absenceQty = Number(therapist?.absence_qty || 0)
+  return status === 'MASUK' || absenceQty >= 1
+}
+
 const addTherapistAbsence = async (therapist) => {
   try {
     await api.post(`/therapists/attendance/${therapist.id}/absen`, { qty: 1 })
@@ -543,6 +615,7 @@ Alasan: ${payload.note}` : (payload.message || "Update dari staff bar")
   await loadDashboard()
   await syncTimers()
   await loadBarMessages()
+  await loadAttendanceGrades()
   await loadTherapistAttendance()
   await showUnreadBarRepopup()
   
@@ -776,6 +849,15 @@ onUnmounted(() => {
 .attendance-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
 .attendance-head h3 { margin:0; font-size:16px; }
 .attendance-head small { color:#999; }
+
+.attendance-toolbar { display:flex; gap:8px; margin-bottom:10px; }
+.attendance-search, .attendance-grade { background:#0e0e0e; border:1px solid #2c2c2c; color:#fff; border-radius:8px; padding:8px 10px; }
+.attendance-search { flex:1; min-width:220px; }
+.btn-filter { border:none; border-radius:8px; padding:8px 12px; font-weight:700; background:#c9a24d; color:#111; cursor:pointer; }
+.grade-pill { color:#8f8f8f; font-size:11px; border:1px solid #303030; border-radius:999px; padding:2px 8px; }
+.attendance-pagination { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:12px; }
+.btn-page { border:1px solid #333; background:#171717; color:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
+.btn-page:disabled { opacity:.45; cursor:not-allowed; }
 .attendance-list { display:grid; gap:10px; }
 .attendance-row { display:flex; justify-content:space-between; align-items:center; border:1px solid #242424; border-radius:10px; padding:10px; }
 .attendance-name { display:flex; align-items:center; gap:8px; }

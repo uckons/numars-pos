@@ -297,11 +297,63 @@ exports.getTherapistAttendance = async (req, res) => {
 
     const branchId = req.user?.branch_id
     const businessDate = await getBusinessDateForBranch(db, branchId)
+    const page = Math.max(1, Number(req.query?.page || 1))
+    const limit = Math.min(100, Math.max(1, Number(req.query?.limit || 10)))
+    const search = String(req.query?.search || '').trim()
+    const gradeId = Number(req.query?.grade_id || 0)
+    const offset = (page - 1) * limit
+
+    const countWhereFilters = ['t.branch_id = $1', 't.active = true']
+    const countParams = [branchId]
+    let countParamIndex = 2
+
+    if (search) {
+      countWhereFilters.push(`t.name ILIKE $${countParamIndex}`)
+      countParams.push(`%${search}%`)
+      countParamIndex += 1
+    }
+
+    if (gradeId > 0) {
+      countWhereFilters.push(`t.grade_id = $${countParamIndex}`)
+      countParams.push(gradeId)
+      countParamIndex += 1
+    }
+
+    const countWhereClause = `WHERE ${countWhereFilters.join(' AND ')}`
+
+    const countQuery = `
+      SELECT COUNT(*)::int AS total
+      FROM therapists t
+      ${countWhereClause}
+    `
+    const { rows: countRows } = await db.query(countQuery, countParams)
+    const totalRecords = Number(countRows[0]?.total || 0)
+    const totalPages = Math.max(1, Math.ceil(totalRecords / limit))
+
+    const rowWhereFilters = ['t.branch_id = $1', 't.active = true']
+    const rowParams = [branchId, businessDate]
+    let rowParamIndex = 3
+
+    if (search) {
+      rowWhereFilters.push(`t.name ILIKE $${rowParamIndex}`)
+      rowParams.push(`%${search}%`)
+      rowParamIndex += 1
+    }
+
+    if (gradeId > 0) {
+      rowWhereFilters.push(`t.grade_id = $${rowParamIndex}`)
+      rowParams.push(gradeId)
+      rowParamIndex += 1
+    }
+
+    const rowWhereClause = `WHERE ${rowWhereFilters.join(' AND ')}`
 
     const { rows } = await db.query(
       `SELECT
          t.id,
          t.name,
+         t.grade_id,
+         COALESCE(tg.name, '-') AS grade_name,
          t.active,
        (t.attendance_pin IS NOT NULL AND t.attendance_pin <> '') AS has_attendance_pin,
        COALESCE(ta.status, 'OFF') AS attendance_status,
@@ -309,18 +361,25 @@ exports.getTherapistAttendance = async (req, res) => {
        COALESCE(ta.absence_qty, 0) AS absence_qty,
        ta.updated_at
        FROM therapists t
+       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
        LEFT JOIN therapist_attendance ta
          ON ta.therapist_id = t.id
         AND ta.business_date = $2::date
-       WHERE t.branch_id = $1
-         AND t.active = true
-       ORDER BY t.name ASC`,
-      [branchId, businessDate]
+       ${rowWhereClause}
+       ORDER BY t.name ASC
+       LIMIT $${rowParamIndex} OFFSET $${rowParamIndex + 1}`,
+      [...rowParams, limit, offset]
     )
 
     res.json({
       business_date: businessDate,
-      data: rows
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        totalRecords,
+        totalPages
+      }
     })
   } catch (err) {
     console.error('GET THERAPIST ATTENDANCE ERROR:', err)
@@ -403,12 +462,12 @@ exports.addTherapistAbsence = async (req, res) => {
       return res.status(400).json({ message: 'Terapis tidak valid' })
     }
 
-    const qtyDelta = Math.max(1, Number(req.body?.qty || 1))
+    const qtyDelta = 1
     const branchId = req.user?.branch_id
     const businessDate = await getBusinessDateForBranch(db, branchId)
 
     const attendanceRes = await db.query(
-      `SELECT therapist_id, status
+      `SELECT therapist_id, status, absence_qty
        FROM therapist_attendance
        WHERE therapist_id = $1 AND branch_id = $2 AND business_date = $3::date
        LIMIT 1`,
@@ -419,11 +478,6 @@ exports.addTherapistAbsence = async (req, res) => {
       const { rows } = await db.query(
         `INSERT INTO therapist_attendance (therapist_id, branch_id, business_date, status, absence_qty, updated_by, updated_at)
          VALUES ($1, $2, $3::date, 'OFF', $4, $5, NOW())
-         ON CONFLICT (therapist_id, business_date)
-         DO UPDATE SET
-           absence_qty = COALESCE(therapist_attendance.absence_qty, 0) + EXCLUDED.absence_qty,
-           updated_by = EXCLUDED.updated_by,
-           updated_at = NOW()
          RETURNING therapist_id, business_date, status, salon_used, absence_qty, updated_at`,
         [therapistId, branchId, businessDate, qtyDelta, req.user?.id || null]
       )
@@ -435,9 +489,14 @@ exports.addTherapistAbsence = async (req, res) => {
       return res.status(400).json({ message: 'Status MASUK tidak dapat ditambahkan absen.' })
     }
 
+    const currentAbsenceQty = Number(attendanceRes.rows[0].absence_qty || 0)
+    if (currentAbsenceQty >= 1) {
+      return res.status(400).json({ message: 'Absen hanya bisa 1x per hari.' })
+    }
+
     const { rows } = await db.query(
       `UPDATE therapist_attendance
-       SET absence_qty = COALESCE(absence_qty, 0) + $1,
+       SET absence_qty = $1,
            updated_by = $2,
            updated_at = NOW()
        WHERE therapist_id = $3 AND branch_id = $4 AND business_date = $5::date
@@ -467,7 +526,7 @@ exports.setTherapistSalonUsage = async (req, res) => {
     const businessDate = await getBusinessDateForBranch(db, branchId)
 
     const attendanceRes = await db.query(
-      `SELECT therapist_id, status
+      `SELECT therapist_id, status, salon_used, absence_qty
        FROM therapist_attendance
        WHERE therapist_id = $1 AND branch_id = $2 AND business_date = $3::date
        LIMIT 1`,
@@ -479,8 +538,12 @@ exports.setTherapistSalonUsage = async (req, res) => {
     }
 
     const currentStatus = String(attendanceRes.rows[0].status || 'OFF').toUpperCase()
+    const currentSalonUsed = Boolean(attendanceRes.rows[0].salon_used)
     if (currentStatus === 'OFF') {
       return res.status(400).json({ message: 'Status OFF tidak bisa menggunakan salon.' })
+    }
+    if (currentStatus === 'MASUK' && currentSalonUsed && !salonUsed) {
+      return res.status(400).json({ message: 'Salon yang sudah ON saat status MASUK tidak bisa diubah ke OFF.' })
     }
 
     const { rows } = await db.query(
@@ -575,7 +638,7 @@ exports.getTherapistAbsenceSummary = async (req, res) => {
       `SELECT
          t.id AS therapist_id,
          t.name AS therapist_name,
-         COALESCE(SUM(CASE WHEN ta.status <> 'OFF' THEN COALESCE(ta.absence_qty, 0) ELSE 0 END), 0) AS absence_qty
+         COALESCE(SUM(COALESCE(ta.absence_qty, 0)), 0) AS absence_qty
        FROM therapists t
        LEFT JOIN therapist_attendance ta
          ON ta.therapist_id = t.id
