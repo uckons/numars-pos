@@ -61,7 +61,7 @@
         <section class="kpi-grid">
           <article class="card kpi"><p>Revenue</p><h3>Rp {{ formatCurrency(totalRevenue) }}</h3></article>
           <article class="card kpi"><p>Paid Orders</p><h3>{{ paidOrders }}</h3></article>
-          <article class="card kpi"><p>Beban Terapis (Komisi+Kerja+Agent+Salon)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
+          <article class="card kpi"><p>Beban Terapis (Komisi+Kerja+Agent)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
           <article class="card kpi"><p>Beban FNB Paid (QTY × Modal)</p><h3>Rp {{ formatCurrency(fnbPaidModalCost) }}</h3></article>
           <article class="card kpi"><p>Total Beban</p><h3>Rp {{ formatCurrency(totalExpense) }}</h3></article>
           <article class="card kpi"><p>Net Profit/Loss</p><h3 :class="netProfit>=0?'good':'bad'">Rp {{ formatCurrency(netProfit) }}</h3></article>
@@ -92,11 +92,10 @@
           <table class="table">
             <tbody>
               <tr><td>Cash In (Revenue)</td><td class="num">Rp {{ formatCurrency(totalRevenue) }}</td></tr>
-              <tr><td>Cash Out (Beban Terapis + Agent + Salon)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
+              <tr><td>Cash Out (Beban Terapis + Agent)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
               <tr><td>Cash Out (Beban FNB Paid: QTY × Modal)</td><td class="num">Rp {{ formatCurrency(fnbPaidModalCost) }}</td></tr>
               <tr><td class="muted">↳ Pendapatan Terapis</td><td class="num muted">Rp {{ formatCurrency(totalTherapistIncome) }}</td></tr>
               <tr><td class="muted">↳ Pendapatan Agent</td><td class="num muted">Rp {{ formatCurrency(totalAgentIncome) }}</td></tr>
-              <tr><td class="muted">↳ Pendapatan Salon</td><td class="num muted">Rp {{ formatCurrency(totalSalonIncome) }}</td></tr>
               <tr><td>Cash Out (Gaji Karyawan)</td><td class="num">Rp {{ formatCurrency(fixedSalaryCost) }}</td></tr>
               <tr v-for="(e, idx) in manualExpenses" :key="idx"><td>{{ e.label }}</td><td class="num">Rp {{ formatCurrency(e.amount) }}</td></tr>
               <tr><td><strong>Net Cashflow</strong></td><td class="num"><strong>Rp {{ formatCurrency(netProfit) }}</strong></td></tr>
@@ -164,7 +163,12 @@
 
         <section class="card">
           <h4>Master Potongan Global</h4>
+          <small class="muted">SALON dipisah dari SAFETY agar nilai potongan salon bisa diubah kapan saja.</small>
           <div class="deduction-grid">
+            <div class="field">
+              <label>SALON</label>
+              <input type="number" min="0" :value="financeConfig.salon" @input="setFinanceConfigField('salon', $event.target.value)" />
+            </div>
             <div class="field" v-for="field in financeConfigFields" :key="field.key">
               <label>{{ field.label }}</label>
               <input type="number" min="0" :value="financeConfig[field.key]" @input="setFinanceConfigField(field.key, $event.target.value)" />
@@ -201,7 +205,7 @@
                     <div class="breakdown-grid">
                       <div><strong>TOTAL SPA:</strong> Rp {{ formatCurrency(row.spa_net_rate) }} × {{ row.spa_qty }} = <strong>Rp {{ formatCurrency(row.spa_income_raw) }}</strong></div>
                       <div><strong>TOTAL LC:</strong> Rp {{ formatCurrency(row.lc_net_rate) }} × {{ row.lc_qty }} = <strong>Rp {{ formatCurrency(row.lc_income_raw) }}</strong></div>
-                      <div><strong>Detil Potongan-potongan:</strong> Denda (Nilai Denda Rp {{ formatCurrency(row.denda_rate) }} × Qty Absen {{ row.absence_qty }}) = Rp {{ formatCurrency(row.spa_denda) }}, Salon (Rp {{ formatCurrency(row.salon) }} × Qty {{ row.salon_usage_qty }}) = Rp {{ formatCurrency(row.salon_deduction) }}, Hutang = Rp {{ formatCurrency(row.lc_denda) }}, Lain-lain = Rp {{ formatCurrency(row.lain_lain) }}</div>
+                      <div><strong>Detil Potongan-potongan:</strong> Denda (Nilai Denda Rp {{ formatCurrency(row.denda_rate) }} × Qty Absen {{ row.absence_qty }}) = Rp {{ formatCurrency(row.spa_denda) }}, Hutang = Rp {{ formatCurrency(row.lc_denda) }}, Lain-lain = Rp {{ formatCurrency(row.lain_lain) }}</div>
                       <div><strong>Total Pendapatan:</strong> <strong>Rp {{ formatCurrency(row.therapist_income) }}</strong></div>
                       <div><small class="muted">Note: sudah termasuk potongan room, agent dan safety.</small></div>
                     </div>
@@ -210,29 +214,6 @@
               </template>
             </tbody>
             <tfoot><tr><td colspan="7"><strong>Total</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalTherapistIncome) }}</strong></td></tr></tfoot>
-          </table>
-        </section>
-
-        <section class="card">
-          <div class="table-head">
-            <h4>Laporan Pendapatan Salon</h4>
-            <div style="display:flex; align-items:center; gap:10px;">
-              <small class="muted">Berdasarkan absensi harian (SALON ON saat status bukan OFF).</small>
-              <button class="btn" @click="printSalonReport">Print</button>
-            </div>
-          </div>
-          <table class="table">
-            <thead><tr><th>Terapis</th><th>Qty Pemakaian Salon</th><th>Rate Salon</th><th>Pendapatan Salon</th></tr></thead>
-            <tbody>
-              <tr v-if="!salonIncomeRows.length"><td colspan="4" class="muted">Belum ada data pendapatan salon.</td></tr>
-              <tr v-for="row in salonIncomeRows" :key="`salon-${row.key}`">
-                <td>{{ row.therapist_name }}</td>
-                <td class="num">{{ row.salon_usage_qty }}</td>
-                <td class="num">Rp {{ formatCurrency(row.salon_rate) }}</td>
-                <td class="num">Rp {{ formatCurrency(row.salon_income) }} <button class="btn mini-print" @click.stop="printSingleSalonSlip(row)">Slip</button></td>
-              </tr>
-            </tbody>
-            <tfoot><tr><td colspan="3"><strong>Total Pendapatan Salon</strong></td><td class="num"><strong>Rp {{ formatCurrency(totalSalonIncome) }}</strong></td></tr></tfoot>
           </table>
         </section>
 
@@ -326,7 +307,6 @@ const financeConfig = ref({ salon: 0, room: 0, safety: 0, denda: 0, lain_lain: 0
 const expandedFinanceRows = ref({})
 const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
-const salonUsageMap = ref({})
 const absenceQtyMap = ref({})
 
 const auth = useAuthStore()
@@ -359,13 +339,12 @@ const loadReport = async () => {
   loading.value = true
   loadError.value = ""
   try {
-    const [ordersRes, branchRes, analyticsRes, therapistRes, financeCfgRes, salonUsageRes, absenceRes] = await Promise.all([
+    const [ordersRes, branchRes, analyticsRes, therapistRes, financeCfgRes, absenceRes] = await Promise.all([
       api.get("/superadmin/orders"),
       api.get("/superadmin/branches"),
       api.get('/dashboard/kasir/analytics', { params: { preset: 'daily', date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined } }),
       api.get('/therapists', { params: { page: 1, limit: 500, active: 'true', ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
       api.get('/dashboard/therapist-finance-config', { params: { ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
-      api.get('/therapists/attendance/salon-usage/summary', { params: { date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined, ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
       api.get('/therapists/attendance/absen/summary', { params: { date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined, ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } })
     ])
     orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
@@ -382,15 +361,6 @@ const loadReport = async () => {
       lain_lain: Number(cfg.lain_lain ?? cfg.spa_lain_lain ?? cfg.lc_lain_lain ?? 0)
     }
 
-    const usageRows = Array.isArray(salonUsageRes.data?.data) ? salonUsageRes.data.data : []
-    const usageMap = {}
-    for (const row of usageRows) {
-      const key = normalizeTherapistName(row.therapist_name)
-      if (!key) continue
-      usageMap[key] = Number(row.salon_usage_qty || 0)
-    }
-    salonUsageMap.value = usageMap
-
     const absenceRows = Array.isArray(absenceRes.data?.data) ? absenceRes.data.data : []
     const nextAbsenceMap = {}
     for (const row of absenceRows) {
@@ -405,7 +375,6 @@ const loadReport = async () => {
     branches.value = []
     therapistAnalytics.value = []
     therapistMaster.value = []
-    salonUsageMap.value = {}
     absenceQtyMap.value = {}
     loadError.value = err?.response?.data?.message || "Gagal memuat data manager"
     await Swal.fire({ icon: "error", title: "Load report gagal", text: loadError.value })
@@ -618,11 +587,9 @@ const therapistFinanceRows = computed(() => {
 
     const spaIncomeRaw = spaNetRate * spaQty
     const lcIncomeRaw = lcNetRate * lcQty
-    const salonUsageQty = Number(salonUsageMap.value[item.key] || 0)
     const absenceQty = Number(absenceQtyMap.value[item.key] || 0)
     const spaDenda = dendaRate * absenceQty
-    const salonDeduction = salon * salonUsageQty
-    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + salonDeduction + lainLain)
+    const therapistIncome = (spaIncomeRaw + lcIncomeRaw) - (spaDenda + lcDenda + lainLain)
     const agentIncome = (spaQty + lcQty) * agentFee
 
     return {
@@ -634,8 +601,6 @@ const therapistFinanceRows = computed(() => {
       room,
       salon,
       safety,
-      salon_usage_qty: salonUsageQty,
-      salon_deduction: salonDeduction,
       denda_rate: dendaRate,
       absence_qty: absenceQty,
       spa_denda: spaDenda,
@@ -697,21 +662,9 @@ const agentFinanceRows = computed(() => {
 const totalTherapistIncome = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Number(row.therapist_income || 0), 0))
 const totalAgentIncome = computed(() => agentFinanceRows.value.reduce((sum, row) => sum + Number(row.agent_income || 0), 0))
 
-const salonIncomeRows = computed(() => therapistFinanceRows.value
-  .map((row) => ({
-    key: row.key,
-    therapist_name: row.therapist_name,
-    salon_usage_qty: Number(row.salon_usage_qty || 0),
-    salon_rate: Number(row.salon || 0),
-    salon_income: Number(row.salon_deduction || 0)
-  }))
-  .filter((row) => row.salon_usage_qty > 0 || row.salon_income > 0)
-  .sort((a, b) => a.therapist_name.localeCompare(b.therapist_name)))
-
-const totalSalonIncome = computed(() => salonIncomeRows.value.reduce((sum, row) => sum + Number(row.salon_income || 0), 0))
 
 const therapistBaseCost = computed(() => therapistFinanceRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.therapist_income || 0)), 0))
-const therapistSalaryCost = computed(() => therapistBaseCost.value + Number(totalAgentIncome.value || 0) + Number(totalSalonIncome.value || 0))
+const therapistSalaryCost = computed(() => therapistBaseCost.value + Number(totalAgentIncome.value || 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
 const totalExpense = computed(() => therapistSalaryCost.value + fnbPaidModalCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
@@ -992,7 +945,6 @@ const categoryTrendOptions = computed(() => ({
 }))
 
 const financeConfigFields = [
-  { key: 'salon', label: 'SALON' },
   { key: 'room', label: 'ROOM' },
   { key: 'safety', label: 'SAFETY' },
   { key: 'denda', label: 'DENDA' },
@@ -1007,8 +959,7 @@ const saveFinanceConfig = async () => {
   try {
     await api.post('/dashboard/therapist-finance-config', {
       ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
-      spa_salon: Number(financeConfig.value.salon || 0),
-      lc_salon: Number(financeConfig.value.salon || 0),
+      salon: Number(financeConfig.value.salon || 0),
       spa_room: Number(financeConfig.value.room || 0),
       lc_room: Number(financeConfig.value.room || 0),
       spa_safety: Number(financeConfig.value.safety || 0),
@@ -1127,7 +1078,7 @@ const printSingleTherapistSlip = (row) => {
         <tr><td>Grade</td><td>${row.grade_name}</td></tr>
         <tr><td>Total SPA</td><td>${printCurrency(row.spa_net_rate)} × ${row.spa_qty} = ${printCurrency(row.spa_income_raw)}</td></tr>
         <tr><td>Total LC</td><td>${printCurrency(row.lc_net_rate)} × ${row.lc_qty} = ${printCurrency(row.lc_income_raw)}</td></tr>
-        <tr><td>Detil Potongan-potongan</td><td>Denda: (Nilai Denda ${printCurrency(row.denda_rate)} × Qty Absen ${row.absence_qty}) = ${printCurrency(row.spa_denda)}<br/>Salon: (${printCurrency(row.salon)} × Qty ${row.salon_usage_qty}) = ${printCurrency(row.salon_deduction)}<br/>Hutang: ${printCurrency(row.lc_denda)}<br/>Lain-Lain: ${printCurrency(row.lain_lain)}</td></tr>
+        <tr><td>Detil Potongan-potongan</td><td>Denda: (Nilai Denda ${printCurrency(row.denda_rate)} × Qty Absen ${row.absence_qty}) = ${printCurrency(row.spa_denda)}<br/>Hutang: ${printCurrency(row.lc_denda)}<br/>Lain-Lain: ${printCurrency(row.lain_lain)}</td></tr>
         <tr><td><strong>Total Pendapatan</strong></td><td><strong>${printCurrency(row.therapist_income)}</strong></td></tr>
         <tr><td>Note</td><td>sudah termasuk potongan room, agent dan safety</td></tr>
       </tbody>
@@ -1160,15 +1111,6 @@ const printSingleAgentSlip = (row) => {
 const printTherapistFinanceReport = (mode = 'all') => {
   const therapistHtml = buildTherapistTableHtml(therapistFinanceRows.value)
   const agentHtml = buildAgentTableHtml(agentFinanceRows.value)
-  const salonHtml = `
-    <div class="section-title">Laporan Pendapatan Salon</div>
-    <table>
-      <thead><tr><th>Terapis</th><th>Qty Pemakaian</th><th>Rate Salon</th><th>Pendapatan Salon</th></tr></thead>
-      <tbody>${salonIncomeRows.value.map((row) => `<tr><td>${row.therapist_name}</td><td class="num">${row.salon_usage_qty}</td><td class="num">${printCurrency(row.salon_rate)}</td><td class="num">${printCurrency(row.salon_income)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="3"><strong>Total Pendapatan Salon</strong></td><td class="num"><strong>${printCurrency(totalSalonIncome.value)}</strong></td></tr></tfoot>
-    </table>
-  `
-
   if (mode === 'therapist') {
     openPrintWindow('Laporan Pendapatan Terapis', 'Laporan enterprise pendapatan terapis', therapistHtml)
     return
@@ -1177,38 +1119,9 @@ const printTherapistFinanceReport = (mode = 'all') => {
     openPrintWindow('Laporan Pendapatan Agent', 'Laporan enterprise pendapatan agent', agentHtml)
     return
   }
-  openPrintWindow('Laporan Pendapatan Terapis, Agent & Salon', 'Laporan enterprise gabungan terapis, agent, dan salon', therapistHtml + agentHtml + salonHtml)
+  openPrintWindow('Laporan Pendapatan Terapis & Agent', 'Laporan enterprise gabungan terapis dan agent', therapistHtml + agentHtml)
 }
 
-const printSalonReport = () => {
-  const body = salonIncomeRows.value.map((row) => `
-    <tr><td>${row.therapist_name}</td><td class="num">${row.salon_usage_qty}</td><td class="num">${printCurrency(row.salon_rate)}</td><td class="num">${printCurrency(row.salon_income)}</td></tr>
-  `).join('')
-  const html = `
-    <div class="section-title">Laporan Pendapatan Salon</div>
-    <table>
-      <thead><tr><th>Terapis</th><th>Qty Pemakaian</th><th>Rate Salon</th><th>Pendapatan Salon</th></tr></thead>
-      <tbody>${body}</tbody>
-      <tfoot><tr><td colspan="3"><strong>Total Pendapatan Salon</strong></td><td class="num"><strong>${printCurrency(totalSalonIncome.value)}</strong></td></tr></tfoot>
-    </table>
-  `
-  openPrintWindow('Laporan Pendapatan Salon', 'Laporan enterprise pendapatan salon', html)
-}
-
-const printSingleSalonSlip = (row) => {
-  const html = `
-    <div class="section-title">Slip Pendapatan Salon <span class="pill">${row.therapist_name}</span></div>
-    <table>
-      <tbody>
-        <tr><td>Nama Terapis</td><td>${row.therapist_name}</td></tr>
-        <tr><td>Qty Pemakaian Salon</td><td>${row.salon_usage_qty}</td></tr>
-        <tr><td>Rate Salon</td><td>${printCurrency(row.salon_rate)}</td></tr>
-        <tr><td><strong>Total Pendapatan Salon</strong></td><td><strong>${printCurrency(row.salon_income)}</strong></td></tr>
-      </tbody>
-    </table>
-  `
-  openPrintWindow('Slip Pendapatan Salon', 'Dokumen slip pendapatan salon', html)
-}
 
 const addExpense = async () => {
   const { value: formValues } = await Swal.fire({
