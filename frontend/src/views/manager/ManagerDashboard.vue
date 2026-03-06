@@ -163,6 +163,7 @@
 
         <section class="card">
           <h4>Master Potongan Global</h4>
+          <small class="muted">SALON dipisah dari SAFETY agar nilai potongan salon bisa diubah kapan saja.</small>
           <div class="deduction-grid">
             <div class="field" v-for="field in financeConfigFields" :key="field.key">
               <label>{{ field.label }}</label>
@@ -954,8 +955,7 @@ const saveFinanceConfig = async () => {
   try {
     await api.post('/dashboard/therapist-finance-config', {
       ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
-      spa_salon: Number(financeConfig.value.safety || 0),
-      lc_salon: Number(financeConfig.value.safety || 0),
+      salon: Number(financeConfig.value.salon || 0),
       spa_room: Number(financeConfig.value.room || 0),
       lc_room: Number(financeConfig.value.room || 0),
       spa_safety: Number(financeConfig.value.safety || 0),
