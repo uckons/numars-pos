@@ -165,6 +165,10 @@
           <h4>Master Potongan Global</h4>
           <small class="muted">SALON dipisah dari SAFETY agar nilai potongan salon bisa diubah kapan saja.</small>
           <div class="deduction-grid">
+            <div class="field">
+              <label>SALON</label>
+              <input type="number" min="0" :value="financeConfig.salon" @input="setFinanceConfigField('salon', $event.target.value)" />
+            </div>
             <div class="field" v-for="field in financeConfigFields" :key="field.key">
               <label>{{ field.label }}</label>
               <input type="number" min="0" :value="financeConfig[field.key]" @input="setFinanceConfigField(field.key, $event.target.value)" />
