@@ -65,10 +65,14 @@ const ensureMembershipTables = async (db) => {
         CREATE TABLE IF NOT EXISTS membership_configs (
           branch_id INT PRIMARY KEY,
           card_prefix VARCHAR(20) NOT NULL DEFAULT 'MBR',
-          next_sequence INT NOT NULL DEFAULT 1,
+          next_sequence BIGINT NOT NULL DEFAULT 77889900001,
           updated_at TIMESTAMP DEFAULT NOW()
         )
       `)
+
+
+      await db.query(`ALTER TABLE membership_configs ALTER COLUMN next_sequence TYPE BIGINT`)
+      await db.query(`ALTER TABLE membership_configs ALTER COLUMN next_sequence SET DEFAULT 77889900001`)
 
       await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
       await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
@@ -121,8 +125,9 @@ const getConfig = async (db, user, query = {}) => {
     [branchId]
   )
   if (!rows.length) {
-    await db.query(`INSERT INTO membership_configs (branch_id) VALUES ($1) ON CONFLICT (branch_id) DO NOTHING`, [branchId])
-    return { branch_id: branchId, card_prefix: 'MBR', next_sequence: 1 }
+    const defaultPrefix = `MBR${branchId}`
+    await db.query(`INSERT INTO membership_configs (branch_id, card_prefix, next_sequence) VALUES ($1,$2,$3) ON CONFLICT (branch_id) DO NOTHING`, [branchId, defaultPrefix, 77889900001])
+    return { branch_id: branchId, card_prefix: defaultPrefix, next_sequence: 77889900001 }
   }
   return rows[0]
 }
@@ -130,8 +135,17 @@ const getConfig = async (db, user, query = {}) => {
 const saveConfig = async (db, user, payload = {}) => {
   await ensureMembershipTables(db)
   const branchId = resolveBranchId(user, payload)
-  const prefix = String(payload.card_prefix || 'MBR').trim().toUpperCase().slice(0, 20) || 'MBR'
-  const nextSeq = Math.max(1, Math.floor(Number(payload.next_sequence || 1)))
+  const fallbackPrefix = `MBR${branchId}`
+  const prefix = String(payload.card_prefix || fallbackPrefix).trim().toUpperCase().slice(0, 20) || fallbackPrefix
+  const nextSeq = Math.max(77889900001, Math.floor(Number(payload.next_sequence || 77889900001)))
+
+  const { rows: prefixConflictRows } = await db.query(
+    `SELECT branch_id FROM membership_configs WHERE UPPER(card_prefix)=UPPER($1) AND branch_id <> $2 LIMIT 1`,
+    [prefix, branchId]
+  )
+  if (prefixConflictRows.length) {
+    throw new Error('Prefix kartu sudah dipakai outlet lain, gunakan prefix berbeda')
+  }
   const { rows } = await db.query(
     `INSERT INTO membership_configs (branch_id, card_prefix, next_sequence)
      VALUES ($1,$2,$3)
@@ -178,11 +192,11 @@ const savePlan = async (db, user, payload = {}) => {
 const generateCardNo = async (db, branchId) => {
   const { rows } = await db.query(`SELECT card_prefix, next_sequence FROM membership_configs WHERE branch_id=$1 LIMIT 1`, [branchId])
   if (!rows.length) {
-    await db.query(`INSERT INTO membership_configs (branch_id) VALUES ($1) ON CONFLICT (branch_id) DO NOTHING`, [branchId])
+    await db.query(`INSERT INTO membership_configs (branch_id, card_prefix, next_sequence) VALUES ($1,$2,$3) ON CONFLICT (branch_id) DO NOTHING`, [branchId, `MBR${branchId}`, 77889900001])
   }
-  const prefix = String(rows[0]?.card_prefix || 'MBR')
-  const seq = Math.max(1, Number(rows[0]?.next_sequence || 1))
-  const cardNo = `${prefix}-${String(seq).padStart(6, '0')}`
+  const prefix = String(rows[0]?.card_prefix || `MBR${branchId}`)
+  const seq = Math.max(77889900001, Number(rows[0]?.next_sequence || 77889900001))
+  const cardNo = `${prefix}${String(seq)}`
   await db.query(`UPDATE membership_configs SET next_sequence = $2, updated_at = NOW() WHERE branch_id = $1`, [branchId, seq + 1])
   return cardNo
 }

@@ -547,10 +547,16 @@ const askPaymentDetails = async () => {
         const reg = await SwalTheme.fire({
           title: 'Daftar Member Baru',
           html: `
-            <input id="member-name" class="swal2-input" placeholder="Nama member" />
-            <input id="member-phone" class="swal2-input" placeholder="No HP" />
-            <select id="member-level" class="swal2-input"><option value="SILVER">SILVER</option><option value="GOLD">GOLD</option><option value="VIP">VIP</option></select>
-            <select id="member-duration" class="swal2-input"><option value="MONTHLY">Bulanan</option><option value="6_MONTHS">6 Bulan</option><option value="YEARLY">Tahunan</option></select>
+            <div style="text-align:left;display:grid;gap:8px;">
+              <label style="font-size:12px;">Nama</label>
+              <input id="member-name" class="swal2-input" placeholder="Nama member" style="margin:0;max-width:100%;" />
+              <label style="font-size:12px;">No HP</label>
+              <input id="member-phone" class="swal2-input" placeholder="No HP" style="margin:0;max-width:100%;" />
+              <label style="font-size:12px;">Type Membership</label>
+              <select id="member-level" class="swal2-input" style="margin:0;max-width:100%;"><option value="SILVER">SILVER</option><option value="GOLD">GOLD</option><option value="VIP">VIP</option></select>
+              <label style="font-size:12px;">Durasi Membership</label>
+              <select id="member-duration" class="swal2-input" style="margin:0;max-width:100%;"><option value="MONTHLY">Bulanan</option><option value="6_MONTHS">6 Bulan</option><option value="YEARLY">Tahunan</option></select>
+            </div>
           `,
           showCancelButton: true,
           confirmButtonText: 'Simpan',

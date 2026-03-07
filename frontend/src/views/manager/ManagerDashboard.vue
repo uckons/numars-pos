@@ -366,7 +366,7 @@ const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
 const absenceQtyMap = ref({})
 
-const membershipConfig = ref({ card_prefix: 'MBR', next_sequence: 1 })
+const membershipConfig = ref({ card_prefix: 'MBR', next_sequence: 77889900001 })
 const membershipPlans = ref([])
 const membershipMembers = ref([])
 const membershipReport = ref({ active_members: [], omzet_member: 0, benefit_usage: 0, member_transactions: 0 })
@@ -402,8 +402,8 @@ const loadMembershipData = async () => {
       api.get('/memberships/reports/summary', { params: { ...params, date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined } })
     ])
     membershipConfig.value = {
-      card_prefix: cfgRes.data?.card_prefix || 'MBR',
-      next_sequence: Number(cfgRes.data?.next_sequence || 1)
+      card_prefix: cfgRes.data?.card_prefix || `MBR${selectedBranch.value !== 'ALL' ? selectedBranch.value : ''}`.replace(/\s+/g,''),
+      next_sequence: Number(cfgRes.data?.next_sequence || 77889900001)
     }
     membershipPlans.value = Array.isArray(planRes.data?.data) ? planRes.data.data : []
     membershipMembers.value = Array.isArray(memberRes.data?.data) ? memberRes.data.data : []
@@ -418,7 +418,7 @@ const saveMembershipConfig = async () => {
     await api.post('/memberships/config', {
       ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
       card_prefix: membershipConfig.value.card_prefix,
-      next_sequence: Number(membershipConfig.value.next_sequence || 1)
+      next_sequence: Number(membershipConfig.value.next_sequence || 77889900001)
     })
     await Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Konfigurasi membership tersimpan' })
   } catch (err) {
@@ -454,10 +454,22 @@ const saveMembershipPlans = async () => {
 const openCreateMemberModal = async () => {
   const { value } = await Swal.fire({
     title: 'Tambah Member',
-    html: '<input id="m-name" class="swal2-input" placeholder="Nama" />' +
-      '<input id="m-phone" class="swal2-input" placeholder="No HP" />' +
-      '<select id="m-level" class="swal2-input"><option value="SILVER">SILVER</option><option value="GOLD">GOLD</option><option value="VIP">VIP</option></select>' +
-      '<select id="m-duration" class="swal2-input"><option value="MONTHLY">Bulanan</option><option value="6_MONTHS">6 Bulan</option><option value="YEARLY">Tahunan</option></select>',
+    html: `
+      <div style="text-align:left;display:grid;gap:8px;">
+        <label style="font-size:12px;">Nama</label>
+        <input id="m-name" class="swal2-input" placeholder="Nama" style="margin:0;max-width:100%;" />
+        <label style="font-size:12px;">No HP</label>
+        <input id="m-phone" class="swal2-input" placeholder="No HP" style="margin:0;max-width:100%;" />
+        <label style="font-size:12px;">Type Membership</label>
+        <select id="m-level" class="swal2-input" style="margin:0;max-width:100%;">
+          <option value="SILVER">SILVER</option><option value="GOLD">GOLD</option><option value="VIP">VIP</option>
+        </select>
+        <label style="font-size:12px;">Durasi Membership</label>
+        <select id="m-duration" class="swal2-input" style="margin:0;max-width:100%;">
+          <option value="MONTHLY">Bulanan</option><option value="6_MONTHS">6 Bulan</option><option value="YEARLY">Tahunan</option>
+        </select>
+      </div>
+    `,
     showCancelButton: true,
     preConfirm: () => ({
       full_name: document.getElementById('m-name').value,
