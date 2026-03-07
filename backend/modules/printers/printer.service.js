@@ -58,6 +58,17 @@ const formatReceiptTime = (value = new Date()) => {
   }
 }
 
+
+const buildReceiptMetaNote = (order = {}) => {
+  const lines = []
+  const guestName = String(order.guest_name || '').trim()
+  const memberNo = String(order.membership_card_no || '').trim()
+  if (guestName) lines.push(`Nama Tamu: ${guestName}`)
+  if (memberNo) lines.push(`No Member: ${memberNo}`)
+  return lines.length ? lines.join('\n') : null
+}
+
+
 const buildReceiptPayload = (order, options = {}) => ({
   profile: THERMAL_PROFILE,
   printer_name: options.printerName || null,
@@ -73,6 +84,9 @@ const buildReceiptPayload = (order, options = {}) => ({
     cashier_name: order.cashier_name || null,
     room_name: order.room_name || null,
     therapist_name: order.therapist_name || null,
+    guest_name: order.guest_name || null,
+    membership_card_no: order.membership_card_no || null,
+    note: buildReceiptMetaNote(order),
     payment_method: order.payment_method || "CASH",
     subtotal: Number(order.subtotal || (Number(order.total || 0) + Number(order.discount_amount || 0))),
     discount_amount: Number(order.discount_amount || 0),
@@ -234,6 +248,12 @@ const printViaUsb = async (order) => {
         .text("------------------------")
         .align("LT")
 
+      const guestName = String(order.guest_name || "").trim()
+      const memberNo = String(order.membership_card_no || "").trim()
+      if (guestName) printer.text(`Nama Tamu: ${guestName}`)
+      if (memberNo) printer.text(`No Member: ${memberNo}`)
+      if (guestName || memberNo) printer.text("------------------------")
+
       ;(order.items || []).forEach((item) => {
         printer.text(`${item.service_name} x${item.qty}`)
         if (item.therapist_name) {
@@ -262,16 +282,33 @@ async function sendReceiptToAgent ({ payload, agentUrl, token }) {
   const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
   const endpoint = `${agentUrl.replace(/\/$/, "")}/print/receipt`
 
+  const runPost = async (body) => axios.post(endpoint, body, {
+    headers,
+    timeout: timeoutMs
+  })
+
   try {
-    await axios.post(endpoint, payload, {
-      headers,
-      timeout: timeoutMs
-    })
+    await runPost(payload)
   } catch (err) {
-    const detail = err.response?.data
+    const detailText = err.response?.data
       ? JSON.stringify(err.response.data)
-      : (err.code || err.message)
-    throw new Error(`Gagal terhubung ke print agent (${endpoint}): ${detail}`)
+      : String(err.code || err.message || '')
+
+    const printerMissing = /cannot\s*find\s*printer|printer\s*not\s*found|no\s*printer/i.test(detailText)
+    const configuredPrinterName = String(payload?.printer_name || '').trim()
+    if (printerMissing && configuredPrinterName) {
+      const retryPayload = { ...payload, printer_name: null }
+      try {
+        await runPost(retryPayload)
+        return { mode: "agent", agent_url: agentUrl, fallback_printer_name: true }
+      } catch (retryErr) {
+        const retryDetail = retryErr.response?.data
+          ? JSON.stringify(retryErr.response.data)
+          : (retryErr.code || retryErr.message)
+        throw new Error(`Gagal terhubung ke print agent (${endpoint}) setelah fallback default printer: ${retryDetail}`)
+      }
+    }
+    throw new Error(`Gagal terhubung ke print agent (${endpoint}): ${detailText}`)
   }
 
   return { mode: "agent", agent_url: agentUrl }
@@ -293,6 +330,11 @@ const buildReceiptPlainText = (order) => {
   const lines = []
   lines.push("NUMARS POS")
   lines.push("------------------------")
+  const guestName = String(order.guest_name || "").trim()
+  const memberNo = String(order.membership_card_no || "").trim()
+  if (guestName) lines.push(`Nama Tamu: ${guestName}`)
+  if (memberNo) lines.push(`No Member: ${memberNo}`)
+  if (guestName || memberNo) lines.push("------------------------")
 
   ;(order.items || []).forEach((item) => {
     lines.push(`${item.service_name} x${item.qty}`)

@@ -103,6 +103,7 @@
             <th>Minuman</th>
             <th>Happy Hour</th>
             <th>Paket</th>
+            <th>Membership Tag</th>
             <th>Status</th>
             <th>Group</th>
             <th width="200">Actions</th>
@@ -110,10 +111,10 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="12" class="empty">Loading...</td>
+            <td colspan="13" class="empty">Loading...</td>
           </tr>
           <tr v-else-if="!paginatedItems.length">
-            <td colspan="12" class="empty">No stock items found</td>
+            <td colspan="13" class="empty">No stock items found</td>
           </tr>
           <tr
             v-for="item in paginatedItems"
@@ -136,6 +137,9 @@
                 {{ item.is_package ? "PAKET" : "NON-PAKET" }}
               </span>
               <span v-if="item.package_special" class="badge success" style="margin-left:6px">PAKET KHUSUS</span>
+            </td>
+            <td>
+              <span class="badge" :class="item.membership_tag ? 'success' : 'danger'">{{ item.membership_tag ? 'YA' : 'TIDAK' }}</span>
             </td>
             <td>
               <div class="happy-hour">
@@ -225,6 +229,10 @@
             <label class="inline-toggle">
               <span>Paket Minuman</span>
               <input v-model="form.is_package" type="checkbox" />
+            </label>
+            <label class="inline-toggle">
+              <span>Tag Membership (diskon member)</span>
+              <input v-model="form.membership_tag" type="checkbox" />
             </label>
             <label class="inline-toggle" v-if="form.is_package">
               <span>Paket Khusus (stok ikut varian)</span>
@@ -519,6 +527,7 @@ const openAdd = () => {
     package_special: false,
     happy_hour_enabled: false,
     happy_hour_price: 0,
+    membership_tag: false,
     stock: 0,
     alert_stock: 0,
     branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : ""),
@@ -545,6 +554,7 @@ const openEdit = (item) => {
     package_special: Boolean(item.package_special),
     happy_hour_enabled: Boolean(item.happy_hour_enabled),
     happy_hour_price: Number(item.happy_hour_price || 0),
+    membership_tag: Boolean(item.membership_tag),
     stock: Number(item.stock || 0),
     alert_stock: Number(item.alert_stock || 0),
     branch_id: String(item.branch_id || ""),
@@ -605,6 +615,7 @@ const submitForm = async () => {
     ktv_default_qty: Number(form.value.ktv_default_qty || 0),
     ktv_group_default_qty: form.value.ktv_group_default_qty || {},
     happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
+    membership_tag: Boolean(form.value.membership_tag),
     happy_hour_price: form.value.happy_hour_enabled
       ? Number(form.value.happy_hour_price || 0)
       : null,
