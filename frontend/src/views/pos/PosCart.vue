@@ -445,6 +445,7 @@ const showReceiptModal = ref(false)
 const showPaymentConfirmModal = ref(false)
 const receiptData = ref(null)
 const receiptLoading = ref(false)
+const PRINT_REQUEST_TIMEOUT_MS = 45000
 const pendingPayment = ref(null)
 const pendingPrinted = ref(false)
 const pendingFinalizedOrderId = ref(null)
@@ -1004,7 +1005,7 @@ const printReceipt = async () => {
       await api.post(`/printers/print-order`, {
         order_id: orderId,
         printer: getPrinterAgentConfig()
-      })
+      }, { timeout: PRINT_REQUEST_TIMEOUT_MS })
     } catch (err) {
       thermalPrinted = false
       console.warn('Thermal print failed, order will still be finalized:', err?.message || err)
@@ -1040,7 +1041,7 @@ const printOrder = async (order_id = lastOrder.value.order_id) => {
     await api.post(`/printers/print-order`, {
       order_id,
       printer: getPrinterAgentConfig()
-    })
+    }, { timeout: PRINT_REQUEST_TIMEOUT_MS })
     await SwalTheme.fire({
       icon: "success",
       title: "Struk dikirim",

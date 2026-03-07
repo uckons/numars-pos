@@ -1030,6 +1030,7 @@ const BULK_REPRINT_HISTORY_KEY = 'kasir:bulk-receipt-history'
 const lastBulkReceiptForReprint = ref(null)
 const bulkReceiptHistory = ref([])
 const printLoading = ref(false)
+const PRINT_REQUEST_TIMEOUT_MS = 45000
 const isCompactReceipt = computed(() => {
   const itemCount = bulkReceipt.value?.items?.length ?? printOrder.value?.items?.length ?? 0
   return itemCount > 0 && itemCount <= 3
@@ -1408,13 +1409,13 @@ const sendToThermalPrinter = async () => {
         order_ids: bulkReceipt.value.order_ids,
         payment_method: bulkReceipt.value.payment_method || 'CASH',
         printer: getPrinterAgentConfig()
-      })
+      }, { timeout: PRINT_REQUEST_TIMEOUT_MS })
     } else {
       for (const orderId of orderIds) {
         await api.post('/printers/print-order', {
           order_id: Number(orderId),
           printer: getPrinterAgentConfig()
-        })
+        }, { timeout: PRINT_REQUEST_TIMEOUT_MS })
       }
     }
 
@@ -1430,13 +1431,13 @@ const sendToThermalPrinter = async () => {
     })
   } catch (err) {
     const errorMessage = err.response?.data?.message || err.message || 'Terjadi kesalahan'
-    const shouldFallbackToBrowserPrint = /PRINT_AGENT_URL|print agent|terhubung|koneksi/i.test(String(errorMessage || ''))
+    const shouldFallbackToBrowserPrint = /PRINT_AGENT_URL|print agent|terhubung|koneksi|ECONNABORTED|ETIMEDOUT|timeout/i.test(String(errorMessage || ''))
 
     if (shouldFallbackToBrowserPrint) {
       await Swal.fire({
         icon: 'warning',
         title: 'Printer thermal tidak tersedia',
-        text: 'Akan dialihkan ke browser print supaya reprint kasir tetap bisa dilakukan.',
+        text: 'Koneksi printer timeout/tidak stabil. Dialihkan ke browser print agar kasir tetap bisa reprint.',
         background: '#111',
         color: '#fff'
       })
