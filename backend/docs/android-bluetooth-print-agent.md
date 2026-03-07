@@ -1,99 +1,77 @@
-# Android Bluetooth Print Agent (Rencana Implementasi)
+# Android Bluetooth Print Agent (Kotlin PoC)
 
-Dokumen ini menjelaskan cara menambah **agent Android + Bluetooth thermal** tanpa mengganggu flow print yang sudah berjalan (Windows/USB/PrintNode).
+Dokumen ini untuk menjalankan PoC Android Bluetooth agent yang kompatibel dengan flow print backend saat ini.
 
-## Tujuan
+## Scope implementasi yang sudah ditambahkan
 
-- Backend tetap memakai alur yang sama: kirim HTTP ke `PRINT_AGENT_URL`.
-- Android bertindak sebagai **agent lokal** yang kompatibel endpoint existing (`/health`, `/print/receipt`).
-- Outlet yang belum pakai Android tidak perlu perubahan konfigurasi.
+- PoC app Android (Kotlin): `backend/agents/android-bluetooth-print-agent`
+- API helper di backend untuk generate payload uji Android:
+  - `POST /api/printers/android-poc-payload`
 
-## Kenapa aman (non-breaking)
+## Kenapa non-breaking
 
-Di backend saat ini, urutan print adalah:
+Flow backend tidak diubah:
 
 1. `mode=printnode` -> PrintNode.
-2. Ada `agent_url`/`PRINT_AGENT_URL` -> kirim ke print agent via HTTP.
-3. Jika tidak ada keduanya -> fallback USB lokal backend.
+2. Jika ada `agent_url` / `PRINT_AGENT_URL` -> kirim ke print agent HTTP.
+3. Jika tidak ada -> fallback USB lokal backend.
 
-Artinya Android agent cukup menggantikan nilai `agent_url` (ke IP Android), tanpa ubah logika core.
+Android agent cukup menjadi target baru dari `PRINT_AGENT_URL`.
 
-## Kontrak endpoint Android agent
+## API helper backend (baru)
 
-Agar plug-and-play dengan backend sekarang, Android agent perlu endpoint berikut:
+Endpoint:
 
-### 1) Health
+`POST /api/printers/android-poc-payload`
 
-`GET /health`
-
-Contoh response:
+Body:
 
 ```json
 {
-  "ok": true,
-  "service": "android-bluetooth-print-agent"
-}
-```
-
-### 2) Print receipt
-
-`POST /print/receipt`
-
-Header opsional:
-
-- `x-print-agent-token: <token>`
-
-Body minimum yang kompatibel:
-
-```json
-{
-  "printer_name": "MTP-II",
-  "profile": {
-    "maxDots": 128,
-    "heatTimeUs": 550,
-    "heatIntervalUs": 20,
-    "codePage": 0
-  },
-  "receipt": {
-    "title": "NUMARS POS",
-    "divider": "------------------------",
-    "items": [
-      {
-        "service_name": "Massage 60m",
-        "qty": 1,
-        "subtotal": 120000,
-        "therapist_name": "Sari"
-      }
-    ],
-    "total": 120000,
-    "printed_at": "07/03/2026 11:20:00"
+  "order_id": 123,
+  "printer": {
+    "agent_printer_name": "MTP-II"
   }
 }
 ```
 
-Contoh response sukses:
+Response:
 
 ```json
 {
-  "success": true
+  "ok": true,
+  "payload": {
+    "profile": { "maxDots": 128, "heatTimeUs": 550, "heatIntervalUs": 20, "codePage": 0 },
+    "printer_name": "MTP-II",
+    "receipt": { "title": "NUMARS POS", "items": [], "total": 0 }
+  },
+  "hint": "Gunakan payload ini untuk menguji endpoint POST /print/receipt di Android Bluetooth agent."
 }
 ```
 
-## Arsitektur Android yang disarankan
+## Kontrak endpoint Android agent
 
-- **Foreground service** (stabil, tidak gampang dimatikan OS).
-- HTTP server lokal di Android (port default `19000`).
-- Transport ke printer:
-  - Bluetooth Classic / SPP (`00001101-0000-1000-8000-00805F9B34FB`).
-  - Kirim byte ESC/POS (raw) sesuai payload receipt.
-- Simpan konfigurasi lokal:
-  - token,
-  - MAC address printer Bluetooth,
-  - optional printer alias (`printer_name`).
+Aplikasi PoC Android membuka endpoint lokal:
 
-## Konfigurasi backend (tetap sama)
+- `GET /health`
+- `POST /print/receipt`
 
-Set di VPS / backend:
+Header auth opsional:
+
+- `x-print-agent-token`
+
+Body yang diterima kompatibel dengan payload dari backend (`profile`, `printer_name`, `receipt`).
+
+## Cara jalan cepat
+
+1. Buka project Android: `backend/agents/android-bluetooth-print-agent`
+2. Run ke device Android.
+3. Isi config:
+   - token,
+   - MAC printer Bluetooth,
+   - port (default `19000`).
+4. Start Agent dari app.
+5. Set backend:
 
 ```bash
 PRINT_AGENT_URL=http://IP-ANDROID:19000
@@ -101,29 +79,8 @@ PRINT_AGENT_TOKEN=secret123
 PRINT_AGENT_TIMEOUT_MS=45000
 ```
 
-Atau override per request:
-
-```json
-{
-  "order_id": 123,
-  "printer": {
-    "agent_url": "http://192.168.1.77:19000",
-    "agent_token": "secret123"
-  }
-}
-```
-
 ## Keamanan minimum
 
-- Gunakan jaringan private (VPN / LAN private), jangan expose publik.
-- Selalu aktifkan token auth (`PRINT_AGENT_TOKEN`).
-- Batasi siapa yang bisa akses endpoint agent (allowlist IP jika memungkinkan).
-
-## Rollout bertahap (disarankan)
-
-1. Pilot 1 outlet dengan Android agent.
-2. Aktifkan lewat `agent_url` per outlet/per request.
-3. Monitor timeout/error print.
-4. Jika stabil, baru rollout massal.
-
-Dengan pola ini, flow existing tetap aman karena outlet lain tetap menggunakan jalur lama (Windows agent atau PrintNode).
+- Jalankan di private network (VPN/LAN private).
+- Jangan expose port agent ke internet publik.
+- Selalu aktifkan token.

@@ -103,6 +103,8 @@ const buildReceiptPayload = (order, options = {}) => ({
   }
 })
 
+exports.buildOrderReceiptPayload = ({ order, printerName = null }) => buildReceiptPayload(order, { printerName })
+
 const buildBulkPaymentPayload = (bulk, options = {}) => ({
   profile: THERMAL_PROFILE,
   printer_name: options.printerName || null,
