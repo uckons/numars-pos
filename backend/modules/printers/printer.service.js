@@ -73,6 +73,8 @@ const buildReceiptPayload = (order, options = {}) => ({
     cashier_name: order.cashier_name || null,
     room_name: order.room_name || null,
     therapist_name: order.therapist_name || null,
+    guest_name: order.guest_name || null,
+    membership_card_no: order.membership_card_no || null,
     payment_method: order.payment_method || "CASH",
     subtotal: Number(order.subtotal || (Number(order.total || 0) + Number(order.discount_amount || 0))),
     discount_amount: Number(order.discount_amount || 0),

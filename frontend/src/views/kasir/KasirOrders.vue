@@ -355,6 +355,7 @@
           <!-- Header -->
           <div class="receipt-header">
             <h2>{{ printOrder?.branch_name || 'NUMARS SPA' }}</h2>
+            <p class="receipt-subtitle">Enterprise Receipt</p>
             <p>{{ printOrder?.branch_address }}</p>
             <p>Tel: {{ printOrder?.branch_phone }}</p>
           </div>
@@ -382,6 +383,14 @@
             <div class="info-row">
               <span>Room:</span>
               <span>{{ printOrder?.room_name || '-' }}</span>
+            </div>
+            <div class="info-row" v-if="printOrder?.guest_name">
+              <span>Nama Tamu:</span>
+              <span>{{ printOrder?.guest_name }}</span>
+            </div>
+            <div class="info-row" v-if="printOrder?.membership_card_no">
+              <span>No Member:</span>
+              <span>{{ printOrder?.membership_card_no }}</span>
             </div>
           </div>
 
@@ -1290,6 +1299,7 @@ const receiptPrintStyles = `
     text-transform: uppercase;
   }
   .receipt-header p { font-size: 10px; margin: 2px 0; }
+  .receipt-subtitle { font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
   .receipt-divider { text-align: center; margin: 8px 0; font-size: 9px; color: #333; }
   .receipt-info, .receipt-items, .receipt-total { margin: 10px 0; }
   .info-row, .total-row {

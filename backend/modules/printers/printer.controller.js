@@ -29,6 +29,8 @@ exports.printOrder = async (req, res) => {
         o.payment_amount,
         o.change_amount,
         o.created_at,
+        o.guest_name,
+        o.membership_card_no,
         b.name AS branch_name,
         b.address AS branch_address,
         b.phone AS branch_phone,

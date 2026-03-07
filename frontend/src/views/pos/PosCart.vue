@@ -100,6 +100,7 @@
           <div class="receipt-header" v-if="receiptData?.branch_name || receiptData?.branch_address || receiptData?.branch_phone || receiptData?.branch_logo_url">
             <img v-if="receiptData?.branch_logo_url" :src="receiptData.branch_logo_url" alt="logo outlet" class="receipt-logo" />
             <h2 v-if="receiptData?.branch_name">{{ receiptData?.branch_name }}</h2>
+            <p class="receipt-subtitle">Enterprise Receipt</p>
             <p v-if="receiptData?.branch_address">{{ receiptData?.branch_address }}</p>
             <p v-if="receiptData?.branch_phone">Tel: {{ receiptData?.branch_phone }}</p>
           </div>
@@ -131,6 +132,10 @@
             <div class="info-row" v-if="receiptData?.guest_name">
               <span>Nama Tamu:</span>
               <span>{{ receiptData?.guest_name }}</span>
+            </div>
+            <div class="info-row" v-if="receiptData?.membership_card_no">
+              <span>No Member:</span>
+              <span>{{ receiptData?.membership_card_no }}</span>
             </div>
           </div>
 
@@ -1506,6 +1511,14 @@ const saveDraft = async () => {
   font-size: 11px;
   margin: 2px 0;
   color: #333;
+}
+
+.receipt-subtitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: #8f8f8f;
 }
 
 /* Receipt Divider */
