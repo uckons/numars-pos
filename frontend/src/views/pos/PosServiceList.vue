@@ -87,7 +87,8 @@ const categories = [
   "LC",
   "FNB",
   "LOUNGE",
-  "KARAOKE"
+  "KARAOKE",
+  "MEMBERSHIP"
 ]
 
 const loadServices = async () => {
