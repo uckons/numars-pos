@@ -746,7 +746,7 @@ const therapistFinanceRows = computed(() => {
     const lcDenda = Number(penalty.lc_denda || 0)
 
     const room = Number(financeConfig.value.room || 0)
-    const salon = Number(financeConfig.value.salon || 0)
+    const salon = Number(financeConfig.value.safety || 0)
     const safety = Number(financeConfig.value.safety || 0)
     const lainLain = Number(financeConfig.value.lain_lain || 0)
 
