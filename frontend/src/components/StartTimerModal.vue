@@ -74,6 +74,11 @@
     </div>
 
     <div class="field" v-if="serviceType">
+      <label>Nama Tamu</label>
+      <input type="text" v-model.trim="guestName" placeholder="Opsional" />
+    </div>
+
+    <div class="field" v-if="serviceType">
       <label>{{ roomLabel }}</label>
       <select v-model="selectedRoomId" :disabled="loadingRooms">
         <option value="">-- Pilih --</option>
@@ -195,6 +200,7 @@ const loadingTherapists = ref(false)
 const loadingRooms = ref(false)
 const loadingKtvFnb = ref(false)
 const isSubmitting = ref(false)
+const guestName = ref('')
 const errorMessage = ref("")
 
 const serviceQtyOptions = [1, 2, 3, 4, 5, 6]
@@ -700,7 +706,8 @@ const emitStartTimer = (therapistIdsPayload, karaokeFnbPayload = []) => {
     room_id: parseInt(selectedRoomId.value),
     duration_minutes: effectiveDuration.value,
     order_type: selectedOrderType.value,
-    karaoke_fnb_items: karaokeFnbPayload
+    karaoke_fnb_items: karaokeFnbPayload,
+    guest_name: String(guestName.value || '').trim() || null
   })
 
   setTimeout(() => {
