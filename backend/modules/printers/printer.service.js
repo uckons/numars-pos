@@ -65,7 +65,7 @@ const buildReceiptMetaNote = (order = {}) => {
   const memberNo = String(order.membership_card_no || '').trim()
   if (guestName) lines.push(`Nama Tamu: ${guestName}`)
   if (memberNo) lines.push(`No Member: ${memberNo}`)
-  return lines.length ? lines.join(' | ') : null
+  return lines.length ? lines.join('\n') : null
 }
 
 
