@@ -115,7 +115,7 @@
       Reprint Copy Kasir
     </button>
     <button
-      v-if="bulkReceiptHistory.length > 1"
+      v-if="bulkReceiptHistory.length > 0"
       class="btn-bulk-reprint"
       :disabled="loading || printLoading"
       @click="openBulkReprintHistory"
@@ -738,7 +738,7 @@ const toggleOrderSelection = (orderId, checked) => {
   selectedOrderIds.value = selectedOrderIds.value.filter((selectedId) => selectedId !== id)
 }
 
-const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount, paymentMethod = 'CASH') => {
+const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount, paymentMethod = 'CASH', bulkPaymentId = null) => {
   if (!paidOrderIds.length) return
 
   const decision = await Swal.fire({
@@ -754,6 +754,8 @@ const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount, paymentMethod
   })
 
   if (!decision.isConfirmed) return
+
+  if (bulkPaymentId && await openBulkReceiptByHistoryId(bulkPaymentId)) return
 
   await openBulkReceipt(paidOrderIds, totalAmount, paymentMethod)
 }
@@ -833,7 +835,8 @@ const paySelectedOrders = async () => {
 
     selectedOrderIds.value = []
     await loadOrders()
-    await askPrintAfterBulkPayment(paidOrderIds, Number(data?.total || 0), String(data?.payment_method || 'CASH'))
+    await loadBulkPaymentHistory()
+    await askPrintAfterBulkPayment(paidOrderIds, Number(data?.total || 0), String(data?.payment_method || 'CASH'), Number(data?.bulk_payment_id || 0))
   } catch (err) {
     await Swal.fire({
       icon: 'error',
@@ -1023,6 +1026,80 @@ const isCompactReceipt = computed(() => {
   return itemCount > 0 && itemCount <= 3
 })
 
+
+const normalizeBulkReceiptRow = (row = {}) => ({
+  id: Number(row.id || row.bulk_payment_id || 0),
+  branch_name: row.branch_name || 'NUMARS SPA',
+  branch_address: row.branch_address || '-',
+  branch_phone: row.branch_phone || '-',
+  cashier_name: row.cashier_name || '-',
+  order_ids: Array.isArray(row.order_ids) ? row.order_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0) : [],
+  paid_at: row.paid_at || new Date().toISOString(),
+  items: Array.isArray(row.items) ? row.items : [],
+  total: Number(row.total || 0),
+  payment_amount: Number(row.payment_amount || row.total || 0),
+  change_amount: Number(row.change_amount || 0),
+  payment_method: String(row.payment_method || 'CASH').toUpperCase()
+})
+
+const loadBulkPaymentHistory = async () => {
+  try {
+    const { data } = await api.get('/orders/bulk-payments/history', { params: { limit: 50 } })
+    const rows = Array.isArray(data?.data) ? data.data : []
+    const mapped = rows
+      .map((row) => normalizeBulkReceiptRow(row))
+      .filter((row) => row.order_ids.length)
+
+    bulkReceiptHistory.value = mapped
+    if (mapped.length) {
+      lastBulkReceiptForReprint.value = mapped[0]
+      localStorage.setItem(BULK_REPRINT_STORAGE_KEY, JSON.stringify(mapped[0]))
+    }
+    localStorage.setItem(BULK_REPRINT_HISTORY_KEY, JSON.stringify(mapped))
+  } catch (err) {
+    console.warn('Failed to load bulk payment history from API:', err?.message || err)
+  }
+}
+
+const openBulkReceiptByHistoryId = async (bulkPaymentId) => {
+  const id = Number(bulkPaymentId)
+  if (!Number.isInteger(id) || id <= 0) return false
+
+  try {
+    printLoading.value = true
+    const { data } = await api.get(`/orders/bulk-payments/${id}`)
+    const normalized = normalizeBulkReceiptRow(data)
+    if (!normalized.order_ids.length) return false
+
+    bulkReceipt.value = normalized
+    printOrder.value = null
+    showPrintModal.value = true
+
+    lastBulkReceiptForReprint.value = normalized
+
+    const nextHistory = [normalized, ...(Array.isArray(bulkReceiptHistory.value) ? bulkReceiptHistory.value : [])]
+      .filter((row, idx, arr) => idx === arr.findIndex((x) => Number(x?.id || 0) === Number(row?.id || 0)))
+      .slice(0, 50)
+
+    bulkReceiptHistory.value = nextHistory
+    localStorage.setItem(BULK_REPRINT_STORAGE_KEY, JSON.stringify(normalized))
+    localStorage.setItem(BULK_REPRINT_HISTORY_KEY, JSON.stringify(nextHistory))
+    return true
+  } catch (err) {
+    console.error('Failed to load bulk receipt by history id:', err)
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal memuat struk gabungan',
+      text: err.response?.data?.message || 'Terjadi kesalahan',
+      background: '#111',
+      color: '#fff'
+    })
+    return false
+  } finally {
+    printLoading.value = false
+  }
+}
+
 const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') => {
   const ids = Array.isArray(orderIds)
     ? orderIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
@@ -1086,6 +1163,7 @@ const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') =>
 
 
 const openBulkReprintHistory = async () => {
+  await loadBulkPaymentHistory()
   const list = Array.isArray(bulkReceiptHistory.value) ? bulkReceiptHistory.value : []
   if (!list.length) {
     await Swal.fire({ icon: 'info', title: 'Riwayat kosong', text: 'Belum ada riwayat print bayar gabungan.', background: '#111', color: '#fff' })
@@ -1113,6 +1191,9 @@ const openBulkReprintHistory = async () => {
   const idx = Number(picked.value || 0)
   const receipt = list[idx]
   if (!receipt) return
+
+  if (receipt.id && await openBulkReceiptByHistoryId(receipt.id)) return
+
   bulkReceipt.value = receipt
   printOrder.value = null
   showPrintModal.value = true
@@ -1412,6 +1493,7 @@ onMounted(() => {
   loadOrders()
   loadTherapists()
   loadRooms()
+  loadBulkPaymentHistory().catch(() => {})
 
   poller = setInterval(() => {
     loadOrders()

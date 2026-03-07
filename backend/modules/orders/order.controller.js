@@ -1171,6 +1171,108 @@ exports.createFromPos = async (req, res) => {
   }
 }
 
+
+exports.listBulkPaymentHistory = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBulkPaymentReceiptsTable(db)
+    const limit = Math.min(100, Math.max(1, Number(req.query?.limit || 30)))
+
+    const { rows } = await db.query(
+      `SELECT id, branch_id, cashier_name, payment_method, total, order_ids, paid_at
+       FROM bulk_payment_receipts
+       WHERE branch_id = $1
+       ORDER BY paid_at DESC, id DESC
+       LIMIT $2`,
+      [req.user.branch_id, limit]
+    )
+
+    res.json({
+      data: rows.map((row) => ({
+        id: Number(row.id),
+        branch_id: Number(row.branch_id),
+        cashier_name: row.cashier_name || '-',
+        payment_method: row.payment_method || 'CASH',
+        total: Number(row.total || 0),
+        order_ids: Array.isArray(row.order_ids) ? row.order_ids.map((id) => Number(id)) : [],
+        paid_at: row.paid_at
+      }))
+    })
+  } catch (err) {
+    console.error("LIST BULK HISTORY ERROR:", err)
+    res.status(500).json({ message: err.message || "Gagal memuat riwayat bayar gabungan" })
+  }
+}
+
+exports.getBulkPaymentReceipt = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBulkPaymentReceiptsTable(db)
+    const bulkId = Number(req.params?.bulkId)
+    if (!Number.isInteger(bulkId) || bulkId <= 0) {
+      return res.status(400).json({ message: "bulkId tidak valid" })
+    }
+
+    const receiptRes = await db.query(
+      `SELECT id, branch_id, cashier_name, payment_method, total, order_ids, paid_at
+       FROM bulk_payment_receipts
+       WHERE id = $1 AND branch_id = $2
+       LIMIT 1`,
+      [bulkId, req.user.branch_id]
+    )
+
+    if (!receiptRes.rows.length) {
+      return res.status(404).json({ message: "Riwayat bayar gabungan tidak ditemukan" })
+    }
+
+    const receipt = receiptRes.rows[0]
+    const orderIds = Array.isArray(receipt.order_ids) ? receipt.order_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0) : []
+
+    const orderMetaRes = await db.query(
+      `SELECT b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone
+       FROM orders o
+       LEFT JOIN branches b ON b.id = o.branch_id
+       WHERE o.id = ANY($1::int[])
+       LIMIT 1`,
+      [orderIds]
+    )
+
+    const itemsRes = await db.query(
+      `SELECT oi.order_id, oi.service_id, oi.service_name, oi.qty, oi.subtotal, oi.therapist_name
+       FROM order_items oi
+       WHERE oi.order_id = ANY($1::int[])
+       ORDER BY oi.order_id, oi.id`,
+      [orderIds]
+    )
+
+    res.json({
+      id: Number(receipt.id),
+      branch_name: orderMetaRes.rows[0]?.branch_name || 'NUMARS SPA',
+      branch_address: orderMetaRes.rows[0]?.branch_address || '-',
+      branch_phone: orderMetaRes.rows[0]?.branch_phone || '-',
+      cashier_name: receipt.cashier_name || '-',
+      order_ids: orderIds,
+      paid_at: receipt.paid_at,
+      payment_method: receipt.payment_method || 'CASH',
+      total: Number(receipt.total || 0),
+      payment_amount: Number(receipt.total || 0),
+      change_amount: 0,
+      items: itemsRes.rows.map((item, idx) => ({
+        _key: `${item.order_id}-${item.service_id || idx}`,
+        order_id: Number(item.order_id),
+        service_id: Number(item.service_id || 0),
+        service_name: item.service_name,
+        qty: Number(item.qty || 0),
+        subtotal: Number(item.subtotal || 0),
+        therapist_name: item.therapist_name || null
+      }))
+    })
+  } catch (err) {
+    console.error("GET BULK RECEIPT ERROR:", err)
+    res.status(500).json({ message: err.message || "Gagal memuat struk gabungan" })
+  }
+}
+
 exports.payBulk = async (req, res) => {
   const db = req.app.get("db")
   const orderIds = Array.isArray(req.body?.order_ids)
@@ -1185,6 +1287,7 @@ exports.payBulk = async (req, res) => {
   const client = await db.connect()
   try {
     await client.query("BEGIN")
+    await ensureBulkPaymentReceiptsTable(client)
 
     const { rows } = await client.query(
       `SELECT id, status, total, branch_id
@@ -1251,9 +1354,24 @@ exports.payBulk = async (req, res) => {
       })
     }
 
+    const bulkReceiptRes = await client.query(
+      `INSERT INTO bulk_payment_receipts (branch_id, cashier_id, cashier_name, payment_method, total, order_ids, paid_at)
+       VALUES ($1,$2,$3,$4,$5,$6::int[], NOW())
+       RETURNING id`,
+      [
+        req.user.branch_id,
+        req.user?.id || null,
+        req.user?.name || '-',
+        paymentMethod,
+        grandTotal,
+        orderIds
+      ]
+    )
+
     await client.query("COMMIT")
     res.json({
       success: true,
+      bulk_payment_id: Number(bulkReceiptRes.rows[0]?.id || 0),
       paid_order_ids: orderIds,
       paid_count: orderIds.length,
       payment_method: paymentMethod,
