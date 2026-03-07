@@ -1,4 +1,5 @@
 const printerService = require("./printer.service")
+const printerTargetService = require("./printer-target.service")
 
 
 const ensureOrderPaymentColumns = async (db) => {
@@ -28,6 +29,8 @@ exports.printOrder = async (req, res) => {
         o.payment_amount,
         o.change_amount,
         o.created_at,
+        o.guest_name,
+        o.membership_card_no,
         b.name AS branch_name,
         b.address AS branch_address,
         b.phone AS branch_phone,
@@ -73,8 +76,23 @@ exports.printOrder = async (req, res) => {
     order.change_amount = Number(order.change_amount || 0)
     order.subtotal = Math.max(0, Number(order.total || 0) + Number(order.discount_amount || 0))
 
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: req.user?.branch_id,
+      channel: printerTargetService.CHANNELS.POS_RECEIPT
+    })
+
+    const effectivePrinter = target
+      ? {
+          ...(printer || {}),
+          agent_url: target.agent_url,
+          agent_token: target.agent_token || (printer || {}).agent_token,
+          agent_printer_name: target.agent_printer_name || (printer || {}).agent_printer_name
+        }
+      : (printer || {})
+
     // 🔹 PRINT
-    await printerService.printOrder({ order, printer })
+    await printerService.printOrder({ order, printer: effectivePrinter })
 
     res.json({ success: true })
   } catch (err) {
@@ -219,6 +237,21 @@ exports.printBulk = async (req, res) => {
     const discountAmount = ordersRes.rows.reduce((sum, row) => sum + Number(row.discount_amount || 0), 0)
     const paymentAmount = Number(total)
 
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: req.user?.branch_id,
+      channel: printerTargetService.CHANNELS.POS_RECEIPT
+    })
+
+    const effectivePrinter = target
+      ? {
+          ...(printer || {}),
+          agent_url: target.agent_url,
+          agent_token: target.agent_token || (printer || {}).agent_token,
+          agent_printer_name: target.agent_printer_name || (printer || {}).agent_printer_name
+        }
+      : (printer || {})
+
     await printerService.printBulkPayment({
       bulk: {
         branch_name: firstOrder?.branch_name || null,
@@ -236,7 +269,7 @@ exports.printBulk = async (req, res) => {
         total,
         items
       },
-      printer: printer || {}
+      printer: effectivePrinter
     })
 
     res.json({ success: true })
@@ -251,13 +284,29 @@ exports.printBulk = async (req, res) => {
 
 exports.printRecap = async (req, res) => {
   try {
+    const db = req.app.get("db")
     const { report, printer } = req.body || {}
 
     if (!report || !Array.isArray(report.service_details)) {
       return res.status(400).json({ message: "report.service_details required" })
     }
 
-    await printerService.printRecap({ report, printer: printer || {} })
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: req.user?.branch_id,
+      channel: printerTargetService.CHANNELS.POS_RECAP
+    })
+
+    const effectivePrinter = target
+      ? {
+          ...(printer || {}),
+          agent_url: target.agent_url,
+          agent_token: target.agent_token || (printer || {}).agent_token,
+          agent_printer_name: target.agent_printer_name || (printer || {}).agent_printer_name
+        }
+      : (printer || {})
+
+    await printerService.printRecap({ report, printer: effectivePrinter })
 
     res.json({ success: true })
   } catch (err) {
