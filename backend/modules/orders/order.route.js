@@ -177,6 +177,31 @@ router.post(
   controller.markKasirBarMessageRead
 )
 
+
+router.get(
+  "/bulk-payments/history",
+  auth,
+  (req, res, next) => {
+    if (req.user.role !== "Kasir") {
+      return res.status(403).json({ message: "Only cashier can access bulk payment history" })
+    }
+    next()
+  },
+  controller.listBulkPaymentHistory
+)
+
+router.get(
+  "/bulk-payments/:bulkId",
+  auth,
+  (req, res, next) => {
+    if (req.user.role !== "Kasir") {
+      return res.status(403).json({ message: "Only cashier can access bulk payment history" })
+    }
+    next()
+  },
+  controller.getBulkPaymentReceipt
+)
+
 // CREATE EMPTY ORDER (kasir buka order)
 router.post("/", auth, controller.create)
 

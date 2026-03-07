@@ -5,6 +5,7 @@ const dashboardService = require("../dashboard/dashboard.service")
 const printerService = require("../printers/printer.service")
 const printerTargetService = require("../printers/printer-target.service")
 const journalPostingService = require("../accounting/journal-posting.service")
+const membershipService = require('../memberships/membership.service')
 
 const parseOrderId = (rawId) => {
   const orderId = Number(rawId)
@@ -25,6 +26,28 @@ const normalizeDiscountAmount = (subtotal, rawDiscount) => {
 
   return Math.max(0, Math.min(safeSubtotal, requestedDiscount))
 }
+
+
+const computeCheckoutMembershipDiscount = async (db, branchId, membershipCardNo, items = []) => {
+  const cardNo = String(membershipCardNo || '').trim()
+  if (!cardNo) {
+    return { membershipMemberId: null, membershipCardNo: null, membershipDiscountAmount: 0 }
+  }
+
+  const calc = await membershipService.computeMembershipDiscount(db, {
+    branch_id: branchId,
+    card_no: cardNo,
+    items,
+    as_of: new Date().toISOString()
+  })
+
+  return {
+    membershipMemberId: Number(calc?.member?.id || 0) || null,
+    membershipCardNo: String(calc?.member?.card_no || cardNo),
+    membershipDiscountAmount: Math.max(0, Math.round(Number(calc?.discount_amount || 0)))
+  }
+}
+
 
 const VOID_UNDO_WINDOW_MINUTES = 10
 
@@ -90,6 +113,9 @@ const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
 }
 
 const ensureOrderItemColumns = async (db) => {
@@ -481,7 +507,7 @@ exports.close = async (req, res) => {
     const orderId = parseOrderId(req.params.id)
     await ensureOrderItemColumns(db)
     await ensureOrderPaymentColumns(db)
-    const { items, payment_method, discount_amount, payment_amount } = req.body
+    const { items, payment_method, discount_amount, payment_amount, membership_card_no } = req.body
     const orderStatusRes = await db.query(
       "SELECT status FROM orders WHERE id = $1",
       [orderId]
@@ -566,7 +592,9 @@ exports.close = async (req, res) => {
       [orderId]
     )
     const subtotal = Math.round(Number(totalResult.rows[0].total || 0))
-    const discountAmount = normalizeDiscountAmount(subtotal, discount_amount)
+    const membershipCalc = await computeCheckoutMembershipDiscount(db, Number(req.user.branch_id), membership_card_no, items)
+    const manualDiscount = normalizeDiscountAmount(subtotal, discount_amount)
+    const discountAmount = Math.min(subtotal, manualDiscount + membershipCalc.membershipDiscountAmount)
     const total = Math.max(0, subtotal - discountAmount)
     const paymentMethod = String(payment_method || 'CASH').toUpperCase()
 
@@ -597,10 +625,13 @@ exports.close = async (req, res) => {
            total_amount = $3,
            discount_amount = $4,
            payment_amount = $5,
-           change_amount = $6
+           change_amount = $6,
+           membership_member_id = $7,
+           membership_card_no = $8,
+           membership_discount_amount = $9
        WHERE id = $1
        RETURNING *`,
-      [orderId, paymentMethod, total, discountAmount, paymentAmount, changeAmount]
+      [orderId, paymentMethod, total, discountAmount, paymentAmount, changeAmount, membershipCalc.membershipMemberId, membershipCalc.membershipCardNo, membershipCalc.membershipDiscountAmount]
     )
 
     if (!result.rows.length) {
@@ -654,6 +685,8 @@ exports.close = async (req, res) => {
       total: result.rows[0].total,
       payment_amount: paymentAmount,
       change_amount: changeAmount,
+      membership_discount_amount: membershipCalc.membershipDiscountAmount,
+      membership_card_no: membershipCalc.membershipCardNo,
       status: result.rows[0].status
     })
   } catch (err) {
@@ -979,7 +1012,7 @@ exports.createFromPos = async (req, res) => {
     await ensureOrderItemColumns(db)
     await ensureOrderPaymentColumns(db)
     await dashboardService.ensureOutletCanReceiveOrder(user)
-    const { items, payment_method, discount_amount, payment_amount } = req.body
+    const { items, payment_method, discount_amount, payment_amount, membership_card_no } = req.body
 
     // 1️⃣ ambil branch
     const userRes = await db.query(
@@ -1066,7 +1099,9 @@ exports.createFromPos = async (req, res) => {
     }
 
     const subtotal = Math.round(Number(total || 0))
-    const discountAmount = normalizeDiscountAmount(subtotal, discount_amount)
+    const membershipCalc = await computeCheckoutMembershipDiscount(db, branchId, membership_card_no, items)
+    const manualDiscount = normalizeDiscountAmount(subtotal, discount_amount)
+    const discountAmount = Math.min(subtotal, manualDiscount + membershipCalc.membershipDiscountAmount)
     const finalTotal = Math.max(0, subtotal - discountAmount)
     const paymentMethod = String(payment_method || "CASH").toUpperCase()
 
@@ -1085,8 +1120,8 @@ exports.createFromPos = async (req, res) => {
 
     // 5️⃣ update total
     await db.query(
-     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6 WHERE id=$3",
-      [finalTotal, paymentMethod, orderId, discountAmount, paymentAmount, changeAmount]
+     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6, membership_member_id=$7, membership_card_no=$8, membership_discount_amount=$9 WHERE id=$3",
+      [finalTotal, paymentMethod, orderId, discountAmount, paymentAmount, changeAmount, membershipCalc.membershipMemberId, membershipCalc.membershipCardNo, membershipCalc.membershipDiscountAmount]
     )
     const fnbItemsRes = await db.query(
       [
@@ -1126,11 +1161,115 @@ exports.createFromPos = async (req, res) => {
       total: finalTotal,
       payment_amount: paymentAmount,
       change_amount: changeAmount,
+      membership_discount_amount: membershipCalc.membershipDiscountAmount,
+      membership_card_no: membershipCalc.membershipCardNo,
       status: "PAID"
     })
   } catch (err) {
     console.error("CREATE POS ORDER ERROR:", err)
     res.status(500).json({ message: err.message })
+  }
+}
+
+
+exports.listBulkPaymentHistory = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBulkPaymentReceiptsTable(db)
+    const limit = Math.min(100, Math.max(1, Number(req.query?.limit || 30)))
+
+    const { rows } = await db.query(
+      `SELECT id, branch_id, cashier_name, payment_method, total, order_ids, paid_at
+       FROM bulk_payment_receipts
+       WHERE branch_id = $1
+       ORDER BY paid_at DESC, id DESC
+       LIMIT $2`,
+      [req.user.branch_id, limit]
+    )
+
+    res.json({
+      data: rows.map((row) => ({
+        id: Number(row.id),
+        branch_id: Number(row.branch_id),
+        cashier_name: row.cashier_name || '-',
+        payment_method: row.payment_method || 'CASH',
+        total: Number(row.total || 0),
+        order_ids: Array.isArray(row.order_ids) ? row.order_ids.map((id) => Number(id)) : [],
+        paid_at: row.paid_at
+      }))
+    })
+  } catch (err) {
+    console.error("LIST BULK HISTORY ERROR:", err)
+    res.status(500).json({ message: err.message || "Gagal memuat riwayat bayar gabungan" })
+  }
+}
+
+exports.getBulkPaymentReceipt = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBulkPaymentReceiptsTable(db)
+    const bulkId = Number(req.params?.bulkId)
+    if (!Number.isInteger(bulkId) || bulkId <= 0) {
+      return res.status(400).json({ message: "bulkId tidak valid" })
+    }
+
+    const receiptRes = await db.query(
+      `SELECT id, branch_id, cashier_name, payment_method, total, order_ids, paid_at
+       FROM bulk_payment_receipts
+       WHERE id = $1 AND branch_id = $2
+       LIMIT 1`,
+      [bulkId, req.user.branch_id]
+    )
+
+    if (!receiptRes.rows.length) {
+      return res.status(404).json({ message: "Riwayat bayar gabungan tidak ditemukan" })
+    }
+
+    const receipt = receiptRes.rows[0]
+    const orderIds = Array.isArray(receipt.order_ids) ? receipt.order_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0) : []
+
+    const orderMetaRes = await db.query(
+      `SELECT b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone
+       FROM orders o
+       LEFT JOIN branches b ON b.id = o.branch_id
+       WHERE o.id = ANY($1::int[])
+       LIMIT 1`,
+      [orderIds]
+    )
+
+    const itemsRes = await db.query(
+      `SELECT oi.order_id, oi.service_id, oi.service_name, oi.qty, oi.subtotal, oi.therapist_name
+       FROM order_items oi
+       WHERE oi.order_id = ANY($1::int[])
+       ORDER BY oi.order_id, oi.id`,
+      [orderIds]
+    )
+
+    res.json({
+      id: Number(receipt.id),
+      branch_name: orderMetaRes.rows[0]?.branch_name || 'NUMARS SPA',
+      branch_address: orderMetaRes.rows[0]?.branch_address || '-',
+      branch_phone: orderMetaRes.rows[0]?.branch_phone || '-',
+      cashier_name: receipt.cashier_name || '-',
+      order_ids: orderIds,
+      paid_at: receipt.paid_at,
+      payment_method: receipt.payment_method || 'CASH',
+      total: Number(receipt.total || 0),
+      payment_amount: Number(receipt.total || 0),
+      change_amount: 0,
+      items: itemsRes.rows.map((item, idx) => ({
+        _key: `${item.order_id}-${item.service_id || idx}`,
+        order_id: Number(item.order_id),
+        service_id: Number(item.service_id || 0),
+        service_name: item.service_name,
+        qty: Number(item.qty || 0),
+        subtotal: Number(item.subtotal || 0),
+        therapist_name: item.therapist_name || null
+      }))
+    })
+  } catch (err) {
+    console.error("GET BULK RECEIPT ERROR:", err)
+    res.status(500).json({ message: err.message || "Gagal memuat struk gabungan" })
   }
 }
 
@@ -1148,6 +1287,7 @@ exports.payBulk = async (req, res) => {
   const client = await db.connect()
   try {
     await client.query("BEGIN")
+    await ensureBulkPaymentReceiptsTable(client)
 
     const { rows } = await client.query(
       `SELECT id, status, total, branch_id
@@ -1214,9 +1354,24 @@ exports.payBulk = async (req, res) => {
       })
     }
 
+    const bulkReceiptRes = await client.query(
+      `INSERT INTO bulk_payment_receipts (branch_id, cashier_id, cashier_name, payment_method, total, order_ids, paid_at)
+       VALUES ($1,$2,$3,$4,$5,$6::int[], NOW())
+       RETURNING id`,
+      [
+        req.user.branch_id,
+        req.user?.id || null,
+        req.user?.name || '-',
+        paymentMethod,
+        grandTotal,
+        orderIds
+      ]
+    )
+
     await client.query("COMMIT")
     res.json({
       success: true,
+      bulk_payment_id: Number(bulkReceiptRes.rows[0]?.id || 0),
       paid_order_ids: orderIds,
       paid_count: orderIds.length,
       payment_method: paymentMethod,
@@ -1691,6 +1846,7 @@ exports.getOrderDetail = async (req, res) => {
         o.payment_amount,
         o.change_amount,
         o.created_at,
+        o.guest_name,
         COALESCE(ot.therapist_name, th.name) AS therapist_name,
         r.name AS room_name,
         b.name AS branch_name,
