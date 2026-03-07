@@ -305,7 +305,8 @@ exports.startTimer = async (req, res) => {
       room_id,
       duration_minutes,
       slot,
-      karaoke_fnb_items
+      karaoke_fnb_items,
+      guest_name = null
     } = req.body
 
     if (!service_id || !room_id || !duration_minutes) {
@@ -557,6 +558,7 @@ exports.startTimer = async (req, res) => {
 
     let finalOrderId = order_id
 
+    await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS guest_name VARCHAR(120)`)
     await db.query('BEGIN')
 
     try {
@@ -564,21 +566,21 @@ exports.startTimer = async (req, res) => {
         const { rows } = await db.query(
           `
           INSERT INTO orders
-            (branch_id, user_id, status, total)
+            (branch_id, user_id, status, total, guest_name)
           VALUES
-            ($1, $2, 'DRAFT', 0)
+            ($1, $2, 'DRAFT', 0, $3)
           RETURNING id
           `,
-          [branchId, user.id]
+          [branchId, user.id, String(guest_name || '').trim() || null]
         )
         finalOrderId = rows[0].id
       }
 
       await db.query(
         `UPDATE orders
-         SET therapist_id = $1, room_id = $2
+         SET therapist_id = $1, room_id = $2, guest_name = COALESCE(NULLIF($4, ''), guest_name)
          WHERE id = $3`,
-         [therapistIds[0], room_id, finalOrderId]
+         [therapistIds[0], room_id, finalOrderId, String(guest_name || '').trim()]
       )
 
       let therapistNameById = new Map()
