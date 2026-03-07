@@ -14,6 +14,7 @@
         <button class="nav-btn" :class="{active:tab==='services'}" @click="tab='services'"><BellRing size="18" /> Services</button>
         <button class="nav-btn" :class="{active:tab==='therapists'}" @click="tab='therapists'"><UsersIcon size="18" /> Therapists</button>
         <button class="nav-btn" :class="{active:tab==='agent-profiles'}" @click="tab='agent-profiles'"><Calculator size="18" /> Agent Profiles</button>
+        <button class="nav-btn" :class="{active:tab==='membership'}" @click="openMembershipDashboard()"><UsersIcon size="18" /> Membership</button>
         <button class="nav-btn" :class="{active:tab==='therapist-finance'}" @click="openTherapistFinanceReport()"><FileSpreadsheet size="18" /> Laporan Terapis & Agent</button>
         <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
@@ -252,6 +253,62 @@
         </section>
       </section>
 
+
+      <section v-else-if="tab==='membership'" class="page">
+        <section class="card hero">
+          <div>
+            <h2>Dashboard Membership</h2>
+            <p class="muted">Per outlet: no member, plan Silver/Gold/VIP, pendaftaran, dan laporan penggunaan benefit.</p>
+          </div>
+          <div class="hero-actions">
+            <button class="btn" @click="loadMembershipData">Refresh</button>
+            <button class="btn" @click="saveMembershipConfig">Simpan No Membership</button>
+          </div>
+        </section>
+
+        <section class="card filters">
+          <div class="field"><label>Outlet</label><select v-model="selectedBranch"><option value="ALL">Semua Outlet</option><option v-for="b in branches" :key="b.id" :value="String(b.id)">{{ b.name }}</option></select></div>
+          <div class="field"><label>Prefix No Kartu</label><input v-model="membershipConfig.card_prefix" /></div>
+          <div class="field"><label>Next Sequence</label><input type="number" min="1" v-model.number="membershipConfig.next_sequence" /></div>
+          <button class="btn" @click="saveMembershipConfig">Simpan</button>
+        </section>
+
+        <section class="card">
+          <div class="table-head"><h4>Plan Membership</h4><button class="btn" @click="saveMembershipPlans">Simpan Plan</button></div>
+          <table class="table">
+            <thead><tr><th>Level</th><th>Durasi</th><th>Diskon FNB (%)</th><th>Aktif</th></tr></thead>
+            <tbody>
+              <tr v-for="plan in membershipPlans" :key="`${plan.level}-${plan.duration_type}`">
+                <td>{{ plan.level }}</td>
+                <td>{{ plan.duration_type }}</td>
+                <td><input class="mini-select" type="number" min="0" max="100" :value="plan.discount_percent" @input="setMembershipPlanField(plan, 'discount_percent', $event.target.value)" /></td>
+                <td><input type="checkbox" :checked="plan.is_active" @change="setMembershipPlanField(plan, 'is_active', $event.target.checked)" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <div class="table-head"><h4>Daftar Member (manual kasir/manager)</h4><button class="btn" @click="openCreateMemberModal">Tambah Member</button></div>
+          <table class="table">
+            <thead><tr><th>No Kartu</th><th>Nama</th><th>Level</th><th>Durasi</th><th>Diskon</th><th>Expired</th></tr></thead>
+            <tbody>
+              <tr v-if="!membershipMembers.length"><td colspan="6" class="muted">Belum ada member.</td></tr>
+              <tr v-for="m in membershipMembers" :key="m.id">
+                <td>{{ m.card_no }}</td><td>{{ m.full_name }}</td><td>{{ m.level }}</td><td>{{ m.duration_type }}</td><td>{{ m.discount_percent }}%</td><td>{{ formatDate(m.ends_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="kpi-grid">
+          <article class="card kpi"><p>Omzet Member</p><h3>Rp {{ formatCurrency(membershipReport.omzet_member || 0) }}</h3></article>
+          <article class="card kpi"><p>Penggunaan Benefit</p><h3>Rp {{ formatCurrency(membershipReport.benefit_usage || 0) }}</h3></article>
+          <article class="card kpi"><p>Transaksi Member</p><h3>{{ membershipReport.member_transactions || 0 }}</h3></article>
+          <article class="card kpi"><p>Member Aktif</p><h3>{{ totalActiveMembers }}</h3></article>
+        </section>
+      </section>
+
       <Orders v-else-if="tab==='orders'" />
       <Timers v-else-if="tab==='timers'" />
       <Branches v-else-if="tab==='branches'" />
@@ -309,6 +366,11 @@ const expandedAgentRows = ref({})
 const therapistPenalties = ref({})
 const absenceQtyMap = ref({})
 
+const membershipConfig = ref({ card_prefix: 'MBR', next_sequence: 1 })
+const membershipPlans = ref([])
+const membershipMembers = ref([])
+const membershipReport = ref({ active_members: [], omzet_member: 0, benefit_usage: 0, member_transactions: 0 })
+
 const auth = useAuthStore()
 const router = useRouter()
 
@@ -323,6 +385,100 @@ const openTherapistFinanceReport = async () => {
   tab.value = 'therapist-finance'
   await loadReport()
 }
+
+
+const openMembershipDashboard = async () => {
+  tab.value = 'membership'
+  await loadMembershipData()
+}
+
+const loadMembershipData = async () => {
+  try {
+    const params = { ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) }
+    const [cfgRes, planRes, memberRes, reportRes] = await Promise.all([
+      api.get('/memberships/config', { params }),
+      api.get('/memberships/plans', { params }),
+      api.get('/memberships/members', { params: { ...params, active: 'true' } }),
+      api.get('/memberships/reports/summary', { params: { ...params, date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined } })
+    ])
+    membershipConfig.value = {
+      card_prefix: cfgRes.data?.card_prefix || 'MBR',
+      next_sequence: Number(cfgRes.data?.next_sequence || 1)
+    }
+    membershipPlans.value = Array.isArray(planRes.data?.data) ? planRes.data.data : []
+    membershipMembers.value = Array.isArray(memberRes.data?.data) ? memberRes.data.data : []
+    membershipReport.value = reportRes.data || { active_members: [] }
+  } catch (err) {
+    await Swal.fire({ icon: 'error', title: 'Membership gagal dimuat', text: err?.response?.data?.message || err.message })
+  }
+}
+
+const saveMembershipConfig = async () => {
+  try {
+    await api.post('/memberships/config', {
+      ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
+      card_prefix: membershipConfig.value.card_prefix,
+      next_sequence: Number(membershipConfig.value.next_sequence || 1)
+    })
+    await Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Konfigurasi membership tersimpan' })
+  } catch (err) {
+    await Swal.fire({ icon: 'error', title: 'Gagal', text: err?.response?.data?.message || err.message })
+  }
+}
+
+const setMembershipPlanField = (plan, key, value) => {
+  membershipPlans.value = membershipPlans.value.map((row) => {
+    if (row.id !== plan.id) return row
+    return { ...row, [key]: key === 'discount_percent' ? Math.max(0, Number(value || 0)) : Boolean(value) }
+  })
+}
+
+const saveMembershipPlans = async () => {
+  try {
+    for (const row of membershipPlans.value) {
+      await api.post('/memberships/plans', {
+        ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}),
+        level: row.level,
+        duration_type: row.duration_type,
+        discount_percent: Number(row.discount_percent || 0),
+        is_active: Boolean(row.is_active)
+      })
+    }
+    await Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Plan membership tersimpan' })
+    await loadMembershipData()
+  } catch (err) {
+    await Swal.fire({ icon: 'error', title: 'Gagal', text: err?.response?.data?.message || err.message })
+  }
+}
+
+const openCreateMemberModal = async () => {
+  const { value } = await Swal.fire({
+    title: 'Tambah Member',
+    html: '<input id="m-name" class="swal2-input" placeholder="Nama" />' +
+      '<input id="m-phone" class="swal2-input" placeholder="No HP" />' +
+      '<select id="m-level" class="swal2-input"><option value="SILVER">SILVER</option><option value="GOLD">GOLD</option><option value="VIP">VIP</option></select>' +
+      '<select id="m-duration" class="swal2-input"><option value="MONTHLY">Bulanan</option><option value="6_MONTHS">6 Bulan</option><option value="YEARLY">Tahunan</option></select>',
+    showCancelButton: true,
+    preConfirm: () => ({
+      full_name: document.getElementById('m-name').value,
+      phone: document.getElementById('m-phone').value,
+      level: document.getElementById('m-level').value,
+      duration_type: document.getElementById('m-duration').value
+    })
+  })
+  if (!value?.full_name) return
+  try {
+    await api.post('/memberships/members', { ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}), ...value })
+    await Swal.fire({ icon: 'success', title: 'Member ditambahkan' })
+    await loadMembershipData()
+  } catch (err) {
+    await Swal.fire({ icon: 'error', title: 'Gagal', text: err?.response?.data?.message || err.message })
+  }
+}
+
+const totalActiveMembers = computed(() => (Array.isArray(membershipReport.value?.active_members)
+  ? membershipReport.value.active_members.reduce((sum, row) => sum + Number(row.active_count || 0), 0)
+  : 0))
 
 const openAccountingUAT = () => {
   localStorage.setItem('accountingUAT.activeModule', 'manual-journal')
