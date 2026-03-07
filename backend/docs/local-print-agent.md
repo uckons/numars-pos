@@ -41,6 +41,14 @@ backend\scripts\run-print-agent.cmd
 curl http://127.0.0.1:19000/health
 ```
 
+## Opsi Android + Bluetooth
+
+Jika ingin pakai perangkat Android sebagai print agent Bluetooth thermal, lihat panduan:
+
+- `backend/docs/android-bluetooth-print-agent.md`
+
+Implementasi ini dirancang tetap kompatibel dengan alur backend saat ini (non-breaking).
+
 ## Koneksi dari VPS backend
 
 Set env di backend VPS:
