@@ -8,19 +8,10 @@ const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
 }
 
-exports.printOrder = async (req, res) => {
-  try {
-    const db = req.app.get("db")
-    await ensureOrderPaymentColumns(db)
-    const { order_id, printer } = req.body
 
-    if (!order_id) {
-      return res.status(400).json({ message: "order_id required" })
-    }
-
-    // 🔹 ambil order (detail lengkap untuk layout receipt enterprise)
-    const orderRes = await db.query(
-      `
+const loadOrderForPrinting = async (db, orderId) => {
+  const orderRes = await db.query(
+    `
       SELECT
         o.id,
         o.total,
@@ -51,30 +42,47 @@ exports.printOrder = async (req, res) => {
       ) ot ON true
       WHERE o.id = $1
       `,
-      [order_id]
-    )
+    [orderId]
+  )
 
-    if (!orderRes.rows.length) {
-      return res.status(404).json({ message: "Order not found" })
-    }
+  if (!orderRes.rows.length) {
+    return null
+  }
 
-    const order = orderRes.rows[0]
+  const order = orderRes.rows[0]
 
-    // 🔹 ambil items
-    const itemsRes = await db.query(
-      `
+  const itemsRes = await db.query(
+    `
       SELECT service_name, qty, subtotal, therapist_name
       FROM order_items
       WHERE order_id = $1
       `,
-      [order_id]
-    )
+    [orderId]
+  )
 
-    order.items = itemsRes.rows
-    order.discount_amount = Number(order.discount_amount || 0)
-    order.payment_amount = Number(order.payment_amount || order.total || 0)
-    order.change_amount = Number(order.change_amount || 0)
-    order.subtotal = Math.max(0, Number(order.total || 0) + Number(order.discount_amount || 0))
+  order.items = itemsRes.rows
+  order.discount_amount = Number(order.discount_amount || 0)
+  order.payment_amount = Number(order.payment_amount || order.total || 0)
+  order.change_amount = Number(order.change_amount || 0)
+  order.subtotal = Math.max(0, Number(order.total || 0) + Number(order.discount_amount || 0))
+
+  return order
+}
+
+exports.printOrder = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureOrderPaymentColumns(db)
+    const { order_id, printer } = req.body
+
+    if (!order_id) {
+      return res.status(400).json({ message: "order_id required" })
+    }
+
+    const order = await loadOrderForPrinting(db, order_id)
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
 
     const target = await printerTargetService.getResolvedPrinterTarget({
       db,
@@ -171,6 +179,41 @@ exports.agentDiagnostics = async (req, res) => {
   }
 }
 
+
+
+exports.androidPocPayload = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureOrderPaymentColumns(db)
+
+    const orderId = Number(req.body?.order_id || 0)
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      return res.status(400).json({ message: "order_id required" })
+    }
+
+    const order = await loadOrderForPrinting(db, orderId)
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    const payload = printerService.buildOrderReceiptPayload({
+      order,
+      printerName: req.body?.printer?.agent_printer_name || process.env.PRINT_AGENT_PRINTER || null
+    })
+
+    res.json({
+      ok: true,
+      payload,
+      hint: "Gunakan payload ini untuk menguji endpoint POST /print/receipt di Android Bluetooth agent."
+    })
+  } catch (err) {
+    console.error("ANDROID POC PAYLOAD ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Gagal membentuk payload. Pastikan order_id valid dan data order lengkap."
+    })
+  }
+}
 
 
 exports.printBulk = async (req, res) => {

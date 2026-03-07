@@ -40,4 +40,11 @@ router.post(
   controller.agentDiagnostics
 )
 
+
+router.post(
+  "/android-poc-payload",
+  auth,
+  controller.androidPocPayload
+)
+
 module.exports = router
