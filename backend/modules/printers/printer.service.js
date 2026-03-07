@@ -58,6 +58,17 @@ const formatReceiptTime = (value = new Date()) => {
   }
 }
 
+
+const buildReceiptMetaNote = (order = {}) => {
+  const lines = []
+  const guestName = String(order.guest_name || '').trim()
+  const memberNo = String(order.membership_card_no || '').trim()
+  if (guestName) lines.push(`Nama Tamu: ${guestName}`)
+  if (memberNo) lines.push(`No Member: ${memberNo}`)
+  return lines.length ? lines.join(' | ') : null
+}
+
+
 const buildReceiptPayload = (order, options = {}) => ({
   profile: THERMAL_PROFILE,
   printer_name: options.printerName || null,
@@ -75,6 +86,7 @@ const buildReceiptPayload = (order, options = {}) => ({
     therapist_name: order.therapist_name || null,
     guest_name: order.guest_name || null,
     membership_card_no: order.membership_card_no || null,
+    note: buildReceiptMetaNote(order),
     payment_method: order.payment_method || "CASH",
     subtotal: Number(order.subtotal || (Number(order.total || 0) + Number(order.discount_amount || 0))),
     discount_amount: Number(order.discount_amount || 0),
@@ -236,6 +248,12 @@ const printViaUsb = async (order) => {
         .text("------------------------")
         .align("LT")
 
+      const guestName = String(order.guest_name || "").trim()
+      const memberNo = String(order.membership_card_no || "").trim()
+      if (guestName) printer.text(`Nama Tamu: ${guestName}`)
+      if (memberNo) printer.text(`No Member: ${memberNo}`)
+      if (guestName || memberNo) printer.text("------------------------")
+
       ;(order.items || []).forEach((item) => {
         printer.text(`${item.service_name} x${item.qty}`)
         if (item.therapist_name) {
@@ -312,6 +330,11 @@ const buildReceiptPlainText = (order) => {
   const lines = []
   lines.push("NUMARS POS")
   lines.push("------------------------")
+  const guestName = String(order.guest_name || "").trim()
+  const memberNo = String(order.membership_card_no || "").trim()
+  if (guestName) lines.push(`Nama Tamu: ${guestName}`)
+  if (memberNo) lines.push(`No Member: ${memberNo}`)
+  if (guestName || memberNo) lines.push("------------------------")
 
   ;(order.items || []).forEach((item) => {
     lines.push(`${item.service_name} x${item.qty}`)
