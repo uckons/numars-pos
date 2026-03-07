@@ -262,16 +262,33 @@ async function sendReceiptToAgent ({ payload, agentUrl, token }) {
   const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
   const endpoint = `${agentUrl.replace(/\/$/, "")}/print/receipt`
 
+  const runPost = async (body) => axios.post(endpoint, body, {
+    headers,
+    timeout: timeoutMs
+  })
+
   try {
-    await axios.post(endpoint, payload, {
-      headers,
-      timeout: timeoutMs
-    })
+    await runPost(payload)
   } catch (err) {
-    const detail = err.response?.data
+    const detailText = err.response?.data
       ? JSON.stringify(err.response.data)
-      : (err.code || err.message)
-    throw new Error(`Gagal terhubung ke print agent (${endpoint}): ${detail}`)
+      : String(err.code || err.message || '')
+
+    const printerMissing = /cannot\s*find\s*printer|printer\s*not\s*found|no\s*printer/i.test(detailText)
+    const configuredPrinterName = String(payload?.printer_name || '').trim()
+    if (printerMissing && configuredPrinterName) {
+      const retryPayload = { ...payload, printer_name: null }
+      try {
+        await runPost(retryPayload)
+        return { mode: "agent", agent_url: agentUrl, fallback_printer_name: true }
+      } catch (retryErr) {
+        const retryDetail = retryErr.response?.data
+          ? JSON.stringify(retryErr.response.data)
+          : (retryErr.code || retryErr.message)
+        throw new Error(`Gagal terhubung ke print agent (${endpoint}) setelah fallback default printer: ${retryDetail}`)
+      }
+    }
+    throw new Error(`Gagal terhubung ke print agent (${endpoint}): ${detailText}`)
   }
 
   return { mode: "agent", agent_url: agentUrl }

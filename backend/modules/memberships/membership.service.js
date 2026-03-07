@@ -80,6 +80,29 @@ const ensureMembershipTables = async (db) => {
 
       await db.query(`ALTER TABLE membership_plans ADD COLUMN IF NOT EXISTS manual_price NUMERIC(12,2) NOT NULL DEFAULT 0`)
 
+      await db.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'services'
+              AND column_name = 'type'
+              AND udt_name = 'service_type'
+          ) THEN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM pg_type t
+              JOIN pg_enum e ON e.enumtypid = t.oid
+              WHERE t.typname = 'service_type'
+                AND e.enumlabel = 'MEMBERSHIP'
+            ) THEN
+              ALTER TYPE service_type ADD VALUE 'MEMBERSHIP';
+            END IF;
+          END IF;
+        END $$;
+      `)
+
 
       for (const level of MEMBERSHIP_LEVELS) {
         await db.query(
