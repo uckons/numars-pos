@@ -19,6 +19,10 @@ const ensureFnbColumns = async (db) => {
     ALTER TABLE fnb_items
     ADD COLUMN IF NOT EXISTS ktv_group_default_qty JSONB NOT NULL DEFAULT '{}'::jsonb
   `)
+  await db.query(`
+    ALTER TABLE fnb_items
+    ADD COLUMN IF NOT EXISTS membership_tag BOOLEAN NOT NULL DEFAULT false
+  `)
 }
 
 const normalizeItemGroup = (value) => {
@@ -80,6 +84,7 @@ exports.getAll = async (db, user, query = {}) => {
       fi.ktv_group_tags,
       fi.ktv_default_qty,
       fi.ktv_group_default_qty,
+      fi.membership_tag,
       COALESCE(fi.price, s.base_price, 0) AS sell_price,
       COALESCE(fi.price, s.base_price, 0) AS price,
       s.is_active AS service_active
@@ -136,7 +141,8 @@ exports.create = async (db, user, data) => {
     package_name,
     ktv_group_tags,
     ktv_default_qty,
-    ktv_group_default_qty
+    ktv_group_default_qty,
+    membership_tag
   } = data
   const role = String(user.role || '')
   const privileged = ['SuperAdmin', 'Manager', 'Owner'].includes(role)
@@ -179,8 +185,8 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name, ktv_group_tags, ktv_default_qty, ktv_group_default_qty, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name, ktv_group_tags, ktv_default_qty, ktv_group_default_qty, membership_tag, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        RETURNING *`,
       [
         targetBranchId,
@@ -201,6 +207,7 @@ exports.create = async (db, user, data) => {
         normalizedKtvTags,
         Number(ktv_default_qty || 0),
         normalizedKtvQtyMap,
+        Boolean(membership_tag),
         stock ?? 0,
         alert_stock ?? 0
       ]
@@ -237,7 +244,8 @@ exports.update = async (db, id, data) => {
     package_name,
     ktv_group_tags,
     ktv_default_qty,
-    ktv_group_default_qty
+    ktv_group_default_qty,
+    membership_tag
   } = data  
   const normalizedItemGroup = normalizeItemGroup(item_group)
   const normalizedKtvTags = normalizeKtvTags(ktv_group_tags)
@@ -310,8 +318,9 @@ exports.update = async (db, id, data) => {
            package_name=$16,
            ktv_group_tags=$17,
            ktv_default_qty=$18,
-           ktv_group_default_qty=$19
-       WHERE id=$20
+           ktv_group_default_qty=$19,
+           membership_tag=$20
+       WHERE id=$21
        RETURNING *`,
       [
         name,
@@ -333,6 +342,7 @@ exports.update = async (db, id, data) => {
         normalizedKtvTags,
         Number(ktv_default_qty || 0),
         normalizedKtvQtyMap,
+        Boolean(membership_tag),
         id
       ]
     ) 
