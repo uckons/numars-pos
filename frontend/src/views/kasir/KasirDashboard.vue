@@ -323,7 +323,8 @@ const createManualTimer = async (data) => {
       room_id: data.room_id,
       duration_minutes: data.duration_minutes,
       order_type: data.order_type,
-      karaoke_fnb_items: Array.isArray(data.karaoke_fnb_items) ? data.karaoke_fnb_items : []
+      karaoke_fnb_items: Array.isArray(data.karaoke_fnb_items) ? data.karaoke_fnb_items : [],
+      guest_name: data.guest_name || null
     })
 
     await syncTimers()

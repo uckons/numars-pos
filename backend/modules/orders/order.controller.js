@@ -1728,6 +1728,7 @@ exports.getOrderDetail = async (req, res) => {
         o.payment_amount,
         o.change_amount,
         o.created_at,
+        o.guest_name,
         COALESCE(ot.therapist_name, th.name) AS therapist_name,
         r.name AS room_name,
         b.name AS branch_name,

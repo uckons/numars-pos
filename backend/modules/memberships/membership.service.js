@@ -1,4 +1,5 @@
 const MEMBERSHIP_LEVELS = ['SILVER', 'GOLD', 'VIP']
+let ensureMembershipTablesPromise = null
 
 const normalizeLevel = (value) => {
   const lvl = String(value || '').trim().toUpperCase()
@@ -21,66 +22,82 @@ const durationMonths = (duration) => {
 }
 
 const ensureMembershipTables = async (db) => {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS membership_plans (
-      id SERIAL PRIMARY KEY,
-      branch_id INT NOT NULL,
-      level VARCHAR(20) NOT NULL,
-      duration_type VARCHAR(20) NOT NULL,
-      discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
-      is_active BOOLEAN NOT NULL DEFAULT true,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(branch_id, level, duration_type)
-    )
-  `)
+  if (ensureMembershipTablesPromise) return ensureMembershipTablesPromise
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS membership_members (
-      id SERIAL PRIMARY KEY,
-      branch_id INT NOT NULL,
-      card_no VARCHAR(60) NOT NULL,
-      full_name VARCHAR(120) NOT NULL,
-      phone VARCHAR(40),
-      level VARCHAR(20) NOT NULL,
-      duration_type VARCHAR(20) NOT NULL,
-      discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
-      starts_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      ends_at TIMESTAMP NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-      created_by INT,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(branch_id, card_no)
-    )
-  `)
+  ensureMembershipTablesPromise = (async () => {
+    await db.query('SELECT pg_advisory_lock($1)', [9152701])
+    try {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS membership_plans (
+          id SERIAL PRIMARY KEY,
+          branch_id INT NOT NULL,
+          level VARCHAR(20) NOT NULL,
+          duration_type VARCHAR(20) NOT NULL,
+          discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(branch_id, level, duration_type)
+        )
+      `)
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS membership_configs (
-      branch_id INT PRIMARY KEY,
-      card_prefix VARCHAR(20) NOT NULL DEFAULT 'MBR',
-      next_sequence INT NOT NULL DEFAULT 1,
-      updated_at TIMESTAMP DEFAULT NOW()
-    )
-  `)
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS membership_members (
+          id SERIAL PRIMARY KEY,
+          branch_id INT NOT NULL,
+          card_no VARCHAR(60) NOT NULL,
+          full_name VARCHAR(120) NOT NULL,
+          phone VARCHAR(40),
+          level VARCHAR(20) NOT NULL,
+          duration_type VARCHAR(20) NOT NULL,
+          discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+          starts_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          ends_at TIMESTAMP NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+          created_by INT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(branch_id, card_no)
+        )
+      `)
 
-  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
-  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
-  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS membership_configs (
+          branch_id INT PRIMARY KEY,
+          card_prefix VARCHAR(20) NOT NULL DEFAULT 'MBR',
+          next_sequence INT NOT NULL DEFAULT 1,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `)
 
-  for (const level of MEMBERSHIP_LEVELS) {
-    await db.query(
-      `INSERT INTO membership_plans (branch_id, level, duration_type, discount_percent)
-       SELECT b.id, $1, d.duration_type, d.discount_percent
-       FROM branches b
-       CROSS JOIN (VALUES
-         ('MONTHLY', 5),
-         ('6_MONTHS', 8),
-         ('YEARLY', 10)
-       ) AS d(duration_type, discount_percent)
-       ON CONFLICT (branch_id, level, duration_type) DO NOTHING`,
-      [level]
-    )
+      await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
+      await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
+      await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
+
+      for (const level of MEMBERSHIP_LEVELS) {
+        await db.query(
+          `INSERT INTO membership_plans (branch_id, level, duration_type, discount_percent)
+           SELECT b.id, $1, d.duration_type, d.discount_percent
+           FROM branches b
+           CROSS JOIN (VALUES
+             ('MONTHLY', 5),
+             ('6_MONTHS', 8),
+             ('YEARLY', 10)
+           ) AS d(duration_type, discount_percent)
+           ON CONFLICT (branch_id, level, duration_type) DO NOTHING`,
+          [level]
+        )
+      }
+    } finally {
+      await db.query('SELECT pg_advisory_unlock($1)', [9152701])
+    }
+  })()
+
+  try {
+    await ensureMembershipTablesPromise
+  } catch (err) {
+    ensureMembershipTablesPromise = null
+    throw err
   }
 }
 

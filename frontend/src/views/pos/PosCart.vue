@@ -128,6 +128,10 @@
               <span>Room:</span>
               <span>{{ receiptData?.room_name }}</span>
             </div>
+            <div class="info-row" v-if="receiptData?.guest_name">
+              <span>Nama Tamu:</span>
+              <span>{{ receiptData?.guest_name }}</span>
+            </div>
           </div>
 
           <div class="receipt-divider">================================</div>
