@@ -5,6 +5,7 @@ const dashboardService = require("../dashboard/dashboard.service")
 const printerService = require("../printers/printer.service")
 const printerTargetService = require("../printers/printer-target.service")
 const journalPostingService = require("../accounting/journal-posting.service")
+const membershipService = require('../memberships/membership.service')
 
 const parseOrderId = (rawId) => {
   const orderId = Number(rawId)
@@ -25,6 +26,28 @@ const normalizeDiscountAmount = (subtotal, rawDiscount) => {
 
   return Math.max(0, Math.min(safeSubtotal, requestedDiscount))
 }
+
+
+const computeCheckoutMembershipDiscount = async (db, branchId, membershipCardNo, items = []) => {
+  const cardNo = String(membershipCardNo || '').trim()
+  if (!cardNo) {
+    return { membershipMemberId: null, membershipCardNo: null, membershipDiscountAmount: 0 }
+  }
+
+  const calc = await membershipService.computeMembershipDiscount(db, {
+    branch_id: branchId,
+    card_no: cardNo,
+    items,
+    as_of: new Date().toISOString()
+  })
+
+  return {
+    membershipMemberId: Number(calc?.member?.id || 0) || null,
+    membershipCardNo: String(calc?.member?.card_no || cardNo),
+    membershipDiscountAmount: Math.max(0, Math.round(Number(calc?.discount_amount || 0)))
+  }
+}
+
 
 const VOID_UNDO_WINDOW_MINUTES = 10
 
@@ -90,6 +113,9 @@ const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
 }
 
 const ensureOrderItemColumns = async (db) => {
@@ -481,7 +507,7 @@ exports.close = async (req, res) => {
     const orderId = parseOrderId(req.params.id)
     await ensureOrderItemColumns(db)
     await ensureOrderPaymentColumns(db)
-    const { items, payment_method, discount_amount, payment_amount } = req.body
+    const { items, payment_method, discount_amount, payment_amount, membership_card_no } = req.body
     const orderStatusRes = await db.query(
       "SELECT status FROM orders WHERE id = $1",
       [orderId]
@@ -566,7 +592,9 @@ exports.close = async (req, res) => {
       [orderId]
     )
     const subtotal = Math.round(Number(totalResult.rows[0].total || 0))
-    const discountAmount = normalizeDiscountAmount(subtotal, discount_amount)
+    const membershipCalc = await computeCheckoutMembershipDiscount(db, Number(req.user.branch_id), membership_card_no, items)
+    const manualDiscount = normalizeDiscountAmount(subtotal, discount_amount)
+    const discountAmount = Math.min(subtotal, manualDiscount + membershipCalc.membershipDiscountAmount)
     const total = Math.max(0, subtotal - discountAmount)
     const paymentMethod = String(payment_method || 'CASH').toUpperCase()
 
@@ -597,10 +625,13 @@ exports.close = async (req, res) => {
            total_amount = $3,
            discount_amount = $4,
            payment_amount = $5,
-           change_amount = $6
+           change_amount = $6,
+           membership_member_id = $7,
+           membership_card_no = $8,
+           membership_discount_amount = $9
        WHERE id = $1
        RETURNING *`,
-      [orderId, paymentMethod, total, discountAmount, paymentAmount, changeAmount]
+      [orderId, paymentMethod, total, discountAmount, paymentAmount, changeAmount, membershipCalc.membershipMemberId, membershipCalc.membershipCardNo, membershipCalc.membershipDiscountAmount]
     )
 
     if (!result.rows.length) {
@@ -654,6 +685,8 @@ exports.close = async (req, res) => {
       total: result.rows[0].total,
       payment_amount: paymentAmount,
       change_amount: changeAmount,
+      membership_discount_amount: membershipCalc.membershipDiscountAmount,
+      membership_card_no: membershipCalc.membershipCardNo,
       status: result.rows[0].status
     })
   } catch (err) {
@@ -979,7 +1012,7 @@ exports.createFromPos = async (req, res) => {
     await ensureOrderItemColumns(db)
     await ensureOrderPaymentColumns(db)
     await dashboardService.ensureOutletCanReceiveOrder(user)
-    const { items, payment_method, discount_amount, payment_amount } = req.body
+    const { items, payment_method, discount_amount, payment_amount, membership_card_no } = req.body
 
     // 1️⃣ ambil branch
     const userRes = await db.query(
@@ -1066,7 +1099,9 @@ exports.createFromPos = async (req, res) => {
     }
 
     const subtotal = Math.round(Number(total || 0))
-    const discountAmount = normalizeDiscountAmount(subtotal, discount_amount)
+    const membershipCalc = await computeCheckoutMembershipDiscount(db, branchId, membership_card_no, items)
+    const manualDiscount = normalizeDiscountAmount(subtotal, discount_amount)
+    const discountAmount = Math.min(subtotal, manualDiscount + membershipCalc.membershipDiscountAmount)
     const finalTotal = Math.max(0, subtotal - discountAmount)
     const paymentMethod = String(payment_method || "CASH").toUpperCase()
 
@@ -1085,8 +1120,8 @@ exports.createFromPos = async (req, res) => {
 
     // 5️⃣ update total
     await db.query(
-     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6 WHERE id=$3",
-      [finalTotal, paymentMethod, orderId, discountAmount, paymentAmount, changeAmount]
+     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6, membership_member_id=$7, membership_card_no=$8, membership_discount_amount=$9 WHERE id=$3",
+      [finalTotal, paymentMethod, orderId, discountAmount, paymentAmount, changeAmount, membershipCalc.membershipMemberId, membershipCalc.membershipCardNo, membershipCalc.membershipDiscountAmount]
     )
     const fnbItemsRes = await db.query(
       [
@@ -1126,6 +1161,8 @@ exports.createFromPos = async (req, res) => {
       total: finalTotal,
       payment_amount: paymentAmount,
       change_amount: changeAmount,
+      membership_discount_amount: membershipCalc.membershipDiscountAmount,
+      membership_card_no: membershipCalc.membershipCardNo,
       status: "PAID"
     })
   } catch (err) {
@@ -1691,6 +1728,7 @@ exports.getOrderDetail = async (req, res) => {
         o.payment_amount,
         o.change_amount,
         o.created_at,
+        o.guest_name,
         COALESCE(ot.therapist_name, th.name) AS therapist_name,
         r.name AS room_name,
         b.name AS branch_name,
