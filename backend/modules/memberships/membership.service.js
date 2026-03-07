@@ -214,7 +214,7 @@ const syncMembershipPlanAsService = async (db, { branchId, level, durationType, 
   if (existingRows.length) {
     await db.query(
       `UPDATE services
-       SET base_price=$1, is_active=$2, updated_at=NOW()
+       SET base_price=$1, is_active=$2
        WHERE id=$3`,
       [price, Boolean(isActive), existingRows[0].id]
     )
