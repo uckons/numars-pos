@@ -78,16 +78,19 @@ const ensureMembershipTables = async (db) => {
       await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
       await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
 
+      await db.query(`ALTER TABLE membership_plans ADD COLUMN IF NOT EXISTS manual_price NUMERIC(12,2) NOT NULL DEFAULT 0`)
+
+
       for (const level of MEMBERSHIP_LEVELS) {
         await db.query(
-          `INSERT INTO membership_plans (branch_id, level, duration_type, discount_percent)
-           SELECT b.id, $1, d.duration_type, d.discount_percent
+          `INSERT INTO membership_plans (branch_id, level, duration_type, discount_percent, manual_price)
+           SELECT b.id, $1, d.duration_type, d.discount_percent, d.manual_price
            FROM branches b
            CROSS JOIN (VALUES
-             ('MONTHLY', 5),
-             ('6_MONTHS', 8),
-             ('YEARLY', 10)
-           ) AS d(duration_type, discount_percent)
+             ('MONTHLY', 5, 0),
+             ('6_MONTHS', 8, 0),
+             ('YEARLY', 10, 0)
+           ) AS d(duration_type, discount_percent, manual_price)
            ON CONFLICT (branch_id, level, duration_type) DO NOTHING`,
           [level]
         )
@@ -161,7 +164,7 @@ const listPlans = async (db, user, query = {}) => {
   await ensureMembershipTables(db)
   const branchId = resolveBranchId(user, query)
   const { rows } = await db.query(
-    `SELECT id, branch_id, level, duration_type, discount_percent, is_active
+    `SELECT id, branch_id, level, duration_type, discount_percent, manual_price, is_active
      FROM membership_plans
      WHERE branch_id=$1
      ORDER BY CASE level WHEN 'SILVER' THEN 1 WHEN 'GOLD' THEN 2 ELSE 3 END, duration_type`,
@@ -170,22 +173,58 @@ const listPlans = async (db, user, query = {}) => {
   return rows
 }
 
+
+const buildMembershipServiceName = (level, durationType) => {
+  const durationLabel = durationType === 'MONTHLY' ? '1 Bulan' : durationType === '6_MONTHS' ? '6 Bulan' : '12 Bulan'
+  return `Membership ${level} - ${durationLabel}`
+}
+
+const syncMembershipPlanAsService = async (db, { branchId, level, durationType, manualPrice, isActive }) => {
+  const serviceName = buildMembershipServiceName(level, durationType)
+  const price = Math.max(0, Number(manualPrice || 0))
+
+  const { rows: existingRows } = await db.query(
+    `SELECT id FROM services WHERE branch_id=$1 AND type='MEMBERSHIP' AND name=$2 LIMIT 1`,
+    [branchId, serviceName]
+  )
+
+  if (existingRows.length) {
+    await db.query(
+      `UPDATE services
+       SET base_price=$1, is_active=$2, updated_at=NOW()
+       WHERE id=$3`,
+      [price, Boolean(isActive), existingRows[0].id]
+    )
+    return
+  }
+
+  await db.query(
+    `INSERT INTO services (branch_id, name, type, base_price, duration_minutes, is_active, happy_hour_enabled, happy_hour_price)
+     VALUES ($1,$2,'MEMBERSHIP',$3,NULL,$4,false,NULL)`,
+    [branchId, serviceName, price, Boolean(isActive)]
+  )
+}
+
 const savePlan = async (db, user, payload = {}) => {
   await ensureMembershipTables(db)
   const branchId = resolveBranchId(user, payload)
   const level = normalizeLevel(payload.level)
   const durationType = normalizeDuration(payload.duration_type)
   const discountPercent = Math.max(0, Math.min(100, Number(payload.discount_percent || 0)))
+  const manualPrice = Math.max(0, Number(payload.manual_price || 0))
   const isActive = payload.is_active !== false
 
   const { rows } = await db.query(
-    `INSERT INTO membership_plans (branch_id, level, duration_type, discount_percent, is_active)
-     VALUES ($1,$2,$3,$4,$5)
+    `INSERT INTO membership_plans (branch_id, level, duration_type, discount_percent, manual_price, is_active)
+     VALUES ($1,$2,$3,$4,$5,$6)
      ON CONFLICT (branch_id, level, duration_type)
-     DO UPDATE SET discount_percent=EXCLUDED.discount_percent, is_active=EXCLUDED.is_active, updated_at=NOW()
+     DO UPDATE SET discount_percent=EXCLUDED.discount_percent, manual_price=EXCLUDED.manual_price, is_active=EXCLUDED.is_active, updated_at=NOW()
      RETURNING *`,
-    [branchId, level, durationType, discountPercent, isActive]
+    [branchId, level, durationType, discountPercent, manualPrice, isActive]
   )
+
+  await syncMembershipPlanAsService(db, { branchId, level, durationType, manualPrice, isActive })
+
   return rows[0]
 }
 

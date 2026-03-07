@@ -276,12 +276,13 @@
         <section class="card">
           <div class="table-head"><h4>Plan Membership</h4><button class="btn" @click="saveMembershipPlans">Simpan Plan</button></div>
           <table class="table">
-            <thead><tr><th>Level</th><th>Durasi</th><th>Diskon FNB (%)</th><th>Aktif</th></tr></thead>
+            <thead><tr><th>Level</th><th>Durasi</th><th>Diskon FNB (%)</th><th>Harga Jual Membership</th><th>Aktif</th></tr></thead>
             <tbody>
               <tr v-for="plan in membershipPlans" :key="`${plan.level}-${plan.duration_type}`">
                 <td>{{ plan.level }}</td>
                 <td>{{ plan.duration_type }}</td>
                 <td><input class="mini-select" type="number" min="0" max="100" :value="plan.discount_percent" @input="setMembershipPlanField(plan, 'discount_percent', $event.target.value)" /></td>
+                <td><input class="mini-select" type="number" min="0" :value="plan.manual_price || 0" @input="setMembershipPlanField(plan, 'manual_price', $event.target.value)" /></td>
                 <td><input type="checkbox" :checked="plan.is_active" @change="setMembershipPlanField(plan, 'is_active', $event.target.checked)" /></td>
               </tr>
             </tbody>
@@ -429,7 +430,7 @@ const saveMembershipConfig = async () => {
 const setMembershipPlanField = (plan, key, value) => {
   membershipPlans.value = membershipPlans.value.map((row) => {
     if (row.id !== plan.id) return row
-    return { ...row, [key]: key === 'discount_percent' ? Math.max(0, Number(value || 0)) : Boolean(value) }
+    return { ...row, [key]: ['discount_percent', 'manual_price'].includes(key) ? Math.max(0, Number(value || 0)) : Boolean(value) }
   })
 }
 
@@ -441,6 +442,7 @@ const saveMembershipPlans = async () => {
         level: row.level,
         duration_type: row.duration_type,
         discount_percent: Number(row.discount_percent || 0),
+        manual_price: Number(row.manual_price || 0),
         is_active: Boolean(row.is_active)
       })
     }

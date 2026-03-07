@@ -422,6 +422,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        COALESCE(SUM(CASE WHEN category = 'SPA' THEN revenue END), 0) AS spa,
        COALESCE(SUM(CASE WHEN category = 'LC' THEN revenue END), 0) AS lc,
        COALESCE(SUM(CASE WHEN category = 'FNB' THEN revenue END), 0) AS fnb,
+       COALESCE(SUM(CASE WHEN category = 'MEMBERSHIP' THEN revenue END), 0) AS membership,
        COALESCE(SUM(CASE WHEN category = 'KTV' THEN revenue END), 0) AS ktv
      FROM mapped
      GROUP BY bucket
@@ -759,6 +760,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
       spa: Number(row.spa || 0),
       lc: Number(row.lc || 0),
       fnb: Number(row.fnb || 0),
+      membership: Number(row.membership || 0),
       ktv: Number(row.ktv || 0)
     })),
     service_details: serviceDetailRes.rows.map((row) => ({
