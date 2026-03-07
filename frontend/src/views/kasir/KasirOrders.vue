@@ -114,6 +114,14 @@
     >
       Reprint Copy Kasir
     </button>
+    <button
+      v-if="bulkReceiptHistory.length > 1"
+      class="btn-bulk-reprint"
+      :disabled="loading || printLoading"
+      @click="openBulkReprintHistory"
+    >
+      Riwayat Reprint
+    </button>
   </div>
 </div>
 
@@ -1006,7 +1014,9 @@ const showPrintModal = ref(false)
 const printOrder = ref(null)
 const bulkReceipt = ref(null)
 const BULK_REPRINT_STORAGE_KEY = 'kasir:last-bulk-receipt'
+const BULK_REPRINT_HISTORY_KEY = 'kasir:bulk-receipt-history'
 const lastBulkReceiptForReprint = ref(null)
+const bulkReceiptHistory = ref([])
 const printLoading = ref(false)
 const isCompactReceipt = computed(() => {
   const itemCount = bulkReceipt.value?.items?.length ?? printOrder.value?.items?.length ?? 0
@@ -1052,6 +1062,12 @@ const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') =>
     lastBulkReceiptForReprint.value = bulkReceipt.value
     localStorage.setItem(BULK_REPRINT_STORAGE_KEY, JSON.stringify(bulkReceipt.value))
 
+    const nextHistory = [bulkReceipt.value, ...(Array.isArray(bulkReceiptHistory.value) ? bulkReceiptHistory.value : [])]
+      .filter((row, idx, arr) => idx === arr.findIndex((x) => String(x?.paid_at) === String(row?.paid_at) && String(x?.order_ids?.join(',')) === String(row?.order_ids?.join(','))))
+      .slice(0, 20)
+    bulkReceiptHistory.value = nextHistory
+    localStorage.setItem(BULK_REPRINT_HISTORY_KEY, JSON.stringify(nextHistory))
+
     printOrder.value = null
     showPrintModal.value = true
   } catch (err) {
@@ -1066,6 +1082,40 @@ const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') =>
   } finally {
     printLoading.value = false
   }
+}
+
+
+const openBulkReprintHistory = async () => {
+  const list = Array.isArray(bulkReceiptHistory.value) ? bulkReceiptHistory.value : []
+  if (!list.length) {
+    await Swal.fire({ icon: 'info', title: 'Riwayat kosong', text: 'Belum ada riwayat print bayar gabungan.', background: '#111', color: '#fff' })
+    return
+  }
+
+  const options = list.reduce((acc, row, idx) => {
+    const label = `${formatDateTime(row.paid_at)} • ${Array.isArray(row.order_ids) ? row.order_ids.length : 0} order • Rp ${format(row.total || 0)}`
+    acc[String(idx)] = label
+    return acc
+  }, {})
+
+  const picked = await Swal.fire({
+    title: 'Pilih Riwayat Bayar Gabungan',
+    input: 'select',
+    inputOptions: options,
+    inputValue: '0',
+    showCancelButton: true,
+    confirmButtonText: 'Reprint',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (!picked.isConfirmed) return
+  const idx = Number(picked.value || 0)
+  const receipt = list[idx]
+  if (!receipt) return
+  bulkReceipt.value = receipt
+  printOrder.value = null
+  showPrintModal.value = true
 }
 
 const reprintLastBulkPayment = async () => {
@@ -1096,7 +1146,13 @@ const reprintReceipt = async (orderId) => {
     showPrintModal.value = true
   } catch (err) {
     console.error("Failed to load order detail:", err)
-    alert("Gagal memuat detail order")
+    await Swal.fire({
+      icon: "error",
+      title: "Gagal memuat detail order",
+      text: err.response?.data?.message || err.message || "Terjadi kesalahan",
+      background: "#111",
+      color: "#fff"
+    })
     await openNextQueuedPrint()
   } finally {
     printLoading.value = false
@@ -1282,11 +1338,27 @@ const sendToThermalPrinter = async () => {
       color: '#fff'
     })
   } catch (err) {
+    const errorMessage = err.response?.data?.message || err.message || 'Terjadi kesalahan'
+    const shouldFallbackToBrowserPrint = /PRINT_AGENT_URL|print agent|terhubung|koneksi/i.test(String(errorMessage || ''))
+
+    if (shouldFallbackToBrowserPrint) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Printer thermal tidak tersedia',
+        text: 'Akan dialihkan ke browser print supaya reprint kasir tetap bisa dilakukan.',
+        background: '#111',
+        color: '#fff'
+      })
+      printReceipt()
+      await closePrintModal()
+      return
+    }
+
     await closePrintModal()
     await Swal.fire({
       icon: 'error',
       title: 'Gagal kirim ke printer',
-      text: err.response?.data?.message || err.message || 'Terjadi kesalahan',
+      text: errorMessage,
       background: '#111',
       color: '#fff'
     })
@@ -1323,6 +1395,14 @@ onMounted(() => {
       const parsed = JSON.parse(stored)
       if (Array.isArray(parsed?.order_ids) && parsed.order_ids.length) {
         lastBulkReceiptForReprint.value = parsed
+      }
+    }
+
+    const historyStored = localStorage.getItem(BULK_REPRINT_HISTORY_KEY)
+    if (historyStored) {
+      const parsedHistory = JSON.parse(historyStored)
+      if (Array.isArray(parsedHistory)) {
+        bulkReceiptHistory.value = parsedHistory.filter((row) => Array.isArray(row?.order_ids) && row.order_ids.length)
       }
     }
   } catch (err) {
