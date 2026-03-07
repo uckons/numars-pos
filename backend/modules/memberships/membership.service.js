@@ -345,13 +345,27 @@ const computeMembershipDiscount = async (db, input = {}) => {
   const items = Array.isArray(input.items) ? input.items : []
   if (!items.length) return { member, discount_amount: 0, eligible_subtotal: 0, details: [] }
 
-  const resolved = items.map((it) => ({
+  const resolvedLines = items.map((it) => ({
     service_id: Number(it?.variant_service_id || it?.id || it?.service_id || 0),
     qty: Math.max(0, Number(it?.qty || 0)),
     unit_price: Math.max(0, Number(it?.base_price ?? it?.price ?? 0))
   })).filter((it) => it.service_id > 0 && it.qty > 0)
 
-  if (!resolved.length) return { member, discount_amount: 0, eligible_subtotal: 0, details: [] }
+  if (!resolvedLines.length) return { member, discount_amount: 0, eligible_subtotal: 0, details: [] }
+
+  const grouped = new Map()
+  for (const line of resolvedLines) {
+    const current = grouped.get(line.service_id) || { service_id: line.service_id, qty: 0, line_total: 0 }
+    current.qty += line.qty
+    current.line_total += (line.qty * line.unit_price)
+    grouped.set(line.service_id, current)
+  }
+
+  const resolved = [...grouped.values()].map((row) => ({
+    service_id: row.service_id,
+    qty: row.qty,
+    unit_price: row.qty > 0 ? (row.line_total / row.qty) : 0
+  }))
 
   const serviceIds = [...new Set(resolved.map((x) => x.service_id))]
   const { rows: fnbRows } = await db.query(
@@ -386,9 +400,9 @@ const computeMembershipDiscount = async (db, input = {}) => {
     const meta = fnbMap.get(row.service_id)
     if (!meta || String(meta.type || '').toUpperCase() !== 'FNB' || !meta.membership_tag) continue
 
-    let eligibleQty = row.qty
+    let eligibleQty = Math.max(0, row.qty - 1)
     if (meta.happy_hour_enabled) {
-      eligibleQty = isFnbHappyHourActive ? 0 : Math.floor(row.qty / 2)
+      eligibleQty = isFnbHappyHourActive ? 0 : Math.max(0, row.qty - 1)
     }
 
     const lineEligible = Math.max(0, eligibleQty * row.unit_price)
@@ -399,7 +413,7 @@ const computeMembershipDiscount = async (db, input = {}) => {
       eligible_qty: eligibleQty,
       unit_price: row.unit_price,
       eligible_subtotal: lineEligible,
-      rule: meta.happy_hour_enabled ? (isFnbHappyHourActive ? 'HH_ACTIVE_NO_DISCOUNT' : 'HH_OUTSIDE_EVERY_2ND') : 'STANDARD_MEMBERSHIP_TAG'
+      rule: meta.happy_hour_enabled ? (isFnbHappyHourActive ? 'HH_ACTIVE_NO_DISCOUNT' : 'HH_OUTSIDE_FROM_2ND') : 'FROM_2ND'
     })
   }
 
