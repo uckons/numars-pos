@@ -100,6 +100,7 @@
           <div class="receipt-header" v-if="receiptData?.branch_name || receiptData?.branch_address || receiptData?.branch_phone || receiptData?.branch_logo_url">
             <img v-if="receiptData?.branch_logo_url" :src="receiptData.branch_logo_url" alt="logo outlet" class="receipt-logo" />
             <h2 v-if="receiptData?.branch_name">{{ receiptData?.branch_name }}</h2>
+            <p class="receipt-subtitle">Enterprise Receipt</p>
             <p v-if="receiptData?.branch_address">{{ receiptData?.branch_address }}</p>
             <p v-if="receiptData?.branch_phone">Tel: {{ receiptData?.branch_phone }}</p>
           </div>
@@ -127,6 +128,14 @@
             <div class="info-row" v-if="receiptData?.room_name">
               <span>Room:</span>
               <span>{{ receiptData?.room_name }}</span>
+            </div>
+            <div class="info-row" v-if="receiptData?.guest_name">
+              <span>Nama Tamu:</span>
+              <span>{{ receiptData?.guest_name }}</span>
+            </div>
+            <div class="info-row" v-if="receiptData?.membership_card_no">
+              <span>No Member:</span>
+              <span>{{ receiptData?.membership_card_no }}</span>
             </div>
           </div>
 
@@ -271,7 +280,7 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
         })
       })
     },
-    preConfirm: () => {
+    preConfirm: async () => {
       const popup = Swal.getPopup()
       const inputs = Array.from(popup?.querySelectorAll('.var-qty') || [])
       const rows = inputs.map(el => ({
@@ -436,6 +445,7 @@ const showReceiptModal = ref(false)
 const showPaymentConfirmModal = ref(false)
 const receiptData = ref(null)
 const receiptLoading = ref(false)
+const PRINT_REQUEST_TIMEOUT_MS = 45000
 const pendingPayment = ref(null)
 const pendingPrinted = ref(false)
 const pendingFinalizedOrderId = ref(null)
@@ -504,7 +514,11 @@ const askPaymentDetails = async () => {
           <option value="TRANSFER BANK">TRANSFER BANK</option>
         </select>
 
-        <label style="display:block;margin-bottom:6px;font-size:13px;">Discount (Rp)</label>
+        <label style="display:block;margin-bottom:6px;font-size:13px;">No Kartu Member (opsional)</label>
+        <input id="pay-member-card" type="text" class="swal2-input" style="margin:0 0 6px 0;max-width:100%;" placeholder="contoh: MBR-000001" />
+        <button id="btn-register-member" type="button" class="swal2-styled" style="background:#2d6cdf;margin:0 0 12px 0;">Daftar Member Baru</button>
+
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Discount Manual (Rp)</label>
         <input id="pay-discount" type="number" min="0" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;" value="0" />
 
         <label id="pay-amount-label" style="display:block;margin-bottom:6px;font-size:13px;">Jumlah Bayar Cash (Rp)</label>
@@ -533,16 +547,79 @@ const askPaymentDetails = async () => {
 
       methodEl?.addEventListener("change", toggleAmountInput)
       toggleAmountInput()
+
+      const registerBtn = document.getElementById('btn-register-member')
+      registerBtn?.addEventListener('click', async () => {
+        const reg = await SwalTheme.fire({
+          title: 'Daftar Member Baru',
+          html: `
+            <div style="text-align:left;display:grid;gap:8px;">
+              <label style="font-size:12px;">Nama</label>
+              <input id="member-name" class="swal2-input" placeholder="Nama member" style="margin:0;max-width:100%;" />
+              <label style="font-size:12px;">No HP</label>
+              <input id="member-phone" class="swal2-input" placeholder="No HP" style="margin:0;max-width:100%;" />
+              <label style="font-size:12px;">Type Membership</label>
+              <select id="member-level" class="swal2-input" style="margin:0;max-width:100%;"><option value="SILVER">SILVER</option><option value="GOLD">GOLD</option><option value="VIP">VIP</option></select>
+              <label style="font-size:12px;">Durasi Membership</label>
+              <select id="member-duration" class="swal2-input" style="margin:0;max-width:100%;"><option value="MONTHLY">Bulanan</option><option value="6_MONTHS">6 Bulan</option><option value="YEARLY">Tahunan</option></select>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: 'Simpan',
+          preConfirm: async () => {
+            const full_name = String(document.getElementById('member-name')?.value || '').trim()
+            if (!full_name) { Swal.showValidationMessage('Nama wajib diisi'); return false }
+            try {
+              const res = await api.post('/memberships/members', {
+                full_name,
+                phone: String(document.getElementById('member-phone')?.value || '').trim() || null,
+                level: String(document.getElementById('member-level')?.value || 'SILVER'),
+                duration_type: String(document.getElementById('member-duration')?.value || 'MONTHLY')
+              })
+              return res.data
+            } catch (err) {
+              Swal.showValidationMessage(err?.response?.data?.message || 'Gagal daftar member')
+              return false
+            }
+          }
+        })
+        if (reg.isConfirmed && reg.value?.card_no) {
+          const cardInput = document.getElementById('pay-member-card')
+          if (cardInput) cardInput.value = String(reg.value.card_no)
+          await SwalTheme.fire({ icon: 'success', title: 'Member terdaftar', text: `No kartu: ${reg.value.card_no}` })
+        }
+      })
+
     },
-    preConfirm: () => {
+    preConfirm: async () => {
       const method = String(document.getElementById("pay-method")?.value || "CASH").toUpperCase()
       const discountAmount = Math.max(0, Math.round(Number(document.getElementById("pay-discount")?.value || 0)))
+      const membershipCardNo = String(document.getElementById('pay-member-card')?.value || '').trim()
+      let membershipDiscountAmount = 0
+      let membershipMemberName = null
       const subtotal = total
-      if (subtotal > 0 && discountAmount >= subtotal) {
-        Swal.showValidationMessage("Discount harus lebih kecil dari subtotal")
+
+      if (membershipCardNo) {
+        try {
+          const calcRes = await api.post('/memberships/discount/validate', {
+            card_no: membershipCardNo,
+            items: toPayloadItems(),
+            as_of: new Date().toISOString()
+          })
+          membershipDiscountAmount = Math.max(0, Math.round(Number(calcRes.data?.discount_amount || 0)))
+          membershipMemberName = calcRes.data?.member?.full_name || null
+        } catch (err) {
+          Swal.showValidationMessage(err?.response?.data?.message || 'No kartu member tidak valid')
+          return false
+        }
+      }
+
+      const totalDiscount = discountAmount + membershipDiscountAmount
+      if (subtotal > 0 && totalDiscount >= subtotal) {
+        Swal.showValidationMessage("Total discount (manual + membership) harus lebih kecil dari subtotal")
         return false
       }
-      const finalTotal = Math.max(0, subtotal - discountAmount)
+      const finalTotal = Math.max(0, subtotal - totalDiscount)
 
       let paymentAmount = Math.round(Number(document.getElementById("pay-amount")?.value || 0))
       if (method !== "CASH") paymentAmount = finalTotal
@@ -554,6 +631,9 @@ const askPaymentDetails = async () => {
       return {
         payment_method: method,
         discount_amount: discountAmount,
+        membership_card_no: membershipCardNo || null,
+        membership_discount_amount: membershipDiscountAmount,
+        membership_member_name: membershipMemberName,
         payment_amount: paymentAmount
       }
     }
@@ -648,7 +728,9 @@ const guardCheckoutByBarDelivery = async () => {
 
 const buildDraftReceiptPreview = (payment) => {
   const subtotal = Math.round(Number(grandTotal.value || 0))
-  const discount = Math.max(0, Math.round(Number(payment?.discount_amount || 0)))
+  const manualDiscount = Math.max(0, Math.round(Number(payment?.discount_amount || 0)))
+  const membershipDiscount = Math.max(0, Math.round(Number(payment?.membership_discount_amount || 0)))
+  const discount = manualDiscount + membershipDiscount
   const total = Math.max(0, subtotal - discount)
   const method = String(payment?.payment_method || 'CASH').toUpperCase()
   const paymentAmount = method === 'CASH'
@@ -661,6 +743,8 @@ const buildDraftReceiptPreview = (payment) => {
     payment_method: method,
     subtotal,
     discount_amount: discount,
+    membership_discount_amount: membershipDiscount,
+    membership_card_no: payment?.membership_card_no || null,
     total,
     payment_amount: paymentAmount,
     change_amount: Math.max(0, paymentAmount - total),
@@ -684,7 +768,8 @@ const finalizeOrderForPrint = async () => {
     items: toPayloadItems(),
     payment_method: pendingPayment.value.payment_method,
     discount_amount: pendingPayment.value.discount_amount,
-    payment_amount: pendingPayment.value.payment_amount
+    payment_amount: pendingPayment.value.payment_amount,
+    membership_card_no: pendingPayment.value.membership_card_no || null
   }
 
   let res
@@ -793,7 +878,7 @@ const askCashAmountCorrection = async (minimumAmount) => {
     confirmButtonText: 'Simpan',
     cancelButtonText: 'Batal',
     focusConfirm: false,
-    preConfirm: () => {
+    preConfirm: async () => {
       const raw = document.getElementById('pay-amount-correction')?.value
       const amount = Math.round(Number(raw || 0))
       if (amount < Number(minimumAmount || 0)) {
@@ -920,7 +1005,7 @@ const printReceipt = async () => {
       await api.post(`/printers/print-order`, {
         order_id: orderId,
         printer: getPrinterAgentConfig()
-      })
+      }, { timeout: PRINT_REQUEST_TIMEOUT_MS })
     } catch (err) {
       thermalPrinted = false
       console.warn('Thermal print failed, order will still be finalized:', err?.message || err)
@@ -956,7 +1041,7 @@ const printOrder = async (order_id = lastOrder.value.order_id) => {
     await api.post(`/printers/print-order`, {
       order_id,
       printer: getPrinterAgentConfig()
-    })
+    }, { timeout: PRINT_REQUEST_TIMEOUT_MS })
     await SwalTheme.fire({
       icon: "success",
       title: "Struk dikirim",
@@ -994,7 +1079,7 @@ const saveDraft = async () => {
     confirmButtonText: "Simpan",
     cancelButtonText: "Batal",
     focusConfirm: false,
-    preConfirm: () => {
+    preConfirm: async () => {
       const noteInput = document.getElementById("bar-note-input")
       return noteInput ? String(noteInput.value || "").trim() : ""
     }
@@ -1427,6 +1512,14 @@ const saveDraft = async () => {
   font-size: 11px;
   margin: 2px 0;
   color: #333;
+}
+
+.receipt-subtitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: #8f8f8f;
 }
 
 /* Receipt Divider */
