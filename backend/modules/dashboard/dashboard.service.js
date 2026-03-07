@@ -848,6 +848,11 @@ exports.getTherapistFinanceConfig = async (user, query = {}) => {
   const row = rows[0] || {}
   return {
     branch_id: branchId,
+    salon: Number(row.spa_salon || row.lc_salon || 0),
+    room: Number(row.spa_room || row.lc_room || row.lc_sofa || 0),
+    safety: Number(row.spa_safety || row.lc_safety || 0),
+    denda: Number(row.spa_denda || row.lc_denda || 0),
+    lain_lain: Number(row.spa_lain_lain || row.lc_lain_lain || 0),
     spa_salon: Number(row.spa_salon || 0),
     spa_room: Number(row.spa_room || 0),
     spa_safety: Number(row.spa_safety || 0),
@@ -869,16 +874,17 @@ exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
     throw new Error('branch_id wajib diisi')
   }
 
+  const salonValue = Number(payload.salon ?? 0)
   const values = [
     branchId,
-    Number(payload.spa_salon || 0),
+    Number(payload.spa_salon ?? salonValue),
     Number(payload.spa_room || 0),
     Number(payload.spa_safety || 0),
     Number(payload.spa_denda || 0),
     Number(payload.spa_lain_lain || 0),
     Number(payload.lc_sofa || 0),
     Number(payload.lc_room || 0),
-    Number(payload.lc_salon || 0),
+    Number(payload.lc_salon ?? salonValue),
     Number(payload.lc_safety || 0),
     Number(payload.lc_denda || 0),
     Number(payload.lc_lain_lain || 0)
@@ -909,6 +915,11 @@ exports.saveTherapistFinanceConfig = async (user, payload = {}) => {
 
   return {
     branch_id: branchId,
+    salon: Number(rows[0].spa_salon || rows[0].lc_salon || 0),
+    room: Number(rows[0].spa_room || rows[0].lc_room || rows[0].lc_sofa || 0),
+    safety: Number(rows[0].spa_safety || rows[0].lc_safety || 0),
+    denda: Number(rows[0].spa_denda || rows[0].lc_denda || 0),
+    lain_lain: Number(rows[0].spa_lain_lain || rows[0].lc_lain_lain || 0),
     spa_salon: Number(rows[0].spa_salon || 0),
     spa_room: Number(rows[0].spa_room || 0),
     spa_safety: Number(rows[0].spa_safety || 0),
