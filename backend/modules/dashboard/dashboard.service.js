@@ -1,7 +1,7 @@
 const db = require("../../config/db")
 
 exports.kasir = async (user) => {
-  const branchId = user.branch_id
+  const branchId = resolveAnalyticsBranchId(user, query)
 
   const activeOrders = await db.query(
     `SELECT COUNT(*) FROM orders WHERE status='DRAFT' AND branch_id=$1`,
@@ -129,6 +129,22 @@ const parseDateInput = (raw) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+const resolveAnalyticsBranchId = (user, query = {}) => {
+  const role = String(user?.role || '')
+  const canSelectBranch = ['SuperAdmin', 'Owner', 'Manager'].includes(role)
+  const requestedBranchId = Number(query?.branch_id)
+
+  if (canSelectBranch && Number.isInteger(requestedBranchId) && requestedBranchId > 0) {
+    return requestedBranchId
+  }
+
+  const userBranchId = Number(user?.branch_id)
+  if (!Number.isInteger(userBranchId) || userBranchId <= 0) {
+    throw new Error('branch_id tidak valid')
+  }
+  return userBranchId
+}
+
 const resolveRange = ({ preset, date_from, date_to, open_time, close_time }) => {
   const now = new Date()
   const currentBusinessDate = getCurrentBusinessDate(now, open_time, close_time)
@@ -174,7 +190,7 @@ const resolveRange = ({ preset, date_from, date_to, open_time, close_time }) => 
 }
 
 exports.kasirAnalytics = async (user, query = {}) => {
-  const branchId = user.branch_id
+  const branchId = resolveAnalyticsBranchId(user, query)
   const preset = String(query.preset || "monthly").toLowerCase()
 
   const scheduleRes = await db.query(
@@ -1037,3 +1053,5 @@ exports.ensureOutletCanReceiveOrder = async (user) => {
     throw new Error('Outlet belum buka, mohon contact supervisor untuk start jam outlet.')
   }
 }
+
+exports.resolveAnalyticsBranchId = resolveAnalyticsBranchId

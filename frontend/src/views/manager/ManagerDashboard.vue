@@ -513,7 +513,7 @@ const loadReport = async () => {
     const [ordersRes, branchRes, analyticsRes, therapistRes, financeCfgRes, absenceRes] = await Promise.all([
       api.get("/superadmin/orders"),
       api.get("/superadmin/branches"),
-      api.get('/dashboard/kasir/analytics', { params: { preset: 'daily', date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined } }),
+      api.get('/dashboard/kasir/analytics', { params: { preset: 'daily', date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined, ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
       api.get('/therapists', { params: { page: 1, limit: 500, active: 'true', ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
       api.get('/dashboard/therapist-finance-config', { params: { ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } }),
       api.get('/therapists/attendance/absen/summary', { params: { date_from: dateFrom.value || undefined, date_to: dateTo.value || undefined, ...(selectedBranch.value !== 'ALL' ? { branch_id: selectedBranch.value } : {}) } })
