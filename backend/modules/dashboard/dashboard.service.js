@@ -214,11 +214,21 @@ exports.kasirAnalytics = async (user, query = {}) => {
         o.id,
         o.total,
         o.created_at,
-        timezone('Asia/Jakarta', o.created_at)::date AS business_date
+        timezone('Asia/Jakarta', o.created_at)::date AS business_date,
+        COALESCE(order_totals.gross_subtotal, 0) AS gross_subtotal,
+        CASE
+          WHEN COALESCE(order_totals.gross_subtotal, 0) > 0 THEN COALESCE(o.total, 0) / order_totals.gross_subtotal
+          ELSE 0
+        END AS net_ratio
       FROM orders o
       JOIN business_windows bw
         ON timezone('Asia/Jakarta', o.created_at) >= bw.window_start
        AND timezone('Asia/Jakarta', o.created_at) < bw.window_end
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(oi.subtotal), 0) AS gross_subtotal
+        FROM order_items oi
+        WHERE oi.order_id = o.id
+      ) order_totals ON true
       WHERE o.status = 'PAID'
         AND o.branch_id = $1
     )`
@@ -247,7 +257,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          WHEN s.type::text = 'LOUNGE' THEN 'LC'
          ELSE s.type::text
        END AS category,
-       COALESCE(SUM(oi.subtotal), 0) AS revenue,
+       COALESCE(SUM(oi.subtotal * o.net_ratio), 0) AS revenue,
        COALESCE(SUM(oi.qty), 0) AS qty
      FROM order_items oi
      JOIN orders_scoped o ON o.id = oi.order_id
@@ -262,7 +272,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        oi.service_id,
        oi.service_name,
        COALESCE(SUM(oi.qty), 0) AS qty,
-       COALESCE(SUM(oi.subtotal), 0) AS revenue
+       COALESCE(SUM(oi.subtotal * o.net_ratio), 0) AS revenue
      FROM order_items oi
      JOIN orders_scoped o ON o.id = oi.order_id
      JOIN services s ON s.id = oi.service_id
@@ -412,7 +422,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
            WHEN s.type::text = 'LOUNGE' THEN 'LC'
            ELSE s.type::text
          END AS category,
-         COALESCE(oi.subtotal, 0) AS revenue
+         COALESCE(oi.subtotal * o.net_ratio, 0) AS revenue
       FROM order_items oi
       JOIN orders_scoped o ON o.id = oi.order_id
       JOIN services s ON s.id = oi.service_id
@@ -454,7 +464,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        oi.service_id,
        oi.service_name,
        COALESCE(SUM(oi.qty), 0) AS qty,
-       COALESCE(SUM(oi.subtotal), 0) AS revenue
+       COALESCE(SUM(oi.subtotal * o.net_ratio), 0) AS revenue
      FROM order_items oi
      JOIN orders_scoped o ON o.id = oi.order_id
      JOIN services s ON s.id = oi.service_id
@@ -524,7 +534,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
            ELSE s.type::text
          END AS category,
          COALESCE(oi.qty, 0) AS qty,
-         COALESCE(oi.subtotal, 0) AS subtotal,
+         COALESCE(oi.subtotal * o.net_ratio, 0) AS subtotal,
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
