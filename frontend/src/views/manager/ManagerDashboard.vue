@@ -595,21 +595,28 @@ const getOrderNetRevenue = (order) => {
   const hasPayment = Number.isFinite(paymentAmount)
   const hasChange = Number.isFinite(changeAmount)
 
-  if (hasPayment) {
+  if (hasPayment && paymentAmount > 0) {
     const realizedPaid = Math.max(0, paymentAmount - (hasChange ? changeAmount : 0))
     if (realizedPaid > 0) return realizedPaid
   }
 
   const totalAmount = Number(order?.total_amount)
   const total = Number(order?.total)
+  const discountAmount = Math.max(0, Number(order?.discount_amount || 0))
   const hasTotalAmount = Number.isFinite(totalAmount)
   const hasTotal = Number.isFinite(total)
 
-  if (hasTotalAmount && hasTotal) {
-    return Math.min(totalAmount, total)
+  const candidates = []
+  if (hasTotal) candidates.push(Math.max(0, total))
+  if (hasTotalAmount) candidates.push(Math.max(0, totalAmount))
+
+  if (discountAmount > 0) {
+    if (hasTotal) candidates.push(Math.max(0, total - discountAmount))
+    if (hasTotalAmount) candidates.push(Math.max(0, totalAmount - discountAmount))
   }
-  if (hasTotal) return total
-  if (hasTotalAmount) return totalAmount
+
+  const positive = candidates.filter((v) => v > 0)
+  if (positive.length) return Math.min(...positive)
   return 0
 }
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + getOrderNetRevenue(o), 0))
