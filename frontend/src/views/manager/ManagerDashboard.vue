@@ -592,8 +592,14 @@ const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(
 const getOrderNetRevenue = (order) => {
   const totalAmount = Number(order?.total_amount)
   const total = Number(order?.total)
-  if (Number.isFinite(totalAmount)) return totalAmount
-  if (Number.isFinite(total)) return total
+  const hasTotalAmount = Number.isFinite(totalAmount)
+  const hasTotal = Number.isFinite(total)
+
+  if (hasTotalAmount && hasTotal) {
+    return Math.min(totalAmount, total)
+  }
+  if (hasTotal) return total
+  if (hasTotalAmount) return totalAmount
   return 0
 }
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + getOrderNetRevenue(o), 0))
