@@ -384,7 +384,7 @@ const computeMembershipDiscount = async (db, input = {}) => {
 
   let eligibleSubtotal = 0
   const details = []
-  const nonHhProgressByService = new Map()
+  const totalProgressByService = new Map()
 
   for (const row of resolvedLines) {
     const meta = fnbMap.get(row.service_id)
@@ -393,15 +393,15 @@ const computeMembershipDiscount = async (db, input = {}) => {
     const hasHhLabel = row.price_label.includes('HH') && !row.price_label.includes('NON HH')
     const lineIsHappyHour = meta.happy_hour_enabled && (row.is_happy_hour_price || hasHhLabel || (!row.price_label && isFnbHappyHourActive))
 
-    const nonHhQtyBefore = Number(nonHhProgressByService.get(row.service_id) || 0)
-    const nonHhQtyAfter = nonHhQtyBefore + (lineIsHappyHour ? 0 : row.qty)
-    const eligibleBefore = Math.max(0, nonHhQtyBefore - 1)
-    const eligibleAfter = Math.max(0, nonHhQtyAfter - 1)
-    const eligibleQty = Math.max(0, eligibleAfter - eligibleBefore)
+    const totalQtyBefore = Number(totalProgressByService.get(row.service_id) || 0)
+    const totalQtyAfter = totalQtyBefore + row.qty
+    totalProgressByService.set(row.service_id, totalQtyAfter)
 
-    if (!lineIsHappyHour) {
-      nonHhProgressByService.set(row.service_id, nonHhQtyAfter)
-    }
+    const eligibleBefore = Math.max(0, totalQtyBefore - 1)
+    const eligibleAfter = Math.max(0, totalQtyAfter - 1)
+    const eligibleQty = lineIsHappyHour
+      ? 0
+      : Math.max(0, eligibleAfter - eligibleBefore)
 
     const lineEligible = Math.max(0, eligibleQty * row.unit_price)
     eligibleSubtotal += lineEligible
@@ -413,7 +413,7 @@ const computeMembershipDiscount = async (db, input = {}) => {
       eligible_subtotal: lineEligible,
       rule: lineIsHappyHour
         ? 'HH_LINE_NO_DISCOUNT'
-        : (meta.happy_hour_enabled ? 'NON_HH_FROM_2ND' : 'FROM_2ND')
+        : (meta.happy_hour_enabled ? 'NON_HH_AFTER_FIRST_QTY' : 'FROM_2ND')
     })
   }
 
