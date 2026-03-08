@@ -24,10 +24,6 @@
         <p>Inbox Pending</p>
         <h3>{{ pendingInboxCount }}</h3>
       </article>
-      <article class="kpi card-glass">
-        <p>Total Nilai Stok</p>
-        <h3>Rp {{ formatCurrency(totalStockValue) }}</h3>
-      </article>
     </section>
 
     <section class="card-glass">
@@ -185,7 +181,6 @@ const stockPageSize = ref(10)
 
 const lowStockCount = computed(() => fnbItems.value.filter(i => Number(i.stock || 0) <= Number(i.alert_stock || 0)).length)
 const pendingInboxCount = computed(() => barInbox.value.filter(i => i.status === "PENDING").length)
-const totalStockValue = computed(() => fnbItems.value.reduce((acc, i) => acc + (Number(i.stock || 0) * Number(i.sell_price || i.price || 0)), 0))
 
 const filteredStocks = computed(() => {
   const key = stockSearch.value.toLowerCase()
@@ -226,12 +221,48 @@ const stockChartOptions = computed(() => {
     .slice(0, 12)
 
   return {
-    xaxis: { categories: rows.map(i => i.name) },
-    theme: { mode: "dark" },
-    plotOptions: { bar: { borderRadius: 6, columnWidth: "50%" } },
+    chart: {
+      type: 'bar',
+      toolbar: { show: false },
+      animations: { enabled: true, speed: 450 },
+      foreColor: '#d8dbe2'
+    },
+    theme: { mode: 'dark' },
+    xaxis: {
+      categories: rows.map(i => i.name),
+      labels: {
+        rotate: -25,
+        trim: true,
+        style: { colors: '#c9ced8', fontSize: '12px' }
+      },
+      axisBorder: { color: 'rgba(255,255,255,0.18)' },
+      axisTicks: { color: 'rgba(255,255,255,0.15)' }
+    },
+    yaxis: {
+      title: { text: 'Qty Stock', style: { color: '#a5adbb', fontWeight: 600 } },
+      labels: { style: { colors: '#c9ced8' } }
+    },
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        borderRadius: 6,
+        borderRadiusApplication: 'end',
+        columnWidth: '44%',
+        distributed: false
+      }
+    },
+    stroke: { show: true, width: 1, colors: ['#f7f9ff22'] },
     dataLabels: { enabled: false },
-    colors: ["#f5c518"],
-    grid: { borderColor: "#2e2e2e" }
+    colors: ['#f5c518'],
+    grid: {
+      borderColor: 'rgba(255,255,255,0.13)',
+      strokeDashArray: 4,
+      xaxis: { lines: { show: false } }
+    },
+    tooltip: {
+      theme: 'dark',
+      y: { formatter: (val) => `${Number(val || 0)} item` }
+    }
   }
 })
 
