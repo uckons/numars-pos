@@ -1506,6 +1506,7 @@ const saveDraft = async () => {
   max-height: min(70vh, 620px);
   overflow-y: auto;
   background: #f8fafc;
+  color: #0f172a;
 }
 
 .payment-confirm-note {
@@ -1515,6 +1516,10 @@ const saveDraft = async () => {
   font-family: 'Courier New', monospace;
 }
 
+.payment-confirm-body * {
+  color: inherit;
+}
+
 .payment-confirm-meta,
 .payment-confirm-total {
   border: 1px solid rgba(148, 163, 184, 0.28);
@@ -1522,6 +1527,7 @@ const saveDraft = async () => {
   padding: 10px 12px;
   background: #fff;
   font-family: 'Courier New', monospace;
+  color: #0f172a;
 }
 
 .meta-row {
@@ -1531,6 +1537,15 @@ const saveDraft = async () => {
   gap: 12px;
   font-size: 14px;
   padding: 4px 0;
+}
+
+.meta-row span {
+  color: #334155;
+}
+
+.meta-row strong {
+  color: #0f172a;
+  font-weight: 700;
 }
 
 .meta-row.grand {
@@ -1546,6 +1561,7 @@ const saveDraft = async () => {
   overflow: hidden;
   background: #fff;
   font-family: 'Courier New', monospace;
+  color: #0f172a;
 }
 
 .confirm-item-header,
@@ -1561,6 +1577,7 @@ const saveDraft = async () => {
 .confirm-item-header {
   font-weight: 700;
   background: #f1f5f9;
+  color: #334155;
 }
 
 .confirm-item-row {
@@ -1570,6 +1587,7 @@ const saveDraft = async () => {
 .confirm-item-name {
   text-align: left;
   font-weight: 600;
+  color: #0f172a;
 }
 
 /* Receipt Preview */
