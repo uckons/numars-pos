@@ -79,6 +79,10 @@
         <span>Total KTV</span>
         <strong>Rp {{ format(ktvTotalRevenue) }}</strong>
       </article>
+      <article class="summary-card">
+        <span>Total Membership</span>
+        <strong>Rp {{ format(membershipTotalRevenue) }}</strong>
+      </article>
     </section>
 
     <section class="chart-panel compact-panel">
@@ -94,7 +98,7 @@
     </section>
 
     <section class="chart-panel compact-panel">
-      <h3>Pergerakan Harian Kategori (SPA / LC / FNB / KTV)</h3>
+      <h3>Pergerakan Harian Kategori (SPA / LC / FNB / KTV / MEMBERSHIP)</h3>
       <div class="chart-wrap small">
         <ApexChart
           type="line"
@@ -313,8 +317,8 @@ const loadAnalytics = async () => {
 }
 
 const normalizedBreakdown = computed(() => {
-  const base = { SPA: 0, LC: 0, FNB: 0, KTV: 0 }
-  const qty = { SPA: 0, LC: 0, FNB: 0, KTV: 0 }
+  const base = { SPA: 0, LC: 0, FNB: 0, KTV: 0, MEMBERSHIP: 0 }
+  const qty = { SPA: 0, LC: 0, FNB: 0, KTV: 0, MEMBERSHIP: 0 }
   for (const row of analytics.value.breakdown || []) {
     const key = row.category === 'KARAOKE' ? 'KTV' : row.category
     if (base[key] !== undefined) {
@@ -378,6 +382,12 @@ const lcTotalRevenue = computed(() => {
 
 const ktvTotalRevenue = computed(() => {
   return ktvServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
+const membershipTotalRevenue = computed(() => {
+  return (analytics.value.service_details || [])
+    .filter((row) => String(row.category || '').toUpperCase() === 'MEMBERSHIP')
+    .reduce((sum, row) => sum + Number(row.revenue || 0), 0)
 })
 
 const fnbTotalQty = computed(() => {
@@ -471,6 +481,7 @@ const printReport = () => {
           <div><strong>Total LC:</strong> Rp ${format(lcTotalRevenue.value)}</div>
           <div><strong>Total FNB:</strong> Rp ${format(fnbTotalRevenue.value)}</div>
           <div><strong>Total KTV:</strong> Rp ${format(ktvTotalRevenue.value)}</div>
+          <div><strong>Total Membership:</strong> Rp ${format(membershipTotalRevenue.value)}</div>
         </div>
 
         <h2>Recap Kategori (SPA / LC / FNB / KTV)</h2>
@@ -551,7 +562,7 @@ const trendChartSeries = computed(() => ([
 
 const categoryTrendOptions = computed(() => ({
   theme: { mode: 'dark' },
-  colors: ['#f0c46a', '#8b5cf6', '#22c55e', '#3b82f6'],
+  colors: ['#f0c46a', '#8b5cf6', '#22c55e', '#3b82f6', '#f97316'],
   stroke: {
     curve: 'smooth',
     width: 2.5
@@ -609,6 +620,10 @@ const categoryTrendSeries = computed(() => ([
   {
     name: 'KTV',
     data: (analytics.value.category_trend || []).map((row) => Number(row.ktv || 0))
+  },
+  {
+    name: 'MEMBERSHIP',
+    data: (analytics.value.category_trend || []).map((row) => Number(row.membership || 0))
   }
 ]))
 
@@ -646,9 +661,11 @@ onMounted(loadAnalytics)
   cursor: pointer;
 }
 
-.filters { display: grid; grid-template-columns: auto 160px auto 160px auto 160px 110px 90px; gap: 10px; align-items: center; background:#121212; border:1px solid #242424; border-radius:12px; padding: 12px; margin-bottom: 14px; }
+.filters { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; background:#121212; border:1px solid #242424; border-radius:12px; padding: 10px 12px; margin-bottom: 14px; }
+.filters label { margin-right: 2px; color:#d3d7df; }
 .filters select, .filters input { background:#1a1a1a; border:1px solid #2f2f2f; color:#fff; border-radius:8px; padding:8px 10px; }
-.date-input { max-width: 160px; }
+.filters select { min-width: 160px; }
+.date-input { width: 160px; max-width: 160px; }
 .apply-btn { background:#c9a24d; border:none; color:#111; font-weight:700; border-radius:8px; padding:9px; cursor:pointer; }
 .ghost-btn { background:transparent; border:1px solid #474747; color:#fff; border-radius:8px; padding:9px; cursor:pointer; }
 .apply-btn:disabled, .ghost-btn:disabled { opacity: .6; cursor: not-allowed; }
@@ -675,7 +692,7 @@ tfoot th { color:#fff; }
 
 @media (max-width: 1200px) { .two-col { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 1024px) {
-  .filters { grid-template-columns: 1fr 1fr; }
+  .filters { gap: 8px; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
   .two-col { grid-template-columns: 1fr; }
 }
