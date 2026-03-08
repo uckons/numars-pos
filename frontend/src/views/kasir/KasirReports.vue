@@ -49,7 +49,7 @@
     <section class="summary-grid">
       <article class="summary-card">
         <span>Total Pendapatan</span>
-        <strong>Rp {{ format(analytics.summary.revenue) }}</strong>
+        <strong>Rp {{ format(displayRevenueTotal) }}</strong>
       </article>
       <article class="summary-card">
         <span>Order PAID</span>
@@ -329,7 +329,9 @@ const normalizedBreakdown = computed(() => {
   }))
 })
 
-
+const displayRevenueTotal = computed(() => {
+  return normalizedBreakdown.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
 
 const fnbServiceRows = computed(() => {
   return (analytics.value.service_details || [])
@@ -462,7 +464,7 @@ const printReport = () => {
         <h1>Report Pendapatan Kasir</h1>
         <p class="meta">Periode: ${rangeLabel}</p>
         <div class="summary">
-          <div><strong>Total Pendapatan:</strong> Rp ${format(analytics.value.summary.revenue)}</div>
+          <div><strong>Total Pendapatan:</strong> Rp ${format(displayRevenueTotal.value)}</div>
           <div><strong>Total Order PAID:</strong> ${analytics.value.summary.paid_orders}</div>
           <div><strong>Total Item Terjual:</strong> ${analytics.value.summary.items_sold}</div>
           <div><strong>Total SPA:</strong> Rp ${format(spaTotalRevenue.value)}</div>

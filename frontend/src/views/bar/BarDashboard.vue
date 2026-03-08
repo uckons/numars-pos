@@ -26,16 +26,8 @@
       </article>
       <article class="kpi card-glass">
         <p>Total Nilai Stok</p>
-        <h3>Rp {{ formatCurrency(totalStockValue) }}</h3>
+        <h3>🔒 Disembunyikan</h3>
       </article>
-    </section>
-
-    <section class="card-glass">
-      <div class="section-head">
-        <h3>Live Stock Overview</h3>
-        <small class="muted">Top 12 item untuk visual cepat.</small>
-      </div>
-      <ApexChart type="bar" :height="280" :series="stockSeries" :options="stockChartOptions" />
     </section>
 
     <section class="card-glass">
@@ -160,7 +152,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import Swal from "sweetalert2"
 import UserBar from "../../components/UserBar.vue"
-import ApexChart from "../../components/ApexChart.vue"
 import api from "../../services/api"
 import socket from "../../services/socket"
 import { useAuthStore } from "../../store/auth.store"
@@ -183,7 +174,6 @@ const stockPageSize = ref(10)
 
 const lowStockCount = computed(() => fnbItems.value.filter(i => Number(i.stock || 0) <= Number(i.alert_stock || 0)).length)
 const pendingInboxCount = computed(() => barInbox.value.filter(i => i.status === "PENDING").length)
-const totalStockValue = computed(() => fnbItems.value.reduce((acc, i) => acc + (Number(i.stock || 0) * Number(i.sell_price || i.price || 0)), 0))
 
 const filteredStocks = computed(() => {
   const key = stockSearch.value.toLowerCase()
@@ -209,28 +199,6 @@ watch([stockSearch, sortMode, stockPageSize], () => {
 
 watch(stockTotalPages, (total) => {
   if (stockPage.value > total) stockPage.value = total
-})
-
-const stockSeries = computed(() => {
-  const rows = [...fnbItems.value]
-    .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
-    .slice(0, 12)
-  return [{ name: "Stock", data: rows.map(i => Number(i.stock || 0)) }]
-})
-
-const stockChartOptions = computed(() => {
-  const rows = [...fnbItems.value]
-    .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
-    .slice(0, 12)
-
-  return {
-    xaxis: { categories: rows.map(i => i.name) },
-    theme: { mode: "dark" },
-    plotOptions: { bar: { borderRadius: 6, columnWidth: "50%" } },
-    dataLabels: { enabled: false },
-    colors: ["#f5c518"],
-    grid: { borderColor: "#2e2e2e" }
-  }
 })
 
 const loadAll = async (options = {}) => {
