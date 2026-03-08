@@ -67,11 +67,38 @@
         <button class="modal-close" @click="closePaymentConfirmModal">✕</button>
       </div>
 
-      <div class="receipt-preview" style="padding:20px;text-align:center;">
-        <p style="margin:0 0 10px 0;">Pastikan pembayaran sudah benar.</p>
-        <p style="margin:0 0 4px 0;"><strong>Metode:</strong> {{ receiptData?.payment_method || 'CASH' }}</p>
-        <p style="margin:0 0 4px 0;"><strong>Total:</strong> {{ formatRupiah(receiptData?.total || 0) }}</p>
-        <p style="margin:0;"><strong>Bayar:</strong> {{ formatRupiah(receiptData?.payment_amount || 0) }}</p>
+      <div class="payment-confirm-body">
+        <p class="payment-confirm-note">Pastikan pembayaran sudah benar.</p>
+
+        <div class="payment-confirm-meta">
+          <div class="meta-row"><span>Metode</span><strong>{{ receiptData?.payment_method || 'CASH' }}</strong></div>
+          <div class="meta-row" v-if="receiptData?.membership_card_no"><span>No Member</span><strong>{{ receiptData?.membership_card_no }}</strong></div>
+        </div>
+
+        <div class="payment-confirm-items" v-if="Array.isArray(receiptData?.items) && receiptData?.items.length">
+          <div class="confirm-item-header">
+            <span>Item</span>
+            <span>Qty</span>
+            <span>Harga</span>
+            <span>Subtotal</span>
+          </div>
+          <div v-for="(item, idx) in receiptData?.items" :key="`confirm-${item.service_id}-${idx}`" class="confirm-item-row">
+            <span class="confirm-item-name">{{ item.service_name }}</span>
+            <span>{{ item.qty }}x</span>
+            <span>{{ formatRupiah(item.price || 0) }}</span>
+            <strong>{{ formatRupiah(item.subtotal || 0) }}</strong>
+          </div>
+        </div>
+
+        <div class="payment-confirm-total">
+          <div class="meta-row"><span>Subtotal</span><strong>{{ formatRupiah(receiptData?.subtotal ?? 0) }}</strong></div>
+          <div class="meta-row"><span>Diskon Manual</span><strong>{{ formatRupiah(Math.max(0, Number(receiptData?.discount_amount || 0) - Number(receiptData?.membership_discount_amount || 0))) }}</strong></div>
+          <div class="meta-row"><span>Diskon Member</span><strong>{{ formatRupiah(receiptData?.membership_discount_amount || 0) }}</strong></div>
+          <div class="meta-row"><span>Total Diskon</span><strong>{{ formatRupiah(receiptData?.discount_amount || 0) }}</strong></div>
+          <div class="meta-row grand"><span>Total</span><strong>{{ formatRupiah(receiptData?.total || 0) }}</strong></div>
+          <div class="meta-row"><span>Bayar</span><strong>{{ formatRupiah(receiptData?.payment_amount || 0) }}</strong></div>
+          <div class="meta-row"><span>Kembali</span><strong>{{ formatRupiah(receiptData?.change_amount || 0) }}</strong></div>
+        </div>
       </div>
 
       <div class="modal-actions">
@@ -972,7 +999,7 @@ const openBrowserPrintPreview = () => {
       body { margin:0; background:#fff; color:#111; font-family:'Courier New', monospace; }
       .print-shell { width:80mm; margin:0 auto; padding:4mm 3mm; box-sizing:border-box; }
       .print-shell * { color:#111 !important; }
-      .print-shell .receipt-preview { max-height:none !important; overflow:visible !important; border:none !important; }
+      .receipt-preview { max-height:none !important; overflow:visible !important; border:none !important; }
       .print-shell .receipt { box-shadow:none !important; border:none !important; }
     </style>
   `
@@ -1412,9 +1439,9 @@ const saveDraft = async () => {
   border: 2px solid #c9a24d;
   border-radius: 16px;
   padding: 0;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
+  max-width: 980px;
+  width: 96%;
+  max-height: 94vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1468,6 +1495,99 @@ const saveDraft = async () => {
 .modal-close:hover {
   background: rgba(0, 0, 0, 0.4);
   transform: rotate(90deg);
+}
+
+
+.payment-confirm-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.payment-confirm-note {
+  margin: 0;
+  text-align: left;
+  color: #475569;
+  font-family: 'Courier New', monospace;
+}
+
+.payment-confirm-body * {
+  color: inherit;
+}
+
+.payment-confirm-meta,
+.payment-confirm-total {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  font-family: 'Courier New', monospace;
+  color: #0f172a;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.meta-row span {
+  color: #334155;
+}
+
+.meta-row strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.meta-row.grand {
+  border-top: 1px dashed rgba(100, 116, 139, 0.45);
+  margin-top: 6px;
+  padding-top: 10px;
+  font-size: 17px;
+}
+
+.payment-confirm-items {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  font-family: 'Courier New', monospace;
+  color: #0f172a;
+}
+
+.confirm-item-header,
+.confirm-item-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.7fr) 70px 130px 150px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.confirm-item-header {
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.confirm-item-row {
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.confirm-item-name {
+  text-align: left;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 /* Receipt Preview */
@@ -1702,8 +1822,15 @@ const saveDraft = async () => {
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .modal-content.receipt-modal {
-    max-width: 95%;
-    width: 95%;
+    max-width: 98%;
+    width: 98%;
+  }
+
+  .confirm-item-header,
+  .confirm-item-row {
+    grid-template-columns: minmax(120px, 1.5fr) 56px 90px 110px;
+    font-size: 12px;
+    padding: 8px 10px;
   }
   
   .modal-actions {
