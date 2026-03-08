@@ -98,30 +98,24 @@
   </div>
 
   <div class="bulk-actions">
-    <span>{{ selectedOrderIds.length }} order dipilih</span>
-    <button
-      class="btn-bulk-pay"
-      :disabled="selectedOrderIds.length === 0 || loading"
-      @click="paySelectedOrders"
-    >
-      Bayar Gabungan
-    </button>
-    <button
-      v-if="lastBulkReceiptForReprint"
-      class="btn-bulk-reprint"
-      :disabled="loading || printLoading"
-      @click="reprintLastBulkPayment"
-    >
-      Reprint Copy Kasir
-    </button>
-    <button
-      v-if="bulkReceiptHistory.length > 0"
-      class="btn-bulk-reprint"
-      :disabled="loading || printLoading"
-      @click="openBulkReprintHistory"
-    >
-      Riwayat Reprint
-    </button>
+    <span class="bulk-selected-count">{{ selectedOrderIds.length }} order dipilih</span>
+    <div class="bulk-actions-buttons">
+      <button
+        class="btn-bulk-pay"
+        :disabled="selectedOrderIds.length === 0 || loading"
+        @click="paySelectedOrders"
+      >
+        Bayar Gabungan
+      </button>
+      <button
+        v-if="bulkReceiptHistory.length > 0"
+        class="btn-bulk-reprint"
+        :disabled="loading || printLoading"
+        @click="openBulkReprintHistory"
+      >
+        Riwayat Reprint
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1849,6 +1843,19 @@ th {
   gap: 12px;
 }
 
+.bulk-selected-count {
+  font-weight: 700;
+  color: #e8eaef;
+}
+
+.bulk-actions-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
 .btn-bulk-pay {
   background: linear-gradient(90deg, #c9a24d, #e3c670);
   color: #111;
@@ -1900,7 +1907,13 @@ th {
 
   .bulk-actions {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  .bulk-actions-buttons {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 /* 📄 PAGINATION SECTION */
