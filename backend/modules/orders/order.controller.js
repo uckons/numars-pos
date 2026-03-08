@@ -109,6 +109,25 @@ const ensureUndoVoidApprovalTable = async (db) => {
 }
 
 
+const ensureBulkPaymentReceiptsTable = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS bulk_payment_receipts (
+      id BIGSERIAL PRIMARY KEY,
+      branch_id INT NOT NULL,
+      cashier_id INT,
+      cashier_name VARCHAR(120),
+      payment_method VARCHAR(30) NOT NULL DEFAULT 'CASH',
+      total NUMERIC(12,2) NOT NULL DEFAULT 0,
+      order_ids INT[] NOT NULL DEFAULT '{}',
+      paid_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_bulk_payment_receipts_branch_paid_at ON bulk_payment_receipts (branch_id, paid_at DESC, id DESC)`)
+}
+
+
 const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
