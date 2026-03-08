@@ -590,6 +590,16 @@ const pagedFilteredOrders = computed(() => {
 
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
 const getOrderNetRevenue = (order) => {
+  const paymentAmount = Number(order?.payment_amount)
+  const changeAmount = Number(order?.change_amount)
+  const hasPayment = Number.isFinite(paymentAmount)
+  const hasChange = Number.isFinite(changeAmount)
+
+  if (hasPayment) {
+    const realizedPaid = Math.max(0, paymentAmount - (hasChange ? changeAmount : 0))
+    if (realizedPaid > 0) return realizedPaid
+  }
+
   const totalAmount = Number(order?.total_amount)
   const total = Number(order?.total)
   const hasTotalAmount = Number.isFinite(totalAmount)
