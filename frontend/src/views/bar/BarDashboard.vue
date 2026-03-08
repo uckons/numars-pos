@@ -24,6 +24,10 @@
         <p>Inbox Pending</p>
         <h3>{{ pendingInboxCount }}</h3>
       </article>
+      <article class="kpi card-glass">
+        <p>Total Nilai Stok</p>
+        <h3>Rp {{ formatCurrency(totalStockValue) }}</h3>
+      </article>
     </section>
 
     <section class="card-glass">
@@ -57,7 +61,6 @@
           <button v-if="order.status === 'PENDING'" class="btn-accept" @click="accept(order.id)">Accept</button>
           <button v-if="order.status === 'ACCEPTED'" class="btn-success" @click="deliver(order.id)">Deliver</button>
           <button v-if="order.status === 'ACCEPTED'" class="btn-danger" @click="cancel(order.id)">Cancel</button>
-          <button class="btn-light" @click="reprintBarTicket(order.id)">Reprint</button>
         </div>
       </div>
 
@@ -146,7 +149,6 @@
         </div>
 
         <div class="modal-actions">
-          <button class="btn-light" @click="reprintBarTicket(selectedInboxOrder.id)">Reprint</button>
           <button class="btn-light" @click="closeInboxDetail">Tutup</button>
         </div>
       </div>
@@ -181,6 +183,7 @@ const stockPageSize = ref(10)
 
 const lowStockCount = computed(() => fnbItems.value.filter(i => Number(i.stock || 0) <= Number(i.alert_stock || 0)).length)
 const pendingInboxCount = computed(() => barInbox.value.filter(i => i.status === "PENDING").length)
+const totalStockValue = computed(() => fnbItems.value.reduce((acc, i) => acc + (Number(i.stock || 0) * Number(i.sell_price || i.price || 0)), 0))
 
 const filteredStocks = computed(() => {
   const key = stockSearch.value.toLowerCase()
@@ -221,48 +224,12 @@ const stockChartOptions = computed(() => {
     .slice(0, 12)
 
   return {
-    chart: {
-      type: 'bar',
-      toolbar: { show: false },
-      animations: { enabled: true, speed: 450 },
-      foreColor: '#d8dbe2'
-    },
-    theme: { mode: 'dark' },
-    xaxis: {
-      categories: rows.map(i => i.name),
-      labels: {
-        rotate: -25,
-        trim: true,
-        style: { colors: '#c9ced8', fontSize: '12px' }
-      },
-      axisBorder: { color: 'rgba(255,255,255,0.18)' },
-      axisTicks: { color: 'rgba(255,255,255,0.15)' }
-    },
-    yaxis: {
-      title: { text: 'Qty Stock', style: { color: '#a5adbb', fontWeight: 600 } },
-      labels: { style: { colors: '#c9ced8' } }
-    },
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        borderRadius: 6,
-        borderRadiusApplication: 'end',
-        columnWidth: '44%',
-        distributed: false
-      }
-    },
-    stroke: { show: true, width: 1, colors: ['#f7f9ff22'] },
+    xaxis: { categories: rows.map(i => i.name) },
+    theme: { mode: "dark" },
+    plotOptions: { bar: { borderRadius: 6, columnWidth: "50%" } },
     dataLabels: { enabled: false },
-    colors: ['#f5c518'],
-    grid: {
-      borderColor: 'rgba(255,255,255,0.13)',
-      strokeDashArray: 4,
-      xaxis: { lines: { show: false } }
-    },
-    tooltip: {
-      theme: 'dark',
-      y: { formatter: (val) => `${Number(val || 0)} item` }
-    }
+    colors: ["#f5c518"],
+    grid: { borderColor: "#2e2e2e" }
   }
 })
 
@@ -389,90 +356,31 @@ const deliver = async (id, fromModal = false) => {
 }
 
 const cancel = async (id, fromModal = false) => {
-  const targetOrder = selectedInboxOrder.value?.id === id
-    ? selectedInboxOrder.value
-    : barInbox.value.find((item) => Number(item.id) === Number(id))
-  const snapshotItems = Array.isArray(targetOrder?.items_snapshot) ? targetOrder.items_snapshot : []
-
-  if (!snapshotItems.length) {
-    await Swal.fire({ icon: 'warning', title: 'Item inbox kosong' })
-    return
-  }
-
-  const html = `
-    <div style="text-align:left;display:grid;gap:10px;max-height:260px;overflow:auto;">
-      ${snapshotItems.map((item, index) => `
-        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-          <input id="cancel-check-${index}" type="checkbox" style="margin-top:6px;transform:scale(1.2);" />
-          <div>
-            <strong>${item.service_name}</strong><br/>
-            <small>Qty kirim: ${Number(item.qty || 0)}</small>
-          </div>
-        </label>
-      `).join('')}
-    </div>
-    <textarea id="cancel-note" class="swal2-textarea" placeholder="Alasan cancel (wajib), contoh: stok habis / item tidak tersedia" style="margin-top:12px;"></textarea>
-    <small style="color:#999;display:block;line-height:1.45;margin-top:6px;">Item yang tidak dicancel akan tetap dikirim (delivered) otomatis.</small>
-  `
-
   const confirm = await Swal.fire({
-    icon: 'warning',
-    title: 'Pilih item yang dicancel',
-    html,
-    focusConfirm: false,
+    icon: "warning",
+    title: "Batalkan item tambahan?",
+    input: "textarea",
+    inputLabel: "Alasan cancel",
+    inputPlaceholder: "Contoh: stok habis / item tidak tersedia",
+    inputValue: "",
+    inputAttributes: { maxlength: 300 },
+    text: "Yang dibatalkan hanya item tambahan dari inbox ini.",
     showCancelButton: true,
-    confirmButtonText: 'Proses cancel',
-    cancelButtonText: 'Kembali',
-    preConfirm: () => {
-      const note = String(document.getElementById('cancel-note')?.value || '').trim()
-      if (!note) {
-        Swal.showValidationMessage('Alasan cancel wajib diisi')
-        return false
-      }
-
-      const cancelledItems = snapshotItems
-        .filter((_, index) => Boolean(document.getElementById(`cancel-check-${index}`)?.checked))
-        .map((item) => ({
-          service_id: Number(item.service_id || 0),
-          qty: Math.max(0, Number(item.qty || 0))
-        }))
-        .filter((item) => item.service_id > 0 && item.qty > 0)
-
-      if (!cancelledItems.length) {
-        Swal.showValidationMessage('Checklist minimal 1 item untuk dicancel')
-        return false
-      }
-
-      return { note, cancelled_items: cancelledItems }
+    confirmButtonText: "Ya, batalkan",
+    cancelButtonText: "Kembali",
+    inputValidator: (value) => {
+      if (!String(value || "").trim()) return "Alasan cancel wajib diisi"
+      return null
     }
   })
-
   if (!confirm.isConfirmed) return
 
-  const payload = confirm.value || {}
-  try {
-    await api.post(`/orders/bar/${id}/cancel`, payload)
-    await loadAll({ silent: true })
-    await Swal.fire({ icon: 'success', title: 'Cancel diproses', text: 'Item yang tidak dicancel tetap delivered.' })
+  const note = String(confirm.value || "").trim()
+  await api.post(`/orders/bar/${id}/cancel`, { note })
+  await loadAll({ silent: true })
+  await Swal.fire({ icon: "success", title: "Item tambahan dibatalkan" })
 
-    if (fromModal) closeInboxDetail()
-  } catch (err) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Cancel gagal',
-      text: err.response?.data?.message || err.message || 'Gagal memproses cancel item'
-    })
-  }
-}
-
-
-const reprintBarTicket = async (id) => {
-  try {
-    await api.post(`/orders/bar/${id}/reprint`)
-    await Swal.fire({ icon: "success", title: "Reprint dikirim", text: "Tiket BAR berhasil dikirim ulang ke printer." })
-  } catch (err) {
-    await Swal.fire({ icon: "error", title: "Reprint gagal", text: err.response?.data?.message || err.message || "Gagal reprint tiket BAR" })
-  }
+  if (fromModal) closeInboxDetail()
 }
 
 const barStockLevelLabel = (item) => {
