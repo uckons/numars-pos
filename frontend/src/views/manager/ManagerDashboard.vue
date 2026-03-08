@@ -81,7 +81,7 @@
         </section>
 
         <section class="card">
-          <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
+          <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV, MEMBERSHIP)</h4>
           <ApexChart type="area" :height="170" :series="categoryTrendSeries" :options="categoryTrendOptions" />
         </section>
 
@@ -589,7 +589,30 @@ const pagedFilteredOrders = computed(() => {
 })
 
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
-const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Number(o.total || 0), 0))
+const getOrderNetRevenue = (order) => {
+  const paymentAmount = Number(order?.payment_amount)
+  const changeAmount = Number(order?.change_amount)
+  const hasPayment = Number.isFinite(paymentAmount)
+  const hasChange = Number.isFinite(changeAmount)
+
+  if (hasPayment) {
+    const realizedPaid = Math.max(0, paymentAmount - (hasChange ? changeAmount : 0))
+    if (realizedPaid > 0) return realizedPaid
+  }
+
+  const totalAmount = Number(order?.total_amount)
+  const total = Number(order?.total)
+  const hasTotalAmount = Number.isFinite(totalAmount)
+  const hasTotal = Number.isFinite(total)
+
+  if (hasTotalAmount && hasTotal) {
+    return Math.min(totalAmount, total)
+  }
+  if (hasTotal) return total
+  if (hasTotalAmount) return totalAmount
+  return 0
+}
+const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + getOrderNetRevenue(o), 0))
 const paidOrders = computed(() => paidOrdersList.value.length)
 const fnbPaidModalCost = computed(() => paidOrdersList.value.reduce((sum, o) => sum + Number(o.fnb_modal_cost || 0), 0))
 const normalizeTherapistName = (name) => String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/gi, '')
@@ -870,7 +893,7 @@ const buildSortedDailyRevenue = (list, allocator) => {
   return [...map.values()].sort((a, b) => new Date(a.x).getTime() - new Date(b.x).getTime())
 }
 
-const trendPoints = computed(() => buildSortedDailyRevenue(paidOrdersList.value, (order) => order.total))
+const trendPoints = computed(() => buildSortedDailyRevenue(paidOrdersList.value, (order) => getOrderNetRevenue(order)))
 
 const formatAccountingNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const formatAxisNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -964,7 +987,7 @@ const breakdownMap = computed(() => {
   for (const o of paidOrdersList.value) {
     for (const catRaw of String(o.category || "-").split(",").map((x) => x.trim()).filter(Boolean)) {
       const cat = catRaw.toUpperCase().includes('KARAOKE') ? 'KTV' : catRaw
-      map.set(cat, (map.get(cat) || 0) + Number(o.total || 0))
+      map.set(cat, (map.get(cat) || 0) + getOrderNetRevenue(o))
     }
   }
   return map
@@ -997,19 +1020,19 @@ const breakdownOptions = computed(() => ({
 }))
 
 const categoryTrendData = computed(() => {
-  const keys = ["FNB", "SPA", "LC", "KTV"]
+  const keys = ["FNB", "SPA", "LC", "KTV", "MEMBERSHIP"]
   const dayMap = new Map()
   for (const o of paidOrdersList.value) {
     const dayKey = getBusinessDateKey(o.created_at, o.branch_id)
     if (!dayKey) continue
     if (!dayMap.has(dayKey)) {
-      dayMap.set(dayKey, { x: startOfBusinessDayIso(dayKey), FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+      dayMap.set(dayKey, { x: startOfBusinessDayIso(dayKey), FNB: 0, SPA: 0, LC: 0, KTV: 0, MEMBERSHIP: 0 })
     }
     const categories = String(o.category || "").toUpperCase().split(",").map((v) => v.trim()).filter(Boolean)
     const normalized = categories.map((cat) => cat.includes('KARAOKE') ? 'KTV' : cat)
     const matched = keys.filter((k) => normalized.some((cat) => cat.includes(k)))
     const divisor = matched.length || 1
-    const allocated = Number(o.total || 0) / divisor
+    const allocated = getOrderNetRevenue(o) / divisor
     for (const cat of matched) dayMap.get(dayKey)[cat] += allocated
   }
   return [...dayMap.values()].sort((a, b) => new Date(a.x).getTime() - new Date(b.x).getTime())
@@ -1018,9 +1041,9 @@ const categoryTrendData = computed(() => {
 const categoryTrendSeries = computed(() => {
   if (!categoryTrendData.value.length) {
     const fallbackX = startOfDayIso()
-    return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [{ x: fallbackX, y: 0 }] }))
+    return ["FNB", "SPA", "LC", "KTV", "MEMBERSHIP"].map((name) => ({ name, data: [{ x: fallbackX, y: 0 }] }))
   }
-  return ["FNB", "SPA", "LC", "KTV"].map((name) => ({
+  return ["FNB", "SPA", "LC", "KTV", "MEMBERSHIP"].map((name) => ({
     name,
     data: categoryTrendData.value.map((row) => ({ x: row.x, y: Number(row[name] || 0) }))
   }))
@@ -1105,7 +1128,7 @@ const categoryTrendOptions = computed(() => ({
     borderColor: "rgba(255, 255, 255, 0.1)",
     strokeDashArray: 3
   },
-  colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd"],
+  colors: ["#ff9f43", "#5f85ff", "#20c997", "#e056fd", "#f97316"],
   legend: {
     position: "top",
     labels: {
