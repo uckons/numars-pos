@@ -1558,7 +1558,9 @@ const saveDraft = async () => {
 .payment-confirm-items {
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: clamp(220px, 34vh, 360px);
   background: #fff;
   font-family: 'Courier New', monospace;
   color: #0f172a;
@@ -1578,6 +1580,9 @@ const saveDraft = async () => {
   font-weight: 700;
   background: #f1f5f9;
   color: #334155;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .confirm-item-row {
@@ -1831,6 +1836,10 @@ const saveDraft = async () => {
     grid-template-columns: minmax(120px, 1.5fr) 56px 90px 110px;
     font-size: 12px;
     padding: 8px 10px;
+  }
+
+  .payment-confirm-items {
+    max-height: clamp(180px, 30vh, 280px);
   }
   
   .modal-actions {
