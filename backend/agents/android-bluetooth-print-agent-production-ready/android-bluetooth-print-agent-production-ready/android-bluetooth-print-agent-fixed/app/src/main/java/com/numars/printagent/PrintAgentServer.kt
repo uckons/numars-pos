@@ -21,10 +21,12 @@ class PrintAgentServer(
 ) {
     private var engine: ApplicationEngine? = null
 
-    fun start(port: Int = 19000) {
+    fun start(port: Int = 19000, host: String = "0.0.0.0") {
         if (engine != null) return
 
-        engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+        val bindHost = host.substringBefore("/").ifBlank { "0.0.0.0" }
+
+        engine = embeddedServer(CIO, port = port, host = bindHost) {
             install(ContentNegotiation) { gson() }
             routing {
                 get("/health") {

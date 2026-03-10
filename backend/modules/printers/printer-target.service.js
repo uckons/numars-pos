@@ -111,6 +111,27 @@ const listPrinterTargets = async ({ db, branchId, channel }) => {
   return (await db.query(sql, params)).rows
 }
 
+
+const deletePrinterTarget = async ({ db, id }) => {
+  await ensurePrinterTargetsTable(db)
+
+  const targetId = Number(id)
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    throw new Error("id target printer tidak valid")
+  }
+
+  const { rowCount } = await db.query(
+    `DELETE FROM printer_targets WHERE id = $1`,
+    [targetId]
+  )
+
+  if (!rowCount) {
+    throw new Error("Printer target tidak ditemukan")
+  }
+
+  return { success: true }
+}
+
 const getResolvedPrinterTarget = async ({ db, branchId, channel }) => {
   await ensurePrinterTargetsTable(db)
   const normalizedChannel = normalizeChannel(channel)
@@ -138,5 +159,6 @@ module.exports = {
   ensurePrinterTargetsTable,
   upsertPrinterTarget,
   listPrinterTargets,
-  getResolvedPrinterTarget
+  getResolvedPrinterTarget,
+  deletePrinterTarget
 }
