@@ -58,6 +58,49 @@ class PrintAgentServer(
                         call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "print failed")))
                     }
                 }
+
+
+                post("/print/test") {
+                    val expectedToken = tokenProvider().trim()
+                    if (expectedToken.isNotEmpty()) {
+                        val token = call.request.headers["x-print-agent-token"].orEmpty()
+                        if (token != expectedToken) {
+                            call.respond(HttpStatusCode.Unauthorized, mapOf("message" to "invalid print agent token"))
+                            return@post
+                        }
+                    }
+
+                    val macAddress = macProvider().trim()
+                    if (macAddress.isEmpty()) {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("message" to "printer MAC belum diset"))
+                        return@post
+                    }
+
+                    val request = PrintReceiptRequest(
+                        receipt = ReceiptData(
+                            title = "NUMARS ANDROID TEST PRINT",
+                            divider = "------------------------",
+                            items = listOf(
+                                ReceiptItem(
+                                    service_name = "Bluetooth check",
+                                    qty = 1,
+                                    subtotal = 0.0,
+                                    therapist_name = "Agent"
+                                )
+                            ),
+                            total = 0.0,
+                            printed_at = java.util.Date().toString()
+                        )
+                    )
+
+                    try {
+                        val bytes = ReceiptEscPosMapper.toEscPos(request)
+                        bluetoothPrinterClient.print(macAddress, bytes)
+                        call.respond(mapOf("success" to true, "message" to "test print sent"))
+                    } catch (e: Exception) {
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("message" to (e.message ?: "test print failed")))
+                    }
+                }
             }
         }
 
