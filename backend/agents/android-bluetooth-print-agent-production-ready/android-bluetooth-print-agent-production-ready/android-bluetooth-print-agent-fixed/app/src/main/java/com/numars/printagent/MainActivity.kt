@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
 
         tokenInput.setText(prefs.getString(PrintAgentService.KEY_TOKEN, ""))
         macInput.setText(prefs.getString(PrintAgentService.KEY_PRINTER_MAC, ""))
-        portInput.setText(String.valueOf(prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT)))
+        portInput.setText(prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT).toString())
 
         val saveBtn = Button(this).apply {
             text = "Simpan Config"
