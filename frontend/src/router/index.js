@@ -14,6 +14,7 @@ const Therapists = () => import("@/views/superadmin/Therapists.vue")
 const AuditLogs = () => import("../views/superadmin/AuditLogs.vue")
 const AccountingUAT = () => import("@/views/superadmin/AccountingUAT.vue")
 const KasirBarInbox = () => import("@/views/kasir/KasirBarInbox.vue")
+const KasirMembership = () => import("@/views/kasir/KasirMembership.vue")
 
 const routes = [
   { path: "/login", component: Login },
@@ -56,6 +57,12 @@ const routes = [
     path: "/kasir/bar-inbox",
     name: "KasirBarInbox",
     component: KasirBarInbox,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: "/kasir/membership",
+    name: "KasirMembership",
+    component: KasirMembership,
     meta: { requiresAuth: true }
   },
   {
