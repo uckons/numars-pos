@@ -526,6 +526,15 @@ const clear = async () => {
 
 const askPaymentDetails = async () => {
   const total = Math.round(Number(grandTotal.value || 0))
+  let memberOptionsHtml = '<option value="">-- Pilih Member --</option>'
+
+  try {
+    const memberRes = await api.get('/memberships/members', { params: { active: 'true', page: 1, limit: 500 } })
+    const memberRows = Array.isArray(memberRes.data?.data) ? memberRes.data.data : []
+    memberOptionsHtml += memberRows.map((m) => `<option value="${String(m.card_no || '').replace(/"/g, '&quot;')}">${String(m.card_no || '-') } - ${String(m.full_name || 'Tanpa Nama')}</option>`).join('')
+  } catch (_) {
+    memberOptionsHtml += ''
+  }
 
   const res = await SwalTheme.fire({
     icon: "question",
@@ -541,9 +550,11 @@ const askPaymentDetails = async () => {
           <option value="TRANSFER BANK">TRANSFER BANK</option>
         </select>
 
-        <label style="display:block;margin-bottom:6px;font-size:13px;">No Kartu Member (opsional)</label>
-        <input id="pay-member-card" type="text" class="swal2-input" style="margin:0 0 6px 0;max-width:100%;" placeholder="contoh: MBR-000001" />
-        <button id="btn-register-member" type="button" class="swal2-styled" style="background:#2d6cdf;margin:0 0 12px 0;">Daftar Member Baru</button>
+        <label style="display:block;margin-bottom:6px;font-size:13px;">List Member (opsional)</label>
+        <select id="pay-member-card" class="swal2-input" style="margin:0 0 6px 0;max-width:100%;">
+          ${memberOptionsHtml}
+        </select>
+        <button id="btn-register-member" type="button" class="swal2-styled" style="background:#2d6cdf;margin:0 0 12px 0;">Tambah Member Baru</button>
 
         <label style="display:block;margin-bottom:6px;font-size:13px;">Discount Manual (Rp)</label>
         <input id="pay-discount" type="number" min="0" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;" value="0" />
@@ -611,8 +622,14 @@ const askPaymentDetails = async () => {
           }
         })
         if (reg.isConfirmed && reg.value?.card_no) {
-          const cardInput = document.getElementById('pay-member-card')
-          if (cardInput) cardInput.value = String(reg.value.card_no)
+          const cardSelect = document.getElementById('pay-member-card')
+          if (cardSelect) {
+            const option = document.createElement('option')
+            option.value = String(reg.value.card_no)
+            option.text = `${reg.value.card_no} - ${reg.value.full_name || 'Tanpa Nama'}`
+            cardSelect.appendChild(option)
+            cardSelect.value = String(reg.value.card_no)
+          }
           await SwalTheme.fire({ icon: 'success', title: 'Member terdaftar', text: `No kartu: ${reg.value.card_no}` })
         }
       })

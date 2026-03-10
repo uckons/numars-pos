@@ -52,6 +52,10 @@
         <span v-if="unreadBarCount" class="notif-dot">{{ unreadBarCount }}</span>
       </router-link>
 
+      <router-link to="/kasir/membership" class="action">
+        👤 Membership
+      </router-link>
+
       <button class="action attendance-action" type="button" @click="showAttendanceModal = true">
         👥 Absensi Terapis
       </button>
