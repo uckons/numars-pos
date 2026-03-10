@@ -24,23 +24,27 @@ class MainActivity : AppCompatActivity() {
 
         val tokenInput = EditText(this).apply { hint = "Token (x-print-agent-token)" }
         val macInput = EditText(this).apply { hint = "MAC printer bluetooth (contoh: 66:22:AA:BB:CC:DD)" }
+        val hostInput = EditText(this).apply { hint = "Host listen (default 0.0.0.0)" }
         val portInput = EditText(this).apply { hint = "Port (default 19000)" }
         val status = TextView(this)
 
         tokenInput.setText(prefs.getString(PrintAgentService.KEY_TOKEN, ""))
         macInput.setText(prefs.getString(PrintAgentService.KEY_PRINTER_MAC, ""))
+        hostInput.setText(prefs.getString(PrintAgentService.KEY_HOST, PrintAgentService.DEFAULT_HOST))
         portInput.setText(prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT).toString())
 
         val saveBtn = Button(this).apply {
             text = "Simpan Config"
             setOnClickListener {
                 val port = portInput.text.toString().toIntOrNull() ?: PrintAgentService.DEFAULT_PORT
+                val host = hostInput.text.toString().trim().substringBefore("/").ifBlank { PrintAgentService.DEFAULT_HOST }
                 prefs.edit()
                     .putString(PrintAgentService.KEY_TOKEN, tokenInput.text.toString())
                     .putString(PrintAgentService.KEY_PRINTER_MAC, macInput.text.toString())
                     .putInt(PrintAgentService.KEY_PORT, port)
+                    .putString(PrintAgentService.KEY_HOST, host)
                     .apply()
-                status.text = "Config tersimpan."
+                status.text = "Config tersimpan (listen $host:$port)."
             }
         }
 
@@ -49,7 +53,8 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 ContextCompat.startForegroundService(this@MainActivity, Intent(this@MainActivity, PrintAgentService::class.java))
                 val port = prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT)
-                status.text = "Agent berjalan di http://0.0.0.0:$port"
+                val host = prefs.getString(PrintAgentService.KEY_HOST, PrintAgentService.DEFAULT_HOST).orEmpty().substringBefore("/").ifBlank { PrintAgentService.DEFAULT_HOST }
+                status.text = "Agent berjalan di http://$host:$port"
             }
         }
 
@@ -66,6 +71,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(32, 48, 32, 32)
             addView(tokenInput)
             addView(macInput)
+            addView(hostInput)
             addView(portInput)
             addView(saveBtn)
             addView(startBtn)
