@@ -58,6 +58,11 @@ class PrintAgentService : Service() {
         
         val port = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_PORT, DEFAULT_PORT)
+        val host = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_HOST, DEFAULT_HOST)
+            .orEmpty()
+            .substringBefore("/")
+            .ifBlank { DEFAULT_HOST }
         
         try {
             // Start as foreground service (prevents normal killing)
@@ -68,13 +73,13 @@ class PrintAgentService : Service() {
             acquireWakeLock()
             
             // Start HTTP server
-            server.start(port)
+            server.start(port = port, host = host)
             
             // Start keep-alive thread (untuk maintain Bluetooth connection)
             startKeepAliveThread()
             
             isRunning = true
-            logger.info("PrintAgentService started successfully on port $port")
+            logger.info("PrintAgentService started successfully on $host:$port")
             
         } catch (e: Exception) {
             logger.severe("Failed to start PrintAgentService: ${e.message}")
@@ -323,7 +328,9 @@ class PrintAgentService : Service() {
         const val KEY_TOKEN = "token"
         const val KEY_PRINTER_MAC = "printer_mac"
         const val KEY_PORT = "port"
+        const val KEY_HOST = "host"
         const val DEFAULT_PORT = 19000
+        const val DEFAULT_HOST = "0.0.0.0"
         
         private const val CHANNEL_ID = "print-agent-channel"
         private const val NOTIF_ID = 2106
