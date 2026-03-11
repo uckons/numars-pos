@@ -178,6 +178,26 @@ const buildBarInboxPayload = (ticket = {}, options = {}) => {
   }
 }
 
+
+const formatAgentErrorDetail = (err) => {
+  if (err.response?.data) {
+    try {
+      return JSON.stringify(err.response.data)
+    } catch {
+      return String(err.response?.data)
+    }
+  }
+
+  const code = err.code || "UNKNOWN"
+  if (code === "ECONNREFUSED") {
+    return "ECONNREFUSED (host bisa di-ping tapi port HTTP tidak terbuka / service agent belum listen)"
+  }
+  if (code === "ETIMEDOUT" || code === "ECONNABORTED") {
+    return `${code} (timeout koneksi ke endpoint agent)`
+  }
+  return code || err.message
+}
+
 const normalizeCategory = (category) => {
   const upper = String(category || '').trim().toUpperCase()
   if (upper === 'KARAOKE') return 'KTV'
@@ -453,7 +473,7 @@ exports.testAgentConnection = async ({ agentUrl, token }) => {
       data: health.data
     }
   } catch (err) {
-    const detail = err.response?.data?.message || err.code || err.message
+    const detail = err.response?.data?.message || formatAgentErrorDetail(err)
     throw new Error(`Koneksi agent gagal (${base}/health): ${detail}`)
   }
 }
@@ -483,9 +503,7 @@ exports.testAgentPrint = async ({ agentUrl, token, printerName }) => {
       data: res.data
     }
   } catch (err) {
-    const detail = err.response?.data
-      ? JSON.stringify(err.response.data)
-      : (err.code || err.message)
+    const detail = formatAgentErrorDetail(err)
     throw new Error(`Test print agent gagal (${base}/print/test): ${detail}`)
   }
 }
@@ -500,10 +518,27 @@ exports.getAgentDiagnostics = async ({ agentUrl, token }) => {
   const base = agentUrl.replace(/\/$/, "")
 
   try {
-    const [healthRes, printersRes] = await Promise.all([
-      axios.get(`${base}/health`, { headers, timeout: timeoutMs }),
-      axios.get(`${base}/printers`, { headers, timeout: timeoutMs })
-    ])
+    const healthRes = await axios.get(`${base}/health`, { headers, timeout: timeoutMs })
+
+    let printers = {
+      status: null,
+      data: null,
+      warning: "Endpoint /printers tidak tersedia di agent ini"
+    }
+
+    try {
+      const printersRes = await axios.get(`${base}/printers`, { headers, timeout: timeoutMs })
+      printers = {
+        status: printersRes.status,
+        data: printersRes.data,
+        warning: null
+      }
+    } catch (printerErr) {
+      const statusCode = printerErr.response?.status
+      if (statusCode && statusCode !== 404) {
+        throw printerErr
+      }
+    }
 
     return {
       ok: true,
@@ -512,15 +547,10 @@ exports.getAgentDiagnostics = async ({ agentUrl, token }) => {
         status: healthRes.status,
         data: healthRes.data
       },
-      printers: {
-        status: printersRes.status,
-        data: printersRes.data
-      }
+      printers
     }
   } catch (err) {
-    const detail = err.response?.data
-      ? JSON.stringify(err.response.data)
-      : (err.code || err.message)
+    const detail = formatAgentErrorDetail(err)
     throw new Error(`Diagnosa agent gagal (${base}): ${detail}`)
   }
 }
