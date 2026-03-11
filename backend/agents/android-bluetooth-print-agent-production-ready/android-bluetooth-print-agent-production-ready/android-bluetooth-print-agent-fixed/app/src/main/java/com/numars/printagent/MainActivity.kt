@@ -13,12 +13,15 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestBluetoothPermissionIfNeeded()
+        requestNotificationPermissionIfNeeded()
 
         val prefs = getSharedPreferences(PrintAgentService.PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -54,7 +57,19 @@ class MainActivity : AppCompatActivity() {
                 ContextCompat.startForegroundService(this@MainActivity, Intent(this@MainActivity, PrintAgentService::class.java))
                 val port = prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT)
                 val host = prefs.getString(PrintAgentService.KEY_HOST, PrintAgentService.DEFAULT_HOST).orEmpty().substringBefore("/").ifBlank { PrintAgentService.DEFAULT_HOST }
-                status.text = "Agent berjalan di http://$host:$port"
+                status.text = "Mencoba start agent di http://$host:$port ..."
+
+                Thread {
+                    Thread.sleep(800)
+                    val healthCheck = checkLocalHealth(port)
+                    runOnUiThread {
+                        status.text = if (healthCheck == null) {
+                            "Agent berjalan di http://$host:$port"
+                        } else {
+                            "Agent gagal start: $healthCheck"
+                        }
+                    }
+                }.start()
             }
         }
 
@@ -80,6 +95,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(container)
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1002)
+        }
+    }
+
+    private fun checkLocalHealth(port: Int): String? {
+        return try {
+            val connection = (URL("http://127.0.0.1:$port/health").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 3000
+                readTimeout = 3000
+                requestMethod = "GET"
+            }
+            connection.connect()
+            if (connection.responseCode in 200..299) null else "HTTP ${connection.responseCode}"
+        } catch (e: Exception) {
+            e.message ?: "unknown error"
+        }
     }
 
     private fun requestBluetoothPermissionIfNeeded() {
