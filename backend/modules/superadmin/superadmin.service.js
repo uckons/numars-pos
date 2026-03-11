@@ -411,3 +411,10 @@ exports.upsertPrinterTarget = async (payload = {}) => {
     payload
   })
 }
+
+exports.deletePrinterTarget = async (id) => {
+  return printerTargetService.deletePrinterTarget({
+    db,
+    id
+  })
+}
