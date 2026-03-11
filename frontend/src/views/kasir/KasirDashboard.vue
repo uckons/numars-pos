@@ -256,15 +256,33 @@ const logout = () => {
 }
 
 const loadDashboard = async () => {
-  const headers = {
-    Authorization: `Bearer ${auth.token}`
+  try {
+    const headers = {
+      Authorization: `Bearer ${auth.token}`
+    }
+
+    const s = await fetch("/api/dashboard/kasir", { headers })
+    const contentType = String(s.headers.get("content-type") || "").toLowerCase()
+
+    if (!s.ok) {
+      const raw = await s.text().catch(() => "")
+      throw new Error(`Dashboard API ${s.status}: ${raw.slice(0, 120) || "unknown error"}`)
+    }
+
+    if (!contentType.includes("application/json")) {
+      const raw = await s.text().catch(() => "")
+      throw new Error(`Dashboard API bukan JSON: ${raw.slice(0, 120) || "empty response"}`)
+    }
+
+    stats.value = await s.json()
+  } catch (err) {
+    console.error("Failed to load dashboard stats:", err)
+    stats.value = {
+      activeOrders: 0,
+      todayRevenue: 0,
+      activeTherapists: 0
+    }
   }
-
-  const s = await fetch("/api/dashboard/kasir", { headers })
-  stats.value = await s.json()
-
-//  const t = await fetch("/api/timers/active", { headers })
-//  timers.value = await t.json()
 }
 const selectedSlot = ref(null)
 const showStartModal = ref(false)
@@ -590,16 +608,18 @@ Alasan: ${payload.note}` : (payload.message || "Update dari staff bar")
     await showUnreadBarRepopup()
   })
 
-  await loadDashboard()
-  await syncTimers()
-  await loadBarMessages()
-  await loadAttendanceGrades()
-  await loadTherapistAttendance()
+  await Promise.allSettled([
+    loadDashboard(),
+    syncTimers(),
+    loadBarMessages(),
+    loadAttendanceGrades(),
+    loadTherapistAttendance()
+  ])
   await showUnreadBarRepopup()
-  
+
   // Start countdown interval (every 1 second)
   countdownInterval = setInterval(updateCountdown, COUNTDOWN_INTERVAL)
-  
+
   // Start API refresh interval (every 30 seconds)
   apiRefreshInterval = setInterval(syncTimers, API_REFRESH_INTERVAL)
   barMessageInterval = setInterval(async () => {

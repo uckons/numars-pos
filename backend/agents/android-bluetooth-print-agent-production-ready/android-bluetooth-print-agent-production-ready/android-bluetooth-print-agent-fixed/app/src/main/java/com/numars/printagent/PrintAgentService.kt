@@ -1,11 +1,13 @@
 package com.numars.printagent
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -58,6 +60,11 @@ class PrintAgentService : Service() {
         
         val port = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getInt(KEY_PORT, DEFAULT_PORT)
+        val host = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_HOST, DEFAULT_HOST)
+            .orEmpty()
+            .substringBefore("/")
+            .ifBlank { DEFAULT_HOST }
         
         try {
             // Start as foreground service (prevents normal killing)
@@ -68,13 +75,13 @@ class PrintAgentService : Service() {
             acquireWakeLock()
             
             // Start HTTP server
-            server.start(port)
+            server.start(port = port, host = host)
             
             // Start keep-alive thread (untuk maintain Bluetooth connection)
             startKeepAliveThread()
             
             isRunning = true
-            logger.info("PrintAgentService started successfully on port $port")
+            logger.info("PrintAgentService started successfully on $host:$port")
             
         } catch (e: Exception) {
             logger.severe("Failed to start PrintAgentService: ${e.message}")
@@ -213,18 +220,24 @@ class PrintAgentService : Service() {
                     // Check Bluetooth connection
                     val mac = prefs.getString(KEY_PRINTER_MAC, "").orEmpty()
                     if (mac.isNotEmpty()) {
-                        try {
-                            val adapter = BluetoothAdapter.getDefaultAdapter()
-                            if (adapter?.isEnabled == true) {
-                                // Lightweight check - just get device reference
-                                val device = adapter.getRemoteDevice(mac)
-                                
-                                // Optional: check bondState untuk verify device adalah accessible
-                                val bondState = device.bondState
-                                logger.fine("Device $mac bond state: $bondState")
+                        if (!hasBluetoothConnectPermission()) {
+                            logger.warning("Skipping keep-alive: BLUETOOTH_CONNECT permission is not granted")
+                        } else {
+                            try {
+                                val adapter = BluetoothAdapter.getDefaultAdapter()
+                                if (adapter?.isEnabled == true) {
+                                    // Lightweight check - just get device reference
+                                    val device = adapter.getRemoteDevice(mac)
+
+                                    // Optional: check bondState untuk verify device adalah accessible
+                                    val bondState = device.bondState
+                                    logger.fine("Device $mac bond state: $bondState")
+                                }
+                            } catch (e: SecurityException) {
+                                logger.warning("Keep-alive blocked by missing Bluetooth permission: ${e.message}")
+                            } catch (e: Exception) {
+                                logger.warning("Keep-alive check failed: ${e.message}")
                             }
-                        } catch (e: Exception) {
-                            logger.warning("Keep-alive check failed: ${e.message}")
                         }
                     }
                     
@@ -269,6 +282,14 @@ class PrintAgentService : Service() {
         }
     }
     
+    /**
+     * BLUETOOTH_CONNECT runtime permission check (Android 12+)
+     */
+    private fun hasBluetoothConnectPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        return checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+    }
+
     // ==================== Notification Management ====================
     
     /**
@@ -323,7 +344,9 @@ class PrintAgentService : Service() {
         const val KEY_TOKEN = "token"
         const val KEY_PRINTER_MAC = "printer_mac"
         const val KEY_PORT = "port"
+        const val KEY_HOST = "host"
         const val DEFAULT_PORT = 19000
+        const val DEFAULT_HOST = "0.0.0.0"
         
         private const val CHANNEL_ID = "print-agent-channel"
         private const val NOTIF_ID = 2106
