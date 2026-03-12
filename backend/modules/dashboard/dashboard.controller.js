@@ -1,8 +1,12 @@
 const service = require("./dashboard.service")
 
 exports.kasir = async (req, res) => {
-  const data = await service.kasir(req.user)
-  res.json(data)
+  try {
+    const data = await service.kasir(req.user)
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
 }
 
 exports.kasirAnalytics = async (req, res) => {

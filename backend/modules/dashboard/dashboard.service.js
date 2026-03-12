@@ -1,7 +1,7 @@
 const db = require("../../config/db")
 
 exports.kasir = async (user) => {
-  const branchId = resolveAnalyticsBranchId(user, query)
+  const branchId = resolveAnalyticsBranchId(user, {})
 
   const activeOrders = await db.query(
     `SELECT COUNT(*) FROM orders WHERE status='DRAFT' AND branch_id=$1`,
@@ -190,7 +190,7 @@ const resolveRange = ({ preset, date_from, date_to, open_time, close_time }) => 
 }
 
 exports.kasirAnalytics = async (user, query = {}) => {
-  const branchId = resolveAnalyticsBranchId(user, query)
+  const branchId = resolveAnalyticsBranchId(user, {})
   const preset = String(query.preset || "monthly").toLowerCase()
 
   const scheduleRes = await db.query(
