@@ -5,6 +5,22 @@ const printerTargetService = require("../printers/printer-target.service")
 
 
 
+const resolveBranchIdFromRequest = async (db, req) => {
+  const direct = Number(req.query?.branch_id || req.body?.branch_id || req.user?.branch_id || 0)
+  if (Number.isInteger(direct) && direct > 0) return direct
+
+  const userId = Number(req.user?.id || 0)
+  if (!Number.isInteger(userId) || userId <= 0) return null
+
+  const userRes = await db.query(
+    "SELECT branch_id FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  )
+  const fromDb = Number(userRes.rows[0]?.branch_id || 0)
+  return Number.isInteger(fromDb) && fromDb > 0 ? fromDb : null
+}
+
+
 const queueBarInboxAutoPrint = (req, payload = {}) => {
   Promise.resolve().then(async () => {
     const db = req.app.get("db")
@@ -129,9 +145,18 @@ exports.start = async (req, res) => {
 }
 
 exports.getActive = async (req, res) => {
-  const db = req.app.get("db")
-  const timers = await service.getActiveTimers(db, req.user.branch_id)
-  res.json(timers)
+  try {
+    const db = req.app.get("db")
+    const branchId = await resolveBranchIdFromRequest(db, req)
+    if (!branchId) {
+      return res.status(400).json({ message: "User belum terikat ke branch" })
+    }
+
+    const timers = await service.getActiveTimers(db, branchId)
+    res.json(timers)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
 }
 
 exports.startTimer = async (req, res) => {
@@ -1141,9 +1166,12 @@ exports.getRooms = async (req, res) => {
 exports.getTimerSlots = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const branch_id = req.query.branch_id || req.user.branch_id
+    const branchId = await resolveBranchIdFromRequest(db, req)
+    if (!branchId) {
+      return res.status(400).json({ message: "User belum terikat ke branch" })
+    }
 
-    const slots = await service.getTimerSlots(db, branch_id)
+    const slots = await service.getTimerSlots(db, branchId)
     res.json(slots)
   } catch (err) {
     console.error("GET TIMER SLOTS ERROR:", err)
