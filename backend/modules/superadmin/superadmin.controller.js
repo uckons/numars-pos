@@ -88,3 +88,12 @@ exports.upsertPrinterTarget = async (req, res) => {
     res.status(400).json({ message: err.message })
   }
 }
+
+exports.deletePrinterTarget = async (req, res) => {
+  try {
+    await s.deletePrinterTarget(req.params.id)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
