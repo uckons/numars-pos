@@ -2,8 +2,8 @@
   <div class="page">
     <header class="header">
       <div>
-        <h2>Accounting Sprint 3 — UAT Console</h2>
-        <p class="subtitle">Manual Journal, Approval Queue, Recurring Generator, dan filter reporting untuk UAT user.</p>
+        <h2>Accounting Sprint 3 — Production Console</h2>
+        <p class="subtitle">Manual Journal, Approval Queue, Recurring Generator, dan filter reporting yang sudah backend-ready.</p>
       </div>
       <div class="header-actions">
         <button class="btn ghost" @click="goBackToDashboard">Kembali ke Dashboard</button>
@@ -23,17 +23,19 @@
 
     <section class="card">
       <h3>Accounting Full Menu</h3>
-      <p class="subtitle2">Aktifkan menu UAT sesuai scope build: GL, AP, AR, Payroll, Payroll Flexible Engine, Tax, Closing, dan Financial Report.</p>
+      <p class="subtitle2">Modul yang belum backend-ready ditandai sebagai coming soon agar tidak dipakai di production.</p>
       <div class="menu-grid">
         <button
           v-for="menu in moduleMenus"
           :key="menu.key"
           class="menu-chip"
-          :class="{ active: activeModule === menu.key }"
-          @click="activeModule = menu.key; persistActiveModule()"
+          :class="{ active: activeModule === menu.key, disabled: !menu.enabled }"
+          :disabled="!menu.enabled"
+          @click="menu.enabled && (activeModule = menu.key, persistActiveModule())"
         >
           <strong>{{ menu.label }}</strong>
           <small>{{ menu.desc }}</small>
+          <small v-if="!menu.enabled" class="coming-soon">Coming Soon</small>
         </button>
       </div>
     </section>
@@ -455,17 +457,17 @@ const router = useRouter()
 const today = new Date().toISOString().slice(0, 10)
 
 const moduleMenus = [
-  { key: 'manual-journal', label: 'General Ledger', desc: 'Manual journal & queue' },
-  { key: 'coa', label: 'Chart of Accounts', desc: 'Setup kode akun dari UI' },
-  { key: 'approval', label: 'Approval Queue', desc: 'Approval SLA & escalation' },
-  { key: 'recurring', label: 'Recurring', desc: 'Recurring journal templates' },
-  { key: 'ap', label: 'Accounts Payable', desc: 'Vendor bills & payable draft' },
-  { key: 'ar', label: 'Accounts Receivable', desc: 'Customer invoice draft' },
-  { key: 'payroll', label: 'Payroll', desc: 'Payroll accrual simulation' },
-  { key: 'payroll-flex', label: 'Payroll Flexible Engine', desc: '4 model therapist + 4 model agent' },
-  { key: 'tax', label: 'Tax Center', desc: 'PPN / PPh workflow' },
-  { key: 'close-book', label: 'Period Closing', desc: 'Close month checklist' },
-  { key: 'reporting', label: 'Reports', desc: 'P&L, Balance Sheet, Cash Flow' }
+  { key: 'manual-journal', label: 'General Ledger', desc: 'Manual journal & queue', enabled: true },
+  { key: 'coa', label: 'Chart of Accounts', desc: 'Setup kode akun dari UI', enabled: true },
+  { key: 'approval', label: 'Approval Queue', desc: 'Approval SLA & escalation', enabled: true },
+  { key: 'recurring', label: 'Recurring', desc: 'Recurring journal templates', enabled: true },
+  { key: 'ap', label: 'Accounts Payable', desc: 'Vendor bills & payable draft', enabled: false },
+  { key: 'ar', label: 'Accounts Receivable', desc: 'Customer invoice draft', enabled: false },
+  { key: 'payroll', label: 'Payroll', desc: 'Payroll accrual simulation', enabled: true },
+  { key: 'payroll-flex', label: 'Payroll Flexible Engine', desc: '4 model therapist + 4 model agent', enabled: true },
+  { key: 'tax', label: 'Tax Center', desc: 'PPN / PPh workflow', enabled: true },
+  { key: 'close-book', label: 'Period Closing', desc: 'Close month checklist', enabled: true },
+  { key: 'reporting', label: 'Reports', desc: 'P&L, Balance Sheet, Cash Flow', enabled: true }
 ]
 
 const reportMenus = [
@@ -476,7 +478,9 @@ const reportMenus = [
   { name: 'Aging Receivable', desc: 'Umur piutang customer' }
 ]
 
-const defaultModule = localStorage.getItem('accountingUAT.activeModule') || 'manual-journal'
+const enabledModules = moduleMenus.filter((menu) => menu.enabled).map((menu) => menu.key)
+const storedModule = localStorage.getItem('accountingUAT.activeModule')
+const defaultModule = enabledModules.includes(storedModule) ? storedModule : 'manual-journal'
 const activeModule = ref(defaultModule)
 
 
@@ -498,7 +502,9 @@ const goBackToDashboard = () => {
 }
 
 const persistActiveModule = () => {
-  localStorage.setItem('accountingUAT.activeModule', activeModule.value)
+  if (enabledModules.includes(activeModule.value)) {
+    localStorage.setItem('accountingUAT.activeModule', activeModule.value)
+  }
 }
 
 const loadingJournals = ref(false)
@@ -943,10 +949,10 @@ const simulateApprovalSync = async () => {
 
 onMounted(async () => {
   const queryModule = String(route.query.module || '')
-  if (moduleMenus.some((menu) => menu.key === queryModule)) {
+  if (enabledModules.includes(queryModule)) {
     activeModule.value = queryModule
   }
-  if (!moduleMenus.some((menu) => menu.key === activeModule.value)) {
+  if (!enabledModules.includes(activeModule.value)) {
     activeModule.value = 'manual-journal'
   }
   persistActiveModule()
@@ -971,6 +977,8 @@ onMounted(async () => {
 .menu-chip { background: #191919; border: 1px solid #2f3a4a; border-radius: 10px; color: #ececec; padding: 10px; display: grid; gap: 2px; text-align: left; cursor: pointer; }
 .menu-chip small { color: #a8a8a8; font-size: 11px; }
 .menu-chip.active { border-color: #c9a24d; background: #242017; }
+.menu-chip.disabled { opacity: 0.6; cursor: not-allowed; }
+.coming-soon { color: #f3b95a !important; font-weight: 600; }
 .report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .report-card { background: #171717; border: 1px solid #303030; border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
 .mini-table { width: 100%; border-collapse: collapse; margin-top: 10px; }

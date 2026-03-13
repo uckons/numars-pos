@@ -68,5 +68,12 @@ router.post(
   c.upsertPrinterTarget
 )
 
+router.delete(
+  "/printer-targets/:id",
+  allowAdminManager,
+  audit("DELETE_PRINTER_TARGET"),
+  c.deletePrinterTarget
+)
+
 
 module.exports = router

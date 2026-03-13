@@ -49,10 +49,11 @@
           <small v-if="order.note" class="note-line">📝 {{ order.note }}</small>
         </button>
 
-        <div class="actions" v-if="!['DELIVERED','CANCELLED'].includes(order.status)">
+        <div class="actions">
           <button v-if="order.status === 'PENDING'" class="btn-accept" @click="accept(order.id)">Accept</button>
           <button v-if="order.status === 'ACCEPTED'" class="btn-success" @click="deliver(order.id)">Deliver</button>
           <button v-if="order.status === 'ACCEPTED'" class="btn-danger" @click="cancel(order.id)">Cancel</button>
+          <button class="btn-light" @click="reprintBarTicket(order.id)">Reprint</button>
         </div>
       </div>
 
@@ -141,6 +142,7 @@
         </div>
 
         <div class="modal-actions">
+          <button class="btn-light" @click="reprintBarTicket(selectedInboxOrder.id)">Reprint</button>
           <button class="btn-light" @click="closeInboxDetail">Tutup</button>
         </div>
       </div>
@@ -321,6 +323,15 @@ const deliver = async (id, fromModal = false) => {
   })
 
   if (fromModal) closeInboxDetail()
+}
+
+const reprintBarTicket = async (id) => {
+  try {
+    await api.post(`/orders/bar/${id}/reprint`)
+    await Swal.fire({ icon: "success", title: "Reprint dikirim", text: "Tiket BAR berhasil dikirim ulang ke printer." })
+  } catch (err) {
+    await Swal.fire({ icon: "error", title: "Reprint gagal", text: err.response?.data?.message || err.message || "Gagal reprint tiket BAR" })
+  }
 }
 
 const cancel = async (id, fromModal = false) => {

@@ -13,34 +13,41 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestBluetoothPermissionIfNeeded()
+        requestNotificationPermissionIfNeeded()
 
         val prefs = getSharedPreferences(PrintAgentService.PREFS_NAME, Context.MODE_PRIVATE)
 
         val tokenInput = EditText(this).apply { hint = "Token (x-print-agent-token)" }
         val macInput = EditText(this).apply { hint = "MAC printer bluetooth (contoh: 66:22:AA:BB:CC:DD)" }
+        val hostInput = EditText(this).apply { hint = "Host listen (default 0.0.0.0)" }
         val portInput = EditText(this).apply { hint = "Port (default 19000)" }
         val status = TextView(this)
 
         tokenInput.setText(prefs.getString(PrintAgentService.KEY_TOKEN, ""))
         macInput.setText(prefs.getString(PrintAgentService.KEY_PRINTER_MAC, ""))
+        hostInput.setText(prefs.getString(PrintAgentService.KEY_HOST, PrintAgentService.DEFAULT_HOST))
         portInput.setText(prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT).toString())
 
         val saveBtn = Button(this).apply {
             text = "Simpan Config"
             setOnClickListener {
                 val port = portInput.text.toString().toIntOrNull() ?: PrintAgentService.DEFAULT_PORT
+                val host = hostInput.text.toString().trim().substringBefore("/").ifBlank { PrintAgentService.DEFAULT_HOST }
                 prefs.edit()
                     .putString(PrintAgentService.KEY_TOKEN, tokenInput.text.toString())
                     .putString(PrintAgentService.KEY_PRINTER_MAC, macInput.text.toString())
                     .putInt(PrintAgentService.KEY_PORT, port)
+                    .putString(PrintAgentService.KEY_HOST, host)
                     .apply()
-                status.text = "Config tersimpan."
+                status.text = "Config tersimpan (listen $host:$port)."
             }
         }
 
@@ -49,7 +56,20 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 ContextCompat.startForegroundService(this@MainActivity, Intent(this@MainActivity, PrintAgentService::class.java))
                 val port = prefs.getInt(PrintAgentService.KEY_PORT, PrintAgentService.DEFAULT_PORT)
-                status.text = "Agent berjalan di http://0.0.0.0:$port"
+                val host = prefs.getString(PrintAgentService.KEY_HOST, PrintAgentService.DEFAULT_HOST).orEmpty().substringBefore("/").ifBlank { PrintAgentService.DEFAULT_HOST }
+                status.text = "Mencoba start agent di http://$host:$port ..."
+
+                Thread {
+                    Thread.sleep(800)
+                    val healthCheck = checkLocalHealth(port)
+                    runOnUiThread {
+                        status.text = if (healthCheck == null) {
+                            "Agent berjalan di http://$host:$port"
+                        } else {
+                            "Agent gagal start: $healthCheck"
+                        }
+                    }
+                }.start()
             }
         }
 
@@ -66,6 +86,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(32, 48, 32, 32)
             addView(tokenInput)
             addView(macInput)
+            addView(hostInput)
             addView(portInput)
             addView(saveBtn)
             addView(startBtn)
@@ -74,6 +95,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(container)
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1002)
+        }
+    }
+
+    private fun checkLocalHealth(port: Int): String? {
+        return try {
+            val connection = (URL("http://127.0.0.1:$port/health").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 3000
+                readTimeout = 3000
+                requestMethod = "GET"
+            }
+            connection.connect()
+            if (connection.responseCode in 200..299) null else "HTTP ${connection.responseCode}"
+        } catch (e: Exception) {
+            e.message ?: "unknown error"
+        }
     }
 
     private fun requestBluetoothPermissionIfNeeded() {
