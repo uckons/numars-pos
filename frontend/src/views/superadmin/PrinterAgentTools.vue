@@ -83,7 +83,10 @@
             <td>
               <span class="status" :class="t.is_active ? 'active' : 'inactive'">{{ t.is_active ? 'ACTIVE' : 'DISABLED' }}</span>
             </td>
-            <td><button class="btn tiny" @click="pickTarget(t)">Edit</button></td>
+            <td class="row-actions">
+              <button class="btn tiny" @click="pickTarget(t)">Edit</button>
+              <button class="btn tiny danger" :disabled="loading" @click="deleteTarget(t)">Delete</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -165,6 +168,31 @@ const pickTarget = (target) => {
     agent_token: target.agent_token || "",
     agent_printer_name: target.agent_printer_name || "",
     is_active: Boolean(target.is_active)
+  }
+}
+
+const deleteTarget = async (target) => {
+  const branchName = target.branch_name || "GLOBAL"
+  const result = await Swal.fire({
+    icon: "warning",
+    title: "Delete printer route?",
+    text: `Route ${branchName} / ${target.channel} akan dihapus permanen.`,
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete",
+    cancelButtonText: "Cancel"
+  })
+
+  if (!result.isConfirmed) return
+
+  loading.value = true
+  try {
+    await api.delete(`/superadmin/printer-targets/${target.id}`)
+    await loadBackendTargets()
+    await Swal.fire({ icon: "success", title: "Terhapus", text: "Route printer berhasil dihapus." })
+  } catch (err) {
+    await Swal.fire({ icon: "error", title: "Gagal hapus", text: err.response?.data?.message || err.message || "Gagal menghapus printer target" })
+  } finally {
+    loading.value = false
   }
 }
 
@@ -281,6 +309,8 @@ input, select { background: #0f0f0f; border: 1px solid #444; color: #fff; border
 .btn { border: 1px solid #444; background: #1f1f1f; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
 .btn.gold { background: #c9a24d; color: #111; border-color: #c9a24d; font-weight: 700; }
 .btn.tiny { padding: 6px 10px; font-size: 12px; }
+.btn.danger { background: #3a1717; border-color: #763434; color: #ffb4b4; }
+.row-actions { display: flex; gap: 6px; align-items: center; }
 .result { margin-top: 14px; border-top: 1px solid #2b2b2b; padding-top: 12px; overflow-x: auto; }
 .target-table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .target-table th, .target-table td { border-bottom: 1px solid #2c2c2c; padding: 8px; text-align: left; font-size: 12px; }
