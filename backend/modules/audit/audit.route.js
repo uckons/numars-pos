@@ -3,7 +3,7 @@ const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 const db = require("../../config/db")
 
-router.get("/", auth, rbac(["SuperAdmin"]), async (req, res) => {
+router.get("/", auth, rbac(["SuperAdmin", "Manager"]), async (req, res) => {
   const { user_id, from, to, action } = req.query
   const page = Math.max(1, Number(req.query.page) || 1)
   const pageSize = Math.min(200, Math.max(10, Number(req.query.page_size) || 50))
@@ -46,9 +46,10 @@ router.get("/", auth, rbac(["SuperAdmin"]), async (req, res) => {
       a.target,
       a.created_at,
       COALESCE(u.username, 'Unknown User') AS username,
-      '-'::text AS role
+      COALESCE(r.name, '-') AS role
     FROM audit_logs a
     LEFT JOIN users u ON u.id = a.user_id
+    LEFT JOIN roles r ON r.id = u.role_id
     WHERE ${where}
     ORDER BY a.created_at DESC
     LIMIT $${params.length + 1}

@@ -2000,6 +2000,13 @@ exports.acceptBarOrder = async (req, res) => {
 
     if (!rows.length) return res.status(404).json({ message: "Inbox order not found" })
 
+    await writeAuditEntry(db, req.user?.id, "BAR_ORDER_ACCEPT", {
+      bar_order_id: Number(rows[0].id),
+      order_id: Number(rows[0].order_id),
+      branch_id: Number(rows[0].branch_id),
+      status: rows[0].status
+    })
+
     res.json(rows[0])
   } catch (err) {
     res.status(400).json({ message: err.message })
@@ -2049,6 +2056,14 @@ exports.deliverBarOrder = async (req, res) => {
       title: `Order #${bo.order_id} siap dikirim`,
       message: "Items dari staff bar sudah delivered.",
       payload: { items }
+    })
+
+    await writeAuditEntry(db, req.user?.id, "BAR_ORDER_DELIVER", {
+      bar_order_id: Number(barOrderId),
+      order_id: Number(bo.order_id),
+      branch_id: Number(bo.branch_id),
+      item_count: items.length,
+      items
     })
 
     await db.query("COMMIT")
@@ -2162,6 +2177,17 @@ exports.cancelBarOrder = async (req, res) => {
         : `Item tambahan order #${bo.order_id} dibatalkan`,
       message: `Alasan: ${note}`,
       payload: { cancelled_items: cancelledItems, delivered_items: deliveredItems, note, updated_total: updatedTotal }
+    })
+
+    await writeAuditEntry(db, req.user?.id, "BAR_ORDER_CANCEL", {
+      bar_order_id: Number(barOrderId),
+      order_id: Number(bo.order_id),
+      branch_id: Number(bo.branch_id),
+      note,
+      next_status: nextStatus,
+      cancelled_items: cancelledItems,
+      delivered_items: deliveredItems,
+      updated_total: updatedTotal
     })
 
     await db.query("COMMIT")
@@ -2309,6 +2335,12 @@ exports.reprintBarOrder = async (req, res) => {
     const ticketNote = [roomName ? `Room/Sofa: ${roomName}` : null, bo.note || null]
       .filter(Boolean)
       .join(" | ") || null
+
+    await writeAuditEntry(db, req.user?.id, "BAR_ORDER_REPRINT", {
+      bar_order_id: Number(bo.id),
+      order_id: Number(bo.order_id),
+      branch_id: Number(bo.branch_id)
+    })
 
     await printerService.printBarInboxTicket({
       ticket: {
