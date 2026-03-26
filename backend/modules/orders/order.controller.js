@@ -133,6 +133,12 @@ const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`)
+  await db.query(`
+    UPDATE orders
+    SET paid_at = COALESCE(paid_at, updated_at, created_at)
+    WHERE status = 'PAID'
+      AND paid_at IS NULL
+  `)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
