@@ -133,9 +133,19 @@ const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`)
+  const { rows: updatedAtColumnRows } = await db.query(`
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'orders'
+      AND column_name = 'updated_at'
+    LIMIT 1
+  `)
+  const paidAtFallbackExpr = updatedAtColumnRows.length
+    ? 'COALESCE(paid_at, updated_at, created_at)'
+    : 'COALESCE(paid_at, created_at)'
   await db.query(`
     UPDATE orders
-    SET paid_at = COALESCE(paid_at, updated_at, created_at)
+    SET paid_at = ${paidAtFallbackExpr}
     WHERE status = 'PAID'
       AND paid_at IS NULL
   `)
