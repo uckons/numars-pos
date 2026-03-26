@@ -132,6 +132,7 @@ const ensureOrderPaymentColumns = async (db) => {
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_member_id INT`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_card_no VARCHAR(60)`)
   await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS membership_discount_amount NUMERIC(12,2) DEFAULT 0`)
@@ -645,6 +646,7 @@ exports.close = async (req, res) => {
            discount_amount = $4,
            payment_amount = $5,
            change_amount = $6,
+           paid_at = NOW(),
            membership_member_id = $7,
            membership_card_no = $8,
            membership_discount_amount = $9
@@ -1139,7 +1141,7 @@ exports.createFromPos = async (req, res) => {
 
     // 5️⃣ update total
     await db.query(
-     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6, membership_member_id=$7, membership_card_no=$8, membership_discount_amount=$9 WHERE id=$3",
+     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6, paid_at=NOW(), membership_member_id=$7, membership_card_no=$8, membership_discount_amount=$9 WHERE id=$3",
       [finalTotal, paymentMethod, orderId, discountAmount, paymentAmount, changeAmount, membershipCalc.membershipMemberId, membershipCalc.membershipCardNo, membershipCalc.membershipDiscountAmount]
     )
     const fnbItemsRes = await db.query(
