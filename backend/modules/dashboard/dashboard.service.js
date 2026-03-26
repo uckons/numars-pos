@@ -1,6 +1,31 @@
 const db = require("../../config/db")
 
+const ensureOrdersPaidAtColumn = async () => {
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`)
+  const { rows: updatedAtColumnRows } = await db.query(`
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'orders'
+      AND column_name = 'updated_at'
+    LIMIT 1
+  `)
+  const paidAtFallbackExpr = updatedAtColumnRows.length
+    ? 'COALESCE(paid_at, updated_at, created_at)'
+    : 'COALESCE(paid_at, created_at)'
+  await db.query(`
+    UPDATE orders
+    SET paid_at = ${paidAtFallbackExpr}
+    WHERE status = 'PAID'
+      AND paid_at IS NULL
+  `)
+  return updatedAtColumnRows.length
+}
+
 exports.kasir = async (user) => {
+  const hasUpdatedAt = await ensureOrdersPaidAtColumn()
+  const paidAtExpr = hasUpdatedAt
+    ? 'COALESCE(o.paid_at, o.updated_at, o.created_at)'
+    : 'COALESCE(o.paid_at, o.created_at)'
   const branchId = resolveAnalyticsBranchId(user, {})
 
   const activeOrders = await db.query(
@@ -41,8 +66,8 @@ exports.kasir = async (user) => {
      CROSS JOIN outlet_window w
      WHERE o.status = 'PAID'
        AND o.branch_id = $1
-       AND o.created_at >= w.start_at
-       AND o.created_at < w.end_at`,
+       AND ${paidAtExpr} >= w.start_at
+       AND ${paidAtExpr} < w.end_at`,
     [branchId]
   )
 
@@ -190,6 +215,10 @@ const resolveRange = ({ preset, date_from, date_to, open_time, close_time }) => 
 }
 
 exports.kasirAnalytics = async (user, query = {}) => {
+  const hasUpdatedAt = await ensureOrdersPaidAtColumn()
+  const paidAtExpr = hasUpdatedAt
+    ? 'COALESCE(o.paid_at, o.updated_at, o.created_at)'
+    : 'COALESCE(o.paid_at, o.created_at)'
   const branchId = resolveAnalyticsBranchId(user, {})
   const preset = String(query.preset || "monthly").toLowerCase()
 
@@ -229,8 +258,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
       SELECT
         o.id,
         o.total,
-        o.created_at,
-        timezone('Asia/Jakarta', o.created_at)::date AS business_date,
+        ${paidAtExpr} AS created_at,
+        timezone('Asia/Jakarta', ${paidAtExpr})::date AS business_date,
         COALESCE(order_totals.gross_subtotal, 0) AS gross_subtotal,
         CASE
           WHEN COALESCE(order_totals.gross_subtotal, 0) > 0 THEN COALESCE(o.total, 0) / order_totals.gross_subtotal
@@ -238,8 +267,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
         END AS net_ratio
       FROM orders o
       JOIN business_windows bw
-        ON timezone('Asia/Jakarta', o.created_at) >= bw.window_start
-       AND timezone('Asia/Jakarta', o.created_at) < bw.window_end
+        ON timezone('Asia/Jakarta', ${paidAtExpr}) >= bw.window_start
+       AND timezone('Asia/Jakarta', ${paidAtExpr}) < bw.window_end
       LEFT JOIN LATERAL (
         SELECT COALESCE(SUM(oi.subtotal), 0) AS gross_subtotal
         FROM order_items oi
