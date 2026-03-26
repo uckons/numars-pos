@@ -683,7 +683,8 @@ exports.startTimer = async (req, res) => {
         const baseMinutes = rawMinutes > 0 ? rawMinutes : durationNum
 
         if (!isKaraokeService && comboQty > 1) {
-          return Math.max(1, baseMinutes - COMBO_DURATION_DEDUCTION_MINUTES)
+          const deductedMinutes = Math.max(1, baseMinutes - COMBO_DURATION_DEDUCTION_MINUTES)
+          return deductedMinutes * comboQty
         }
 
         return baseMinutes
