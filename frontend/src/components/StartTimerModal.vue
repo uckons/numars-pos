@@ -8,6 +8,7 @@
 
     <div class="divider"></div>
 
+    <div class="modal-content">
     <div class="field">
       <label>Tipe Layanan</label>
       <select v-model="selectedOrderType" @change="onTypeChange" :disabled="loadingServices">
@@ -110,6 +111,7 @@
 
     <div v-if="errorMessage" class="error-message">
       {{ errorMessage }}
+    </div>
     </div>
 
     <div class="actions">
@@ -835,19 +837,30 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 12px;
+  overflow-y: auto;
   z-index: 999;
 }
 
 .modal {
   width: 420px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   background: linear-gradient(180deg, #0f0f0f, #0a0a0a);
   border: 1px solid #2a2a2a;
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
   border-radius: 16px;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 .modal-header {
   text-align: center;
+}
+
+.modal-content {
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .therapist-grid {
@@ -913,9 +926,10 @@ onMounted(() => {
   color: #ff6b6b;
 }
 .actions {
-  margin-top: 16px;
+  margin-top: 12px;
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
 }
 .cancel, .start {
   flex: 1;
