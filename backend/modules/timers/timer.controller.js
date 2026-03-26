@@ -677,10 +677,18 @@ exports.startTimer = async (req, res) => {
         comboTotal += Math.round(addonPerTherapist)
       }
 
-      const comboDurationMinutes = comboSelections.reduce(
-        (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
-        0
-      ) || durationNum
+      const COMBO_DURATION_DEDUCTION_MINUTES = 15
+      const timerDurations = timerEntries.map((entry) => {
+        const rawMinutes = Number(entry?.service?.duration_minutes || durationNum || 0)
+        const baseMinutes = rawMinutes > 0 ? rawMinutes : durationNum
+
+        if (!isKaraokeService && comboQty > 1) {
+          return Math.max(1, baseMinutes - COMBO_DURATION_DEDUCTION_MINUTES)
+        }
+
+        return baseMinutes
+      })
+      const comboDurationMinutes = Math.max(...timerDurations, durationNum)
       const comboServiceNames = comboSelections
         .map(selection => selection.service.name)
         .filter(Boolean)
@@ -801,7 +809,8 @@ exports.startTimer = async (req, res) => {
       for (let idx = 0; idx < timerEntries.length; idx += 1) {
         const selection = timerEntries[idx]
         const start = new Date()
-        const plannedEnd = new Date(start.getTime() + comboDurationMinutes * 60000)
+        const timerDurationMinutes = Number(timerDurations[idx] || comboDurationMinutes || durationNum)
+        const plannedEnd = new Date(start.getTime() + timerDurationMinutes * 60000)
         const slotNumber = slotNumbers[idx] || slotNumbers[0]
 
         const { rows: timerRows } = await db.query(
