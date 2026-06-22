@@ -39,7 +39,7 @@
   "overrides": {
     "form-data": "^4.0.1",
     "qs": "^6.14.1",
-    "uuid": "^11.1.1",
+    "uuid": "^8.3.2",
     "request": {
       "tough-cookie": "^4.1.4"
     }
