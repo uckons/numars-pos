@@ -8,12 +8,26 @@ const PASSWORD_POLICY = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$
 function usage() {
   return [
     'Penggunaan:',
+    '  npm run user-admin -- doctor',
     '  npm run user-admin -- list',
     '  npm run user-admin -- reset --username <username>',
     '',
     'Password dibaca dari ADMIN_NEW_PASSWORD agar tidak tersimpan di shell history.',
     'Password minimal 8 karakter dan harus memuat huruf kecil, huruf besar, angka, dan simbol.'
   ].join('\n')
+}
+
+function formatError(error) {
+  if (error?.code === 'ECONNREFUSED') {
+    return 'Koneksi database ditolak (ECONNREFUSED). Pastikan PostgreSQL aktif dan DATABASE_URL di backend/.env menunjuk host/port yang benar.'
+  }
+  if (error?.code === '28P01') {
+    return 'Login database ditolak (28P01). Periksa username dan password pada DATABASE_URL di backend/.env.'
+  }
+  if (error?.code === '3D000') {
+    return 'Database tidak ditemukan (3D000). Periksa nama database pada DATABASE_URL di backend/.env.'
+  }
+  return error?.message || error?.code || String(error)
 }
 
 function parseArgs(argv) {
@@ -79,12 +93,15 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL belum dikonfigurasi')
 
   const { command, options } = parseArgs(process.argv.slice(2))
-  if (!['list', 'reset'].includes(command)) throw new Error(usage())
+  if (!['doctor', 'list', 'reset'].includes(command)) throw new Error(usage())
 
   const { Pool } = require('pg')
   const db = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 })
   try {
-    if (command === 'list') {
+    if (command === 'doctor') {
+      const { rows } = await db.query('SELECT current_database() AS database, current_user AS user')
+      console.log(`Koneksi database berhasil: database='${rows[0].database}', user='${rows[0].user}'`)
+    } else if (command === 'list') {
       await listUsers(db)
     } else {
       const user = await resetPassword(db, options.username, process.env.ADMIN_NEW_PASSWORD)
@@ -97,9 +114,9 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(`Gagal: ${error.message}`)
+    console.error(`Gagal: ${formatError(error)}`)
     process.exitCode = 1
   })
 }
 
-module.exports = { PASSWORD_POLICY, listUsers, parseArgs, resetPassword, usage }
+module.exports = { PASSWORD_POLICY, formatError, listUsers, parseArgs, resetPassword, usage }

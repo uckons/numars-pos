@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { PASSWORD_POLICY, parseArgs, resetPassword } = require('../scripts/user-admin')
+const { PASSWORD_POLICY, formatError, parseArgs, resetPassword } = require('../scripts/user-admin')
 
 test('parseArgs membaca username tanpa menerima argumen asing', () => {
   assert.deepEqual(parseArgs(['reset', '--username', 'admin']), {
@@ -14,6 +14,11 @@ test('parseArgs membaca username tanpa menerima argumen asing', () => {
 test('kebijakan password mensyaratkan campuran karakter', () => {
   assert.equal(PASSWORD_POLICY.test('terlalulemah'), false)
   assert.equal(PASSWORD_POLICY.test('AmanBaru!123'), true)
+})
+
+test('formatError memberi petunjuk untuk koneksi database yang ditolak', () => {
+  assert.match(formatError({ code: 'ECONNREFUSED', message: '' }), /PostgreSQL aktif/)
+  assert.equal(formatError(new Error('contoh')), 'contoh')
 })
 
 test('resetPassword menyimpan hash dan menaikkan token version', async () => {
