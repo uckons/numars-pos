@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "NODE_ENV=development node server.js",
+    "user-admin": "node scripts/user-admin.js",
     "print-agent": "node scripts/local-print-agent.js",
     "print-agent:win": "node scripts/local-print-agent.js",
     "migrate:007": "node scripts/apply-migration-007.js",
@@ -17,7 +18,8 @@
     "migrate:010": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f ../database/migrations/010_sprint4_ap_ar_payroll_staff.sql",
     "recon:sprint4": "node scripts/sprint4-recon-job.js",
     "test:sprint4-recon": "node --test tests/sprint4-recon-job.test.js",
-    "test:payroll-flex": "node --test tests/payroll-flex.service.test.js"
+    "test:payroll-flex": "node --test tests/payroll-flex.service.test.js",
+    "test:user-admin": "node --test tests/user-admin.test.js"
   },
   "dependencies": {
     "axios": "^1.13.5",
