@@ -7,7 +7,7 @@
       </div>
       <div class="header-actions">
         <button class="print-btn" @click="printPosReport" :disabled="loading">Cetak POS</button>
-        <button class="print-btn" @click="printReport" :disabled="loading">Cetak A4</button>
+        <button class="print-btn" @click="exportPdfReport" :disabled="loading">Download PDF</button>
         <button class="back-btn floating-back" @click="router.push('/kasir')">Kembali</button>
       </div>
     </header>
@@ -245,6 +245,7 @@ import { useAuthStore } from '@/store/auth.store'
 import Swal from 'sweetalert2'
 import ApexChart from '@/components/ApexChart.vue'
 import { getPrinterAgentConfig } from '@/utils/printerAgentConfig'
+import { downloadPdf } from '@/utils/pdfDocument'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -430,82 +431,49 @@ const printPosReport = async () => {
   }
 }
 
-const printReport = () => {
-  const reportWindow = window.open('', '_blank', 'width=1024,height=768')
-  if (!reportWindow) return
+const reportTable = (title, rows, nameKey = 'service_name') => ({
+  title,
+  columns: [
+    { key: 'name', label: 'Kategori / Layanan', width: 0.5 },
+    { key: 'qty', label: 'Qty', width: 0.15 },
+    { key: 'revenue', label: 'Pendapatan', width: 0.35 }
+  ],
+  rows: rows.map((row) => ({
+    name: row[nameKey] || row.category || '-',
+    qty: row.qty,
+    revenue: `Rp ${format(row.revenue)}`
+  }))
+})
 
+const exportPdfReport = () => {
   const rangeLabel = `${analytics.value.range.from} s/d ${analytics.value.range.to}`
-  const categoryRowsHtml = normalizedBreakdown.value
-    .map((row) => `<tr><td>${row.category}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
-    .join('')
-
-  const fnbRowsHtml = fnbServiceRows.value
-    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
-    .join('')
-
-  const spaRowsHtml = spaServiceRows.value
-    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
-    .join('')
-
-  const lcRowsHtml = lcServiceRows.value
-    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
-    .join('')
-
-  const ktvRowsHtml = ktvServiceRows.value
-    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
-    .join('')
-
-  reportWindow.document.write(`
-    <html>
-      <head>
-        <title>Report Pendapatan Kasir</title>
-        <style>
-          body { font-family: Arial, sans-serif; color: #111; margin: 24px; }
-          h1, h2 { margin: 0 0 8px; }
-          .meta { margin-bottom: 16px; color: #444; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background: #f5f5f5; }
-          .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
-          .summary div { border: 1px solid #ddd; padding: 10px; border-radius: 6px; }
-        </style>
-      </head>
-      <body>
-        <h1>Report Pendapatan Kasir</h1>
-        <p class="meta">Periode: ${rangeLabel}</p>
-        <div class="summary">
-          <div><strong>Total Pendapatan:</strong> Rp ${format(displayRevenueTotal.value)}</div>
-          <div><strong>Total Order PAID:</strong> ${analytics.value.summary.paid_orders}</div>
-          <div><strong>Total Item Terjual:</strong> ${analytics.value.summary.items_sold}</div>
-          <div><strong>Total SPA:</strong> Rp ${format(spaTotalRevenue.value)}</div>
-          <div><strong>Total LC:</strong> Rp ${format(lcTotalRevenue.value)}</div>
-          <div><strong>Total FNB:</strong> Rp ${format(fnbTotalRevenue.value)}</div>
-          <div><strong>Total KTV:</strong> Rp ${format(ktvTotalRevenue.value)}</div>
-          <div><strong>Total Membership:</strong> Rp ${format(membershipTotalRevenue.value)}</div>
-        </div>
-
-        <h2>Recap Kategori (SPA / LC / FNB / KTV)</h2>
-        <table>
-          <thead><tr><th>Kategori</th><th>Qty</th><th>Pendapatan</th></tr></thead>
-          <tbody>${categoryRowsHtml || '<tr><td colspan="3">Belum ada data</td></tr>'}</tbody>
-        </table>
-
-        <h2>Recap Pendapatan FNB (Semua Item)</h2>
-        <table>
-          <thead><tr><th>Item FNB</th><th>Qty</th><th>Pendapatan</th></tr></thead>
-          <tbody>${fnbRowsHtml || '<tr><td colspan="3">Belum ada data FNB</td></tr>'}</tbody>
-          <tfoot><tr><th>Total FNB</th><th>${fnbTotalQty.value}</th><th>Rp ${format(fnbTotalRevenue.value)}</th></tr></tfoot>
-        </table>
-
-        <h2>Recap SPA</h2><table><thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead><tbody>${spaRowsHtml || '<tr><td colspan="3">Belum ada data SPA</td></tr>'}</tbody></table>
-        <h2>Recap LC</h2><table><thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead><tbody>${lcRowsHtml || '<tr><td colspan="3">Belum ada data LC</td></tr>'}</tbody></table>
-        <h2>Recap KTV</h2><table><thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead><tbody>${ktvRowsHtml || '<tr><td colspan="3">Belum ada data KTV</td></tr>'}</tbody></table>
-      </body>
-    </html>
-  `)
-  reportWindow.document.close()
-  reportWindow.focus()
-  reportWindow.print()
+  downloadPdf({
+    title: 'Laporan Pendapatan Kasir',
+    subtitle: `Periode ${rangeLabel}`,
+    metadata: `Dibuat: ${new Date().toLocaleString('id-ID')}`,
+    filename: `laporan-kasir-${analytics.value.range.from}-${analytics.value.range.to}.pdf`,
+    sections: [
+      {
+        title: 'Ringkasan',
+        columns: [{ key: 'label', label: 'Keterangan', width: 0.55 }, { key: 'value', label: 'Nilai', width: 0.45 }],
+        rows: [
+          { label: 'Total Pendapatan', value: `Rp ${format(displayRevenueTotal.value)}` },
+          { label: 'Total Order PAID', value: analytics.value.summary.paid_orders },
+          { label: 'Total Item Terjual', value: analytics.value.summary.items_sold },
+          { label: 'Total SPA', value: `Rp ${format(spaTotalRevenue.value)}` },
+          { label: 'Total LC', value: `Rp ${format(lcTotalRevenue.value)}` },
+          { label: 'Total FNB', value: `Rp ${format(fnbTotalRevenue.value)}` },
+          { label: 'Total KTV', value: `Rp ${format(ktvTotalRevenue.value)}` },
+          { label: 'Total Membership', value: `Rp ${format(membershipTotalRevenue.value)}` }
+        ]
+      },
+      reportTable('Rekap Kategori', normalizedBreakdown.value, 'category'),
+      reportTable('Rekap FNB', fnbServiceRows.value),
+      reportTable('Rekap SPA', spaServiceRows.value),
+      reportTable('Rekap LC', lcServiceRows.value),
+      reportTable('Rekap KTV', ktvServiceRows.value)
+    ]
+  })
 }
 
 const trendChartOptions = computed(() => ({
