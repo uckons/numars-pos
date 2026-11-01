@@ -5,7 +5,7 @@
         <img
           v-if="showLogoImage"
           :src="logoUrl"
-          alt="SKY POS Logo"
+          alt="Nu Mars Spa - Karaoke - Lounge"
           class="logo-image"
           @error="showLogoImage = false"
         />
@@ -61,7 +61,8 @@ const password = ref("")
 const loading = ref(false)
 const error = ref("")
 
-const logoUrl = computed(() => import.meta.env.VITE_LOGIN_LOGO_URL || "/logo-sky.png")
+// Keep the default logo in /public so a clean build + rsync --delete cannot remove it.
+const logoUrl = computed(() => import.meta.env.VITE_LOGIN_LOGO_URL || "/logo-sky.svg")
 const showLogoImage = ref(true)
 
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ""
