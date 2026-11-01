@@ -5,7 +5,7 @@
         <img
           v-if="showLogoImage"
           :src="logoUrl"
-          alt="SKY POS Logo"
+          alt="Nu Mars Spa - Karaoke - Lounge"
           class="logo-image"
           @error="showLogoImage = false"
         />
